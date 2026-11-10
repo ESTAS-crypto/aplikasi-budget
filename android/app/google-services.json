@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "739102948192",
+    "project_id": "putar-jajan-app",
+    "storage_bucket": "putar-jajan-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:739102948192:android:9d8f37b12049e382",
+        "android_client_info": {
+          "package_name": "com.putarjajan.putar_jajan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_putar_jajan_android_api_key"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+

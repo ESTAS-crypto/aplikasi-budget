@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isMember(gid) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/groups/$(gid)/members/$(request.auth.uid));
+    }
+    
+    function isOwner(gid) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/groups/$(gid)).data.ownerUid == request.auth.uid;
+    }
+    
+    // 1. Invite Codes
+    match /inviteCodes/{code} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.gid != null;
+      allow update, delete: if isAuthenticated();
+    }
+    
+    // 2. Groups
+    match /groups/{gid} {
+      // Create: any authenticated user can create a group with themselves as owner
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.memberCount == 1 &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() >= 1 &&
+        request.resource.data.name.size() <= 30;
+        
+      // Read: only members can read group document
+      allow read: if isMember(gid);
+      
+      // Update: owner can update everything; members can only update activeSession (if playPolicy != 'owner') or memberCount
+      allow update: if isMember(gid) && (
+        isOwner(gid) ||
+        (
+          // Non-owner cannot modify group settings
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'name', 'code', 'budgetMode', 'fixedBudget', 'enabledGames', 'pools', 'diceConfig', 'coinBase', 'playPolicy', 'lockPolicy', 'ownerUid'
+          ]) &&
+          (
+            // Join / Leave update
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount']) &&
+             request.resource.data.memberCount <= 10) ||
+            // Active session update allowed only if playPolicy is not 'owner'
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeSession']) &&
+             resource.data.playPolicy != 'owner')
+          )
+        )
+      );
+      
+      // Delete: only owner can delete group
+      allow delete: if isOwner(gid);
+      
+      // Subcollection: members
+      match /members/{uid} {
+        allow read: if isMember(gid) || (isAuthenticated() && request.auth.uid == uid);
+        
+        // Join: member can add themselves with valid display name (1-20 chars)
+        allow create: if isAuthenticated() &&
+          request.auth.uid == uid &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() >= 1 &&
+          request.resource.data.name.size() <= 20;
+          
+        allow update: if isAuthenticated() &&
+          (request.auth.uid == uid || isOwner(gid));
+          
+        allow delete: if isAuthenticated() &&
+          (request.auth.uid == uid || isOwner(gid));
+      }
+      
+      // Subcollection: notes (Append-only catatan budget)
+      match /notes/{noteId} {
+        allow read: if isMember(gid);
+        allow create: if isMember(gid) &&
+          request.resource.data.authorUid == request.auth.uid &&
+          request.resource.data.amount is number &&
+          request.resource.data.amount > 0;
+          
+        allow update: if isMember(gid) &&
+          (resource.data.authorUid == request.auth.uid || isOwner(gid));
+          
+        allow delete: if isMember(gid) &&
+          (resource.data.authorUid == request.auth.uid || isOwner(gid));
+      }
+      
+      // Subcollection: events (Log aktivitas immutable)
+      match /events/{eventId} {
+        allow read: if isMember(gid);
+        allow create: if isMember(gid) &&
+          request.resource.data.actorUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
+

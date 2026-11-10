@@ -1,0 +1,62 @@
+name: putar_jajan
+description: "Aplikasi roda-putar budget ngedate playful neo-brutalist."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.8.1
+  drift: ^2.26.0
+  drift_flutter: ^0.2.4
+  sqlite3_flutter_libs: ^0.5.28
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  flutter_timezone: ^5.1.1
+  shared_preferences: ^2.3.5
+  intl: ^0.20.2
+  share_plus: ^13.3.1
+  flutter_native_splash: ^2.4.4
+  audioplayers: ^6.8.1
+  connectivity_plus: ^7.3.1
+  supabase_flutter: ^2.18.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.26.0
+  build_runner: ^2.4.15
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/fonts/
+    - assets/audio/
+
+  fonts:
+    - family: BricolageGrotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/BricolageGrotesque-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/BricolageGrotesque-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BricolageGrotesque-ExtraBold.ttf
+          weight: 800
+
+flutter_native_splash:
+  color: "#FFD23F"
+  image: "android/app/src/main/res/drawable/ic_stat_notification.png"
+  android_12:
+    color: "#FFD23F"
+    image: "android/app/src/main/res/drawable/ic_stat_notification.png"

@@ -1,0 +1,1200 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/group/models/group_model.dart';
+import '../../../core/group/models/group_member_model.dart';
+import '../../../core/group/models/group_event_model.dart';
+import '../../../core/group/services/group_service.dart';
+import '../../../core/group/services/group_auth_service.dart';
+import '../../../core/group/services/group_game_service.dart';
+import '../../../core/group/widgets/group_important_dialog.dart';
+import '../../../core/group/widgets/scope_switcher.dart';
+import '../../../core/group/painters/group_icons_painter.dart';
+import '../../../core/painters/game_icons_painter.dart';
+import '../../../core/painters/sticker_icons.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../../core/utils/rupiah_formatter.dart';
+import '../../../core/utils/sound_service.dart';
+import '../../../core/widgets/sticker_button.dart';
+import '../../../core/widgets/in_app_toast.dart';
+
+/// Layar 55 & 56: Home Grup - Pilih Permainan
+/// Sesuai acuan visual GGames.dc.html (Layar 55) & GGames2.dc.html (Layar 56)
+class GroupGamesHubView extends ConsumerStatefulWidget {
+  const GroupGamesHubView({super.key});
+
+  @override
+  ConsumerState<GroupGamesHubView> createState() => _GroupGamesHubViewState();
+}
+
+class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _wheelRotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Animasi putaran roda 12 detik linear infinite sesuai GGames.dc.html line 2
+    _wheelRotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _wheelRotationController.dispose();
+    super.dispose();
+  }
+
+  String _formatTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'baru saja';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mnt lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    return '${diff.inDays} hr lalu';
+  }
+
+  Color _getMemberColor(int index) {
+    const palette = [
+      Color(0xFFFF8FC0), // pink
+      Color(0xFF6FB1FF), // blue
+      Color(0xFFB8E986), // green
+      Color(0xFFFFD23F), // yellow
+      Color(0xFF3DDBB0), // mint
+      Color(0xFFFF9F1C), // orange
+      Color(0xFFB8A4FF), // purple
+      Color(0xFFFF6B5A), // coral
+    ];
+    return palette[index.abs() % palette.length];
+  }
+
+  void _navigateToGroupGame(String gameKey) {
+    SoundService.instance.play(Sfx.uiTap);
+    HapticFeedback.lightImpact();
+
+    switch (gameKey.toLowerCase().trim()) {
+      case 'wheel':
+        context.go('/roda');
+        break;
+      case 'dice':
+        context.push('/group/dice');
+        break;
+      case 'capsule':
+        context.push('/group/capsule');
+        break;
+      case 'envelope':
+        context.push('/group/envelope');
+        break;
+      case 'coin':
+        context.push('/group/coin');
+        break;
+      default:
+        context.go('/roda');
+    }
+  }
+
+  void _pickRandomGroupGame(GroupModel group) {
+    SoundService.instance.play(Sfx.uiTap);
+    HapticFeedback.lightImpact();
+
+    final enabled = group.enabledGames;
+    if (enabled.isEmpty) {
+      InAppToast.show(context, message: 'Semua permainan dimatikan pemilik');
+      return;
+    }
+
+    final randomKey = enabled[math.Random.secure().nextInt(enabled.length)];
+    _navigateToGroupGame(randomKey);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeGroupId = ref.watch(activeGroupIdProvider);
+    final activeGroupAsync = ref.watch(activeGroupStreamProvider);
+    final group = activeGroupAsync.valueOrNull ??
+        (activeGroupId != null && activeGroupId.isNotEmpty
+            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
+            : null);
+
+    final membersAsync = ref.watch(activeGroupMembersStreamProvider);
+    final members = membersAsync.valueOrNull ?? [];
+    final unreadCount = ref.watch(unreadActivityCountProvider);
+
+    final authService = ref.watch(groupAuthServiceProvider);
+    final myUid = authService.currentUid ?? '';
+
+    // Bila belum ada grup aktif
+    if (group == null) {
+      return Scaffold(
+        backgroundColor: AppColors.cream,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(unreadCount: 0, group: null),
+                const SizedBox(height: 14),
+                _buildScopeSwitcher(groupName: 'Grup'),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: AppColors.ink, width: 3),
+                    boxShadow: const [
+                      BoxShadow(color: AppColors.ink, offset: Offset(4, 4), blurRadius: 0),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Belum Ada Grup Aktif',
+                        style: AppTypography.displayMedium.copyWith(fontSize: 20, color: AppColors.ink),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Buat grup baru atau gabung dengan kode undangan untuk bermain bersama teman.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      StickerButton.large(
+                        text: 'BUAT ATAU GABUNG GRUP',
+                        backgroundColor: AppColors.matahari,
+                        textColor: AppColors.ink,
+                        onPressed: () {
+                          context.push('/group/join-or-create');
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(flex: 2),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isSessionLocked = group.isSessionLocked;
+    final activeSession = group.activeSession;
+    final canPlay = group.canUserPlay(myUid);
+    final isFixedMode = group.budgetMode == 'fixed';
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Header (GGames.dc.html line 6)
+              _buildHeader(unreadCount: unreadCount, group: group),
+              const SizedBox(height: 12),
+
+              // 2. ScopeSwitcher (GGames.dc.html line 7)
+              _buildScopeSwitcher(groupName: group.name),
+              const SizedBox(height: 12),
+
+              // 3. Hero Feature: Roda Putar (GGames.dc.html line 7 & GGames2.dc.html line 7)
+              _buildHeroWheelCard(
+                group: group,
+                isLocked: isSessionLocked,
+                isEnabled: group.isGameEnabled('wheel'),
+                canPlay: canPlay,
+                myUid: myUid,
+              ),
+              const SizedBox(height: 14),
+
+              // 4. Grid 2x2: Dadu, Kapsul, Amplop, Koin (GGames.dc.html line 8)
+              _buildGamesGrid(
+                group: group,
+                isLocked: isSessionLocked,
+                canPlay: canPlay,
+                myUid: myUid,
+              ),
+              const SizedBox(height: 14),
+
+              // 5. Status Info Card (GGames.dc.html line 9 vs GGames2.dc.html line 9)
+              _buildStatusCard(
+                group: group,
+                isLocked: isSessionLocked,
+                activeSession: activeSession,
+                members: members,
+                isFixedMode: isFixedMode,
+                myUid: myUid,
+              ),
+              const SizedBox(height: 18),
+
+              // 6. Action Button (GGames.dc.html line 9 vs GGames2.dc.html line 9)
+              _buildBottomActionButton(
+                group: group,
+                isLocked: isSessionLocked,
+                canPlay: canPlay,
+                isFixedMode: isFixedMode,
+                myUid: myUid,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Header Widget ---
+  Widget _buildHeader({required int unreadCount, required GroupModel? group}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Malam ini mau main apa?',
+                style: AppTypography.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Pilih permainan',
+                style: AppTypography.displayMedium.copyWith(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Tombol Aktivitas / Lonceng
+            Semantics(
+              label: unreadCount > 0
+                  ? 'Aktivitas grup, $unreadCount baru'
+                  : 'Aktivitas grup',
+              button: true,
+              child: GestureDetector(
+                onTap: () {
+                  SoundService.instance.play(Sfx.uiTap);
+                  context.push('/group/activity');
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.ink, width: 3),
+                        boxShadow: const [
+                          BoxShadow(color: AppColors.ink, offset: Offset(3, 3), blurRadius: 0),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: const CustomPaint(
+                        size: Size(21, 21),
+                        painter: CustomBellPainter(
+                          color: AppColors.ink,
+                          strokeWidth: 2.8,
+                        ),
+                      ),
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: -5,
+                        top: -5,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 19),
+                          height: 19,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.tomat,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.ink, width: 2),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '$unreadCount',
+                            style: AppTypography.buttonSmall.copyWith(
+                              fontSize: 11,
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Tombol Pengaturan
+            Semantics(
+              label: 'Pengaturan grup',
+              button: true,
+              child: GestureDetector(
+                onTap: () {
+                  SoundService.instance.play(Sfx.uiTap);
+                  if (group != null) {
+                    context.push('/group/budget-settings/${group.id}');
+                  } else {
+                    context.push('/settings');
+                  }
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surface,
+                    border: Border.all(color: AppColors.ink, width: 3),
+                    boxShadow: const [
+                      BoxShadow(color: AppColors.ink, offset: Offset(3, 3), blurRadius: 0),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: const CustomPaint(
+                    size: Size(21, 21),
+                    painter: CustomSettingsIconPainter(
+                      color: AppColors.ink,
+                      strokeWidth: 2.8,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- Scope Switcher ---
+  Widget _buildScopeSwitcher({required String groupName}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: AppColors.ink, width: 3),
+        boxShadow: const [
+          BoxShadow(color: AppColors.ink, offset: Offset(3, 3), blurRadius: 0),
+        ],
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                SoundService.instance.play(Sfx.uiTap);
+                ref.read(appScopeProvider.notifier).state = AppScope.pribadi;
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: Colors.transparent, width: 2),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'Pribadi',
+                  style: AppTypography.buttonSmall.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              decoration: BoxDecoration(
+                color: AppColors.matahari,
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: AppColors.ink, width: 2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'Grup · $groupName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.buttonSmall.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Hero Card: Roda Putar ---
+  Widget _buildHeroWheelCard({
+    required GroupModel group,
+    required bool isLocked,
+    required bool isEnabled,
+    required bool canPlay,
+    required String myUid,
+  }) {
+    final isDimmed = isLocked || !isEnabled;
+
+    return Opacity(
+      opacity: isDimmed ? 0.5 : 1.0,
+      child: GestureDetector(
+        onTap: () {
+          if (!isEnabled) {
+            InAppToast.show(context, message: 'Roda Putar dimatikan oleh pemilik grup');
+            return;
+          }
+          if (isLocked) {
+            if (group.isOwner(myUid)) {
+              _showEndSessionPrompt(group);
+            } else {
+              InAppToast.show(context, message: 'Date berjalan · permainan terkunci');
+            }
+            return;
+          }
+          if (!canPlay) {
+            InAppToast.show(context, message: 'Hanya pemilik yang bisa memainkan');
+            return;
+          }
+          _navigateToGroupGame('wheel');
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.matahari,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.ink, width: 3),
+            boxShadow: const [
+              BoxShadow(color: AppColors.ink, offset: Offset(6, 6), blurRadius: 0),
+            ],
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Roda Putar',
+                          style: AppTypography.displayMedium.copyWith(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Klasik. Putar roda, terima nasib.',
+                          style: AppTypography.bodySmall.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Animated Mini Wheel (96x96 circle)
+                  RotationTransition(
+                    turns: _wheelRotationController,
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.ink, width: 4),
+                        gradient: const SweepGradient(
+                          colors: [
+                            Color(0xFFFF6B5A),
+                            Color(0xFFFF9F1C),
+                            Color(0xFFFFD23F),
+                            Color(0xFF3DDBB0),
+                            Color(0xFF6FB1FF),
+                            Color(0xFFB8A4FF),
+                            Color(0xFFFF8FC0),
+                            Color(0xFFB8E986),
+                            Color(0xFFFF6B5A),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: AppColors.ink, width: 2),
+                  ),
+                  child: Text(
+                    !isEnabled ? 'Dimatikan pemilik' : 'Favorit',
+                    style: AppTypography.buttonSmall.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Grid Permainan 2x2 ---
+  Widget _buildGamesGrid({
+    required GroupModel group,
+    required bool isLocked,
+    required bool canPlay,
+    required String myUid,
+  }) {
+    final diceEnabled = group.isGameEnabled('dice');
+    final capsuleEnabled = group.isGameEnabled('capsule');
+    final envelopeEnabled = group.isGameEnabled('envelope');
+    final coinEnabled = group.isGameEnabled('coin');
+    final isOwner = group.isOwner(myUid);
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildGridItem(
+                title: 'Kocok Dadu',
+                subtitle: 'Dua dadu, hasilnya dikali nominal.',
+                backgroundColor: AppColors.langit,
+                isEnabled: diceEnabled,
+                isLocked: isLocked,
+                canPlay: canPlay,
+                iconPainter: const DiceIconPainter(),
+                onTap: () => _navigateToGroupGame('dice'),
+                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: _buildGridItem(
+                title: 'Gacha Kapsul',
+                subtitle: 'Putar tuas, kapsul jatuh.',
+                backgroundColor: AppColors.permen,
+                isEnabled: capsuleEnabled,
+                isLocked: isLocked,
+                canPlay: canPlay,
+                iconPainter: const CapsuleIconPainter(),
+                onTap: () => _navigateToGroupGame('capsule'),
+                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _buildGridItem(
+                title: 'Pilih Amplop',
+                subtitle: 'Tiga amplop, satu pilihan.',
+                backgroundColor: AppColors.mint,
+                isEnabled: envelopeEnabled,
+                isLocked: isLocked,
+                canPlay: canPlay,
+                iconPainter: const EnvelopeIconPainter(),
+                onTap: () => _navigateToGroupGame('envelope'),
+                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: _buildGridItem(
+                title: 'Lempar Koin',
+                subtitle: 'Gandakan atau setengah.',
+                backgroundColor: AppColors.jeruk,
+                isEnabled: coinEnabled,
+                isLocked: isLocked,
+                canPlay: canPlay,
+                iconPainter: const CoinIconPainter(),
+                onTap: () => _navigateToGroupGame('coin'),
+                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGridItem({
+    required String title,
+    required String subtitle,
+    required Color backgroundColor,
+    required bool isEnabled,
+    required bool isLocked,
+    required bool canPlay,
+    required CustomPainter iconPainter,
+    required VoidCallback onTap,
+    VoidCallback? onLockedTap,
+  }) {
+    final isDimmed = isLocked || !isEnabled;
+
+    return Opacity(
+      opacity: isDimmed ? 0.5 : 1.0,
+      child: GestureDetector(
+        onTap: () {
+          if (!isEnabled) {
+            InAppToast.show(context, message: '$title dimatikan oleh pemilik grup');
+            return;
+          }
+          if (isLocked) {
+            if (onLockedTap != null) {
+              onLockedTap();
+            } else {
+              InAppToast.show(context, message: 'Date berjalan · permainan terkunci');
+            }
+            return;
+          }
+          if (!canPlay) {
+            InAppToast.show(context, message: 'Hanya pemilik yang bisa memainkan');
+            return;
+          }
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.ink, width: 3),
+            boxShadow: const [
+              BoxShadow(color: AppColors.ink, offset: Offset(4, 4), blurRadius: 0),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 64,
+                child: CustomPaint(
+                  size: const Size(64, 64),
+                  painter: iconPainter,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                style: AppTypography.displayMedium.copyWith(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                !isEnabled ? 'Dimatikan pemilik' : subtitle,
+                style: AppTypography.bodySmall.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: !isEnabled ? AppColors.tomat : AppColors.ink,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Status Info Card ---
+  Widget _buildStatusCard({
+    required GroupModel group,
+    required bool isLocked,
+    required GroupSessionModel? activeSession,
+    required List<GroupMemberModel> members,
+    required bool isFixedMode,
+    required String myUid,
+  }) {
+    // 1. Fixed Budget Mode
+    if (isFixedMode) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.ink, width: 3),
+          boxShadow: const [
+            BoxShadow(color: AppColors.ink, offset: Offset(3, 3), blurRadius: 0),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.matahari,
+                border: Border.all(color: AppColors.ink, width: 2.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'Rp',
+                style: AppTypography.buttonSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Budget tetap ${RupiahFormatter.format(group.fixedBudget)}',
+                    style: AppTypography.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  Text(
+                    'Mode angka tetap aktif · Mainkan di tab Pribadi bila ingin solo',
+                    style: AppTypography.bodySmall.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 2. Layar 56: Sesi Terkunci / Date Berjalan
+    if (isLocked && activeSession != null) {
+      final actorInitial = activeSession.startedByName.isNotEmpty
+          ? activeSession.startedByName[0].toUpperCase()
+          : 'A';
+      final gameName = GroupEventModel.formatGameName(activeSession.game);
+      final timeStr = _formatTimeAgo(activeSession.startedAt);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.ink, width: 3),
+          boxShadow: const [
+            BoxShadow(color: AppColors.ink, offset: Offset(3, 3), blurRadius: 0),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.langit,
+                border: Border.all(color: AppColors.ink, width: 3),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                actorInitial,
+                style: AppTypography.buttonSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontSize: 13,
+                        color: AppColors.ink,
+                        height: 1.25,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: activeSession.startedByName,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        TextSpan(text: ' memainkan $gameName'),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'Budget date ini ${RupiahFormatter.format(activeSession.budget)} · $timeStr',
+                    style: AppTypography.bodySmall.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () {
+                if (group.isOwner(myUid)) {
+                  _showEndSessionPrompt(group);
+                } else {
+                  InAppToast.show(context, message: 'Date berjalan · permainan terkunci');
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.matahari,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: AppColors.ink, width: 2),
+                ),
+                child: Text(
+                  'Terkunci',
+                  style: AppTypography.buttonSmall.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 3. Layar 55: Belum Ada Budget
+    final displayMembers = members.take(4).toList();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.ink, width: 3, strokeAlign: BorderSide.strokeAlignCenter),
+      ),
+      child: Row(
+        children: [
+          // Overlapping Avatars
+          if (displayMembers.isNotEmpty)
+            SizedBox(
+              width: 28.0 + (displayMembers.length - 1) * 20.0,
+              height: 28,
+              child: Stack(
+                children: [
+                  for (int i = 0; i < displayMembers.length; i++)
+                    Positioned(
+                      left: i * 20.0,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _getMemberColor(displayMembers[i].colorIndex),
+                          border: Border.all(color: AppColors.ink, width: 3),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          displayMembers[i].name.isNotEmpty
+                              ? displayMembers[i].name[0].toUpperCase()
+                              : 'A',
+                          style: AppTypography.buttonSmall.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.matahari,
+                border: Border.all(color: AppColors.ink, width: 3),
+              ),
+              alignment: Alignment.center,
+              child: const Text('G', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Date ini belum punya budget',
+                  style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    color: AppColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                Text(
+                  'Mainkan satu permainan. Hasilnya jadi budget grup.',
+                  style: AppTypography.bodySmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEndSessionPrompt(GroupModel group) async {
+    final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
+      context,
+      groupName: group.name,
+      budget: group.activeSession?.budget,
+    );
+    if (confirm == true) {
+      await ref.read(groupGameServiceProvider).endSession(gid: group.id);
+      if (mounted) {
+        InAppToast.show(context, message: 'Date grup telah diakhiri. Permainan kini terbuka!');
+      }
+    }
+  }
+
+  // --- Bottom Action Button ---
+  Widget _buildBottomActionButton({
+    required GroupModel group,
+    required bool isLocked,
+    required bool canPlay,
+    required bool isFixedMode,
+    required String myUid,
+  }) {
+    // Mode Fixed Budget: MULAI DATE
+    if (isFixedMode) {
+      if (isLocked) {
+        final isOwner = group.isOwner(myUid);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildPillActionButton(
+              label: 'Date berjalan · permainan terkunci',
+              isDimmed: true,
+              onTap: () {
+                if (isOwner) {
+                  _showEndSessionPrompt(group);
+                } else {
+                  InAppToast.show(context, message: 'Date sedang berjalan');
+                }
+              },
+            ),
+            if (isOwner) ...[
+              const SizedBox(height: 10),
+              StickerButton.large(
+                text: 'AKHIRI DATE GRUP',
+                backgroundColor: AppColors.matahari,
+                textColor: AppColors.ink,
+                borderColor: AppColors.ink,
+                onPressed: () => _showEndSessionPrompt(group),
+              ),
+            ],
+          ],
+        );
+      }
+      if (!canPlay) {
+        return _buildPillActionButton(
+          label: 'Hanya pemilik yang bisa memainkan',
+          isDimmed: true,
+          onTap: () {
+            InAppToast.show(context, message: 'Hanya pemilik grup yang bisa memulai date');
+          },
+        );
+      }
+      return _buildPillActionButton(
+        label: 'MULAI DATE',
+        isDimmed: false,
+        onTap: () async {
+          SoundService.instance.play(Sfx.uiTap);
+          final res = await ref.read(groupGameServiceProvider).startFixedBudgetSession(
+                gid: group.id,
+                fixedBudget: group.fixedBudget,
+              );
+          if (res.success && mounted) {
+            InAppToast.show(context, message: res.message);
+          }
+        },
+      );
+    }
+
+    // Layar 56: Sesi Terkunci
+    if (isLocked) {
+      final isOwner = group.isOwner(myUid);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildPillActionButton(
+            label: 'Date berjalan · permainan terkunci',
+            isDimmed: true,
+            showIcon: true,
+            onTap: () {
+              if (isOwner) {
+                _showEndSessionPrompt(group);
+              } else {
+                InAppToast.show(context, message: 'Date sedang berjalan · Permainan terkunci');
+              }
+            },
+          ),
+          if (isOwner) ...[
+            const SizedBox(height: 10),
+            StickerButton.large(
+              text: 'AKHIRI DATE GRUP',
+              backgroundColor: AppColors.matahari,
+              textColor: AppColors.ink,
+              borderColor: AppColors.ink,
+              onPressed: () => _showEndSessionPrompt(group),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Layar 55: Belum Ada Budget
+    if (!canPlay) {
+      return _buildPillActionButton(
+        label: 'Hanya pemilik yang bisa memainkan',
+        isDimmed: true,
+        showIcon: false,
+        onTap: () {
+          InAppToast.show(context, message: 'Kebijakan grup: hanya pemilik yang bisa memutar');
+        },
+      );
+    }
+
+    return _buildPillActionButton(
+      label: 'Acak aja, serahkan ke aplikasi',
+      isDimmed: false,
+      showIcon: true,
+      onTap: () => _pickRandomGroupGame(group),
+    );
+  }
+
+  Widget _buildPillActionButton({
+    required String label,
+    required bool isDimmed,
+    bool showIcon = false,
+    required VoidCallback onTap,
+  }) {
+    return Opacity(
+      opacity: isDimmed ? 0.6 : 1.0,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 58,
+          decoration: BoxDecoration(
+            color: AppColors.ink,
+            borderRadius: BorderRadius.circular(29),
+            border: Border.all(color: AppColors.ink, width: 3),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xFF6B5B8A),
+                offset: Offset(4, 4),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (showIcon) ...[
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CustomPaint(
+                    painter: ShuffleIconPainter(
+                      color: AppColors.matahari,
+                      strokeWidth: 2.6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: AppTypography.buttonLarge.copyWith(
+                      color: AppColors.cream,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

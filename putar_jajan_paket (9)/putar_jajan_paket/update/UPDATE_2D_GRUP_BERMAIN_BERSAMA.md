@@ -1,0 +1,36 @@
+# UPDATE 2D: Grup bermain bersama (semua permainan di mode Grup) (Putar Jajan)
+
+Status: aplikasi Putar Jajan sudah SELESAI dan berjalan penuh. UPDATE 1 (permainan dan suara) dan UPDATE 2 (grup, kode undangan, catatan grup, status sinkron, pengaturan budget grup layar 52, 53, 54, 61, model data grup) sudah dipasang. Tugas ini hanya MENAMBAH cara memainkan Roda Putar, Kocok Dadu, Gacha Kapsul, Pilih Amplop, dan Lempar Koin bersama-sama di dalam grup. Jangan membangun ulang atau menilai ulang layar lain, dan jangan mengubah aturan tiap permainan (GameEngine yang ada dipakai apa adanya).
+Notifikasi dan banner untuk hasil permainan TIDAK dikerjakan di sini (lihat UPDATE 2C dan UPDATE 3); di sini hanya menulis event game_result.
+
+## 0. Aturan dan acuan
+- Pelajari struktur kode secukupnya (GameEngine dan layar permainan dari UPDATE 1, repository grup, model event, SyncState) dan pakai ulang. Gaya mengikuti yang sudah ada (token tema, widget Sticker*, ikon custom, tanpa emoji, tanpa ikon bawaan).
+- Acuan visual: design/source GGames (layar 55), GGames2 (56), Grup3 (18, Roda bersama), GDadu (57), GKapsul (58), GAmplop (59), GKoin (60) (sumber kebenaran angka persis); pengaturan yang memengaruhinya: Budget1 (53), BudgetIsi (61), Budget2 (54). Gambar PNG layar ini diekspor dari kanvas bila perlu.
+- Prasyarat data (dari UPDATE 2): dokumen grup memuat enabledGames, pools, diceConfig, coinBase, playPolicy, lockPolicy, budgetMode, fixedBudget, dan session aktif; event bertipe game_result {game, amount, detail}. Jika ada yang belum ada, laporkan di D0 dan lengkapi dulu.
+- Mulai dengan D0 (tanpa kode, singkat) dan tunggu "lanjut".
+
+## 1. Model data yang dipakai (ringkasan dari UPDATE 2)
+- groups/{gid}: name, ownerUid, code, createdAt, memberCount (maks 10), budgetMode ("game" default atau "fixed"), fixedBudget (int rupiah, bila fixed), enabledGames (subset dari wheel, dice, capsule, envelope, coin), pools {wheel: [int], capsule: [int], envelope: [int]} (2 sampai 12 isi; envelope minimal 3; tiap nilai Rp1.000 sampai Rp10.000.000), diceConfig {count 1 sampai 3, multiplier int}, coinBase (int rupiah), playPolicy ("all" default atau "owner"), lockPolicy ("lock" default atau "free"), session aktif {sessionId, budget, game, startedByUid, startedAt, locked}. Hanya pemilik yang boleh menulis name, code, budgetMode, fixedBudget, enabledGames, pools, diceConfig, coinBase, playPolicy, lockPolicy (Security Rules; uji dengan emulator).
+
+## 2. Spesifikasi layar dan aturan
+- 18 Roda bersama: ScopeSwitcher; avatar anggota dan "N anggota online" (presence sederhana lewat lastSeen, jangan membuat boros baterai); roda memakai layar roda yang sudah ada; kartu "putaran terakhir" (siapa, kapan, nominal) dan bar sisa budget grup; (ikon lonceng dan banner dalam aplikasi ditambahkan di UPDATE 3).
+- 55 dan 56 Pilih permainan (home, mode Grup) dan 57 sampai 60 permainan grup (Dadu, Kapsul, Amplop, Koin; Roda memakai layar 18): ScopeSwitcher Pribadi/Grup di home. Pada Grup, kartu permainan sama seperti mode pribadi tetapi hanya permainan di enabledGames yang aktif (yang dimatikan pemilik redup dengan keterangan "Dimatikan pemilik"). Layar permainan menambah baris grup (avatar, "N online", "giliran semua", "hasil dilihat semua") dan bar "Budget grup untuk date ini". Aturan konsistensi: hasil permainan ditentukan DULU di perangkat pemain (Random.secure) memakai pool grup (pools, diceConfig, coinBase), lalu ditulis sebagai event game_result {game, amount, detail} dan, bila lockPolicy == lock dan belum ada budget sesi, sebagai session baru {budget = amount, game, locked: true} dalam SATU transaksi/batch (dua orang yang bermain bersamaan: sesi yang createdAt server-nya paling awal menang, hasil yang lain ditandai "tidak berlaku" di feed dan pemainnya melihat pesan ramah). Perangkat penerima TIDAK memutar ulang animasi; mereka melihat kartu "X memainkan <permainan>" dan budget baru. Saat sesi locked (layar 56): semua kartu permainan dan tombol aksi dinonaktifkan dengan label "Date berjalan · permainan terkunci"; terbuka lagi saat sesi selesai, atau selalu terbuka jika lockPolicy == free (hasil terbaru menggantikan budget sesi). playPolicy == owner: tombol aksi anggota biasa dinonaktifkan dengan keterangan "Hanya pemilik yang bisa memainkan". Lempar Koin beruntun: hanya satu pemain pada satu waktu (kunci giliran lewat dokumen sesi); anggota lain melihat tiap lemparan lewat banner; hanya nominal akhir (setelah "Ambil") yang menjadi budget. Pilih Amplop: tiga nominal diundi dari pools.envelope di perangkat pemain; setelah dibuka, isi dua amplop lain ditampilkan redup untuk semua. Mode budgetMode == fixed: tab Grup di home menampilkan kartu "Budget tetap RpX" dan tombol MULAI DATE (permainan tetap bisa dimainkan di tab Pribadi).
+
+## 3. Perilaku tiap permainan di mode Grup
+- Roda Putar: layar Roda bersama (18); roda memakai pools.wheel; hasil ditentukan di perangkat pemain; perangkat lain menerima kartu "X memutar roda" dan budget baru tanpa memutar ulang animasi.
+- Kocok Dadu (57): jumlah dadu dan kelipatan dari diceConfig; budget = jumlah mata x kelipatan; event detail memuat nilai tiap dadu.
+- Gacha Kapsul (58): jumlah kapsul di kubah mengikuti pools.capsule (maks 12); event detail memuat indeks kapsul.
+- Pilih Amplop (59): tiga nominal diundi dari pools.envelope di perangkat pemain; setelah dibuka, isi dua amplop lain tampil redup untuk semua anggota.
+- Lempar Koin (60): nominal dasar coinBase, 1 sampai 3 lemparan; hanya satu pemain pada satu waktu (kunci giliran di dokumen sesi); anggota lain melihat tiap lemparan lewat banner ringan; hanya nominal akhir setelah "Ambil" yang menjadi budget.
+- Permainan yang dimatikan pemilik (enabledGames) tampil redup dengan keterangan "Dimatikan pemilik" dan tidak bisa dibuka.
+
+## 4. Tahapan (berhenti di tiap tahap, tunggu "lanjut")
+- D0: ringkas struktur kode relevan, cek prasyarat data, rencana per file. Tanpa kode.
+- D1: lapisan sesi grup: GroupGameService (mulai permainan, klaim sesi dalam satu transaksi, tulis event game_result, kunci dan buka kunci, kunci giliran koin) + Security Rules untuk playPolicy dan lockPolicy; unit test dan uji emulator.
+- D2: home grup (55, 56): pemilih Pribadi/Grup, kondisi belum ada budget dan terkunci, permainan yang dimatikan.
+- D3: Roda bersama (18) dan Kocok Dadu (57).
+- D4: Gacha Kapsul (58) dan Pilih Amplop (59).
+- D5: Lempar Koin (60), mode Angka tetap (MULAI DATE), polish.
+
+## 5. Pengujian dan kriteria selesai
+Unit test: hasil selalu berasal dari pool grup yang benar; transaksi klaim sesi (dua pemain bersamaan: hanya satu yang menang, yang lain mendapat pesan ramah); lockPolicy lock vs free; playPolicy owner menolak anggota (juga di Security Rules); kunci giliran koin; fixed budget membuat sesi tanpa game_result. Uji emulator dua klien: A dan B online, A memainkan dadu, B melihat budget baru dan kartu "A memainkan Kocok Dadu" tanpa animasi ulang, permainan B terkunci. Golden test layar 55, 56, 57, 58, 59, 60 pada lebar 320 dan 390dp dan textScale 1.3 tanpa overflow. Selesai bila semua permainan bisa dimainkan di grup, hasilnya konsisten di semua anggota, penguncian dan kebijakan siapa boleh bermain bekerja, mode pribadi tidak berubah, tidak ada emoji atau ikon bawaan, dan flutter analyze bersih.
