@@ -78,10 +78,18 @@ class _GroupRealtimeNotificationListenerState
     });
   }
 
+  ClockSyncService? _clockSyncService;
+
   @override
   void initState() {
     super.initState();
     _listenerStartTime = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _clockSyncService?.stopPeriodicSync();
+    super.dispose();
   }
 
   void _loadSeenEventIdsSync(String gid, SharedPreferences prefs) {
@@ -110,14 +118,15 @@ class _GroupRealtimeNotificationListenerState
       if (activeGid != null && activeGid.isNotEmpty) {
         _loadSeenEventIdsSync(activeGid, prefs);
         final gs = ref.read(groupServiceProvider);
-        ref.read(clockSyncServiceProvider).startPeriodicSync(
+        _clockSyncService = ref.read(clockSyncServiceProvider);
+        _clockSyncService!.startPeriodicSync(
           activeGid,
           firestore: gs.firestore,
           supabase: gs.supabase,
           uid: ref.read(groupAuthServiceProvider).currentUid,
         );
       } else {
-        ref.read(clockSyncServiceProvider).stopPeriodicSync();
+        _clockSyncService?.stopPeriodicSync();
       }
     }
 

@@ -41,8 +41,6 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     with TickerProviderStateMixin {
   late AnimationController _spinController;
   late Animation<double> _spinAnimation;
-  late AnimationController _pointerFlickController;
-  late Animation<double> _pointerFlickAnimation;
 
   double _currentRotationAngle = 0.0;
   double _lastAngleForHaptic = 0.0;
@@ -87,23 +85,6 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       duration: const Duration(seconds: 5),
     );
 
-    _pointerFlickController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 140),
-    );
-    _pointerFlickAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: -12.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 35,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: -12.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.bounceOut)),
-        weight: 65,
-      ),
-    ]).animate(_pointerFlickController);
-
     _spinAnimation = CurvedAnimation(
       parent: _spinController,
       curve: const Cubic(0.12, 0.7, 0.1, 1.0),
@@ -133,7 +114,6 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     _spinController.removeListener(_onSpinTick);
     _spinController.removeStatusListener(_onSpinStatus);
     _spinController.dispose();
-    _pointerFlickController.dispose();
     for (final tp in _textPaintersCache.values) {
       tp.dispose();
     }
@@ -141,18 +121,21 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
   }
 
   void _onSpinTick() {
-    setState(() {
-      _currentRotationAngle = _spinAnimation.value;
-    });
-
-    final deltaHaptic = (_currentRotationAngle - _lastAngleForHaptic).abs();
-    final sliceAngle = 360.0 / _currentSlots.length;
-    if (deltaHaptic >= sliceAngle) {
-      _lastAngleForHaptic = _currentRotationAngle;
+    final newAngle = _spinAnimation.value;
+    final crossed = WheelMath.hasCrossedSliceBoundary(
+      previousAngle: _lastAngleForHaptic,
+      currentAngle: newAngle,
+      totalSlots: _currentSlots.length,
+    );
+    if (crossed) {
+      _lastAngleForHaptic = newAngle;
       SoundService.instance.play(Sfx.wheelTick1);
       HapticFeedback.selectionClick();
-      _pointerFlickController.forward(from: 0.0);
     }
+
+    setState(() {
+      _currentRotationAngle = newAngle;
+    });
   }
 
   Future<void> _onSpinStatus(AnimationStatus status) async {
@@ -213,6 +196,18 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
         _spectatorActorUid = null;
       });
 
+      // 0ms LOCAL-FIRST: Update dan simpan langsung ke local group agar tab Catatan & seluruh app
+      // langsung mengenali budget aktif seketika tanpa harus menunggu respons jaringan!
+      final activeGid = ref.read(groupServiceProvider).getActiveGroupId();
+      if (activeGid != null) {
+        final localGroup = ref.read(groupServiceProvider).getLocalGroup(activeGid);
+        if (localGroup != null) {
+          final updated = localGroup.copyWith(activeSession: liveSession);
+          await ref.read(groupServiceProvider).saveLocalGroup(updated);
+          ref.read(groupServiceProvider).notifyGroupChanged(activeGid, updated);
+        }
+      }
+
       // Feedback hasil putaran pada layar (snackbar & kartu budget)
       if (mounted) {
         final formattedBudget = RupiahFormatter.format(won);
@@ -237,6 +232,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               gid: activeGroup.id,
               game: 'wheel',
               amount: won,
+              customSessionId: effectiveSessionId,
               detail: {
                 'slot_index': winningIndex,
                 'amount': won,
@@ -320,9 +316,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final winningIndex = secureRandom.nextInt(totalSlots);
     final wonAmount = _currentSlots[winningIndex];
 
-    final jitterRange = segAngle * 0.3;
-    final jitter = (secureRandom.nextDouble() * 2 - 1) * jitterRange;
-    final targetNormalizedAngle = ((360.0 - (winningIndex * segAngle + segAngle / 2.0) + jitter) % 360.0 + 360.0) % 360.0;
+    // Presisi 100%: Jarum lancip berhenti tepat tegak lurus di tengah irisan nominal yang menang
+    final targetNormalizedAngle = ((360.0 - (winningIndex * segAngle + segAngle / 2.0)) % 360.0 + 360.0) % 360.0;
 
     final startNormalized = (_currentRotationAngle % 360.0 + 360.0) % 360.0;
     double forwardDelta = targetNormalizedAngle - startNormalized;
@@ -335,9 +330,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
 
     final clockSync = ref.read(clockSyncServiceProvider);
     final serverNowMs = clockSync.serverNowMs;
-    // F2: hitung startAtMs = serverNow + 1500 (jeda agar semua HP sempat menerima)
-    final startAtMs = serverNowMs + 1500;
-    const durationMs = 6000;
+    // Nol delay: Siaran dikirim seketika, animasi langsung berjalan lancar dan responsif
+    final startAtMs = serverNowMs;
+    const durationMs = 3800;
     final spinSessionId = 'sess_${serverNowMs}_${secureRandom.nextInt(9999)}';
     _currentSpinSessionId = spinSessionId;
 
@@ -375,21 +370,10 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       ),
     );
 
-    // Host juga memulai animasinya pada startAtMs, bukan seketika, supaya sejajar dengan anggota
-    final delayMs = startAtMs - clockSync.serverNowMs;
-    if (delayMs > 0) {
-      Timer(Duration(milliseconds: delayMs), () {
-        if (mounted && _isSpinning) {
-          SoundService.instance.play(Sfx.wheelSpin);
-          HapticFeedback.mediumImpact();
-          _spinController.forward(from: 0.0);
-        }
-      });
-    } else {
-      SoundService.instance.play(Sfx.wheelSpin);
-      HapticFeedback.mediumImpact();
-      _spinController.forward(from: 0.0);
-    }
+    // Animasi putaran langsung dimulai seketika (0ms delay)
+    SoundService.instance.play(Sfx.wheelSpin);
+    HapticFeedback.mediumImpact();
+    _spinController.forward(from: 0.0);
   }
 
   void _onPanStart(DragStartDetails details, Offset wheelCenter, {required bool canSpin, required String ownerName}) {
@@ -408,9 +392,21 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final touchPos = details.localPosition;
     final currentTouchAngle = math.atan2(touchPos.dy - wheelCenter.dy, touchPos.dx - wheelCenter.dx) * (180 / math.pi);
     final delta = currentTouchAngle - _panStartAngle;
+    final newAngle = _panCurrentAngle + delta;
+
+    final crossed = WheelMath.hasCrossedSliceBoundary(
+      previousAngle: _lastAngleForHaptic,
+      currentAngle: newAngle,
+      totalSlots: _currentSlots.length,
+    );
+    if (crossed) {
+      _lastAngleForHaptic = newAngle;
+      SoundService.instance.play(Sfx.wheelTick1);
+      HapticFeedback.selectionClick();
+    }
 
     setState(() {
-      _currentRotationAngle = _panCurrentAngle + delta;
+      _currentRotationAngle = newAngle;
     });
   }
 
@@ -1391,19 +1387,17 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
             child: SizedBox(
               width: size,
               height: size,
-              child: AnimatedBuilder(
-                animation: _pointerFlickAnimation,
-                builder: (context, child) {
-                  return CustomPaint(
-                    size: Size(size, size),
-                    painter: WheelPainter(
-                      slots: _currentSlots,
-                      rotationAngleDegrees: _currentRotationAngle,
-                      cachedTextPainters: _textPaintersCache,
-                      pointerFlickAngleDegrees: _pointerFlickAnimation.value,
-                    ),
-                  );
-                },
+              child: CustomPaint(
+                size: Size(size, size),
+                painter: WheelPainter(
+                  slots: _currentSlots,
+                  rotationAngleDegrees: _currentRotationAngle,
+                  cachedTextPainters: _textPaintersCache,
+                  pointerFlickAngleDegrees: WheelMath.calculatePointerFlickAngle(
+                    currentAngle: _currentRotationAngle,
+                    totalSlots: _currentSlots.length,
+                  ),
+                ),
               ),
             ),
           );

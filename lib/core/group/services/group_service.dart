@@ -103,6 +103,9 @@ class GroupService {
     }
   }
 
+  /// Memancarkan perubahan model grup ke seluruh stream listener aktif
+  void notifyGroupChanged(String gid, GroupModel? group) => _notifyGroupChanged(gid, group);
+
   // Pelacak putaran roda yang baru saja mendarat agar notifikasi instan 0ms tidak berulang
   String? _lastShownSpinSessionId;
   DateTime? _lastShownSpinTime;
@@ -371,6 +374,25 @@ class GroupService {
 
     // 1. Kirim ke listener stream lokal
     _notifyLiveSpin(gid, payload);
+
+    final livePlay = LivePlayModel(
+      spinId: eventId ?? 'spin_${DateTime.now().millisecondsSinceEpoch}',
+      game: 'wheel',
+      startAtMs: DateTime.now().millisecondsSinceEpoch,
+      durationMs: durationMs,
+      laps: turns,
+      resultIndex: winningIndex,
+      finalAngle: normalized,
+      amount: budget,
+      startedByUid: uid,
+      startedByName: name,
+      params: {
+        'winningIndex': winningIndex,
+        'budget': budget,
+      },
+    );
+    _saveLocalLivePlay(gid, livePlay);
+    _notifyLivePlay(gid, livePlay);
 
     // 2. Broadcast ke semua perangkat melalui Supabase Realtime channel WebSocket
     if (supabase != null) {
@@ -1117,7 +1139,11 @@ class GroupService {
           final group = GroupModel.fromMap(gid, row);
           final currentLocal = _getLocalGroup(gid);
           final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-          local = group.copyWith(wheelSlots: slots);
+          final effSession = group.activeSession ?? currentLocal?.activeSession;
+          local = group.copyWith(
+            wheelSlots: slots,
+            activeSession: effSession,
+          );
           await _saveLocalGroup(local);
           _notifyGroupChanged(gid, local);
           yield local;
@@ -1131,7 +1157,11 @@ class GroupService {
             final group = GroupModel.fromMap(gid, row);
             final currentLocal = _getLocalGroup(gid);
             final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-            final merged = group.copyWith(wheelSlots: slots);
+            final effSession = group.activeSession ?? currentLocal?.activeSession;
+            final merged = group.copyWith(
+              wheelSlots: slots,
+              activeSession: effSession,
+            );
             await _saveLocalGroup(merged);
             _notifyGroupChanged(gid, merged);
           }
@@ -1149,8 +1179,13 @@ class GroupService {
                 final group = GroupModel.fromMap(gid, rows.first);
                 final currentLocal = _getLocalGroup(gid);
                 final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-                final merged = group.copyWith(wheelSlots: slots);
+                final effSession = group.activeSession ?? currentLocal?.activeSession;
+                final merged = group.copyWith(
+                  wheelSlots: slots,
+                  activeSession: effSession,
+                );
                 _saveLocalGroup(merged);
+                _notifyGroupChanged(gid, merged);
               }
             }, onError: (_) {});
       } catch (_) {}
@@ -1172,8 +1207,13 @@ class GroupService {
             final group = GroupModel.fromMap(doc.id, doc.data()!);
             final currentLocal = _getLocalGroup(gid);
             final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-            final merged = group.copyWith(wheelSlots: slots);
+            final effSession = group.activeSession ?? currentLocal?.activeSession;
+            final merged = group.copyWith(
+              wheelSlots: slots,
+              activeSession: effSession,
+            );
             await _saveLocalGroup(merged);
+            _notifyGroupChanged(gid, merged);
             yield merged;
           }
         }
@@ -1669,9 +1709,16 @@ class GroupService {
         final row = await supabase!.from('groups').select('*').eq('id', gid).maybeSingle();
         if (row != null) {
           final group = GroupModel.fromMap(gid, row);
-          await _saveLocalGroup(group);
-          _notifyGroupChanged(gid, group);
-          return group;
+          final currentLocal = _getLocalGroup(gid);
+          final effSession = group.activeSession ?? currentLocal?.activeSession;
+          final effSlots = group.wheelSlots ?? currentLocal?.wheelSlots;
+          final merged = group.copyWith(
+            activeSession: effSession,
+            wheelSlots: effSlots,
+          );
+          await _saveLocalGroup(merged);
+          _notifyGroupChanged(gid, merged);
+          return merged;
         }
       } catch (e) {
         debugPrint('[GroupService] fetchGroup Supabase error: $e');

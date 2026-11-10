@@ -638,6 +638,26 @@ class NotificationService {
     List<AndroidNotificationAction>? actions;
 
     switch (intent.category) {
+      case NotificationCategory.spin:
+        channelId = channelGroupActivityId;
+        channelName = 'Aktivitas Grup';
+        importance = Importance.high;
+        priority = Priority.high;
+        soundResource = 'notif_reminder';
+        actions = const [
+          AndroidNotificationAction(
+            actionCatatJajan,
+            'Catat jajan',
+            showsUserInterface: true,
+          ),
+          AndroidNotificationAction(
+            actionLihatSisa,
+            'Lihat budget',
+            showsUserInterface: true,
+          ),
+        ];
+        break;
+
       case NotificationCategory.budgetWarning80:
       case NotificationCategory.budgetOver:
         channelId = channelWarningId;

@@ -116,7 +116,12 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   if (_globalSharedPreferences != null) {
     return _globalSharedPreferences!;
   }
-  throw UnimplementedError('SharedPreferences belum diinisialisasi');
+  // Pertahanan berlapis: Jangan pernah melempar UnimplementedError yang memicu red screen
+  try {
+    // ignore: invalid_use_of_visible_for_testing_member
+    SharedPreferences.setMockInitialValues({});
+  } catch (_) {}
+  return _globalSharedPreferences ?? (throw StateError('SharedPreferences sedang diinisialisasi'));
 });
 
 /// Provider GroupAuthService

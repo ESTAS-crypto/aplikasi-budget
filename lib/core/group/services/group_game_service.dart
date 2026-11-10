@@ -70,7 +70,7 @@ class GroupGameService {
     final actorName = authService.displayName ?? 'Anggota';
     final now = DateTime.now();
 
-    final currentGroup = await groupService.fetchGroup(gid) ?? groupService.getLocalGroup(gid);
+    final currentGroup = groupService.getLocalGroup(gid) ?? await groupService.fetchGroup(gid);
     if (currentGroup == null) {
       return const ClaimSessionResult(
         success: false,
@@ -78,7 +78,7 @@ class GroupGameService {
       );
     }
 
-    final isOwner = currentGroup.ownerUid == uid;
+    final isOwner = currentGroup.isOwner(uid) || authService.isCurrentUser(currentGroup.ownerUid);
 
     final effectiveSessionId = customSessionId ??
         'sess_${now.millisecondsSinceEpoch}_${Random().nextInt(9999)}';
@@ -91,6 +91,7 @@ class GroupGameService {
       group: currentGroup,
       session: existingSession,
       uid: uid,
+      isCurrentUserOwner: isOwner,
     );
     if (!perm.allowed) {
       if (perm.deniedReason == PlayDenied.sessionLocked && existingSession != null) {

@@ -531,6 +531,7 @@ PlayPermissionResult evaluateCanPlay({
   required GroupModel? group,
   GroupSessionModel? session,
   required String uid,
+  bool isCurrentUserOwner = false,
 }) {
   if (group == null) {
     return const PlayPermissionResult(
@@ -548,8 +549,8 @@ PlayPermissionResult evaluateCanPlay({
     );
   }
 
-  // isOwner = group.ownerUid == uid. Tidak ada sumber lain.
-  final isOwner = group.ownerUid == uid;
+  // isOwner = group.ownerUid == uid atau diakui sebagai owner via AuthService/role
+  final isOwner = group.ownerUid == uid || isCurrentUserOwner;
 
   // Pemilik SELALU boleh memutar atau mengulang, kapan pun, termasuk saat sesi terkunci.
   if (isOwner) {

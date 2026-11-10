@@ -125,17 +125,16 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
       _lastAngleForHaptic = targetAngle;
       SoundService.instance.play(Sfx.wheelTick1);
       HapticFeedback.selectionClick();
-      setState(() {
-        _pointerFlickAngle = -12.0;
-      });
-    } else if (_pointerFlickAngle != 0.0) {
-      setState(() {
-        _pointerFlickAngle = 0.0;
-      });
     }
+
+    final flick = WheelMath.calculatePointerFlickAngle(
+      currentAngle: targetAngle,
+      totalSlots: _slots.length,
+    );
 
     setState(() {
       _currentRotationAngle = targetAngle;
+      _pointerFlickAngle = flick;
     });
 
     if (progress >= 1.0 && !_hasLanded) {

@@ -664,7 +664,10 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                                 painter: WheelPainter(
                                   slots: _currentSlots,
                                   rotationAngleDegrees: _currentRotationAngle,
-                                  pointerFlickAngleDegrees: _pointerFlickAnimation.value,
+                                  pointerFlickAngleDegrees: WheelMath.calculatePointerFlickAngle(
+                                    currentAngle: _currentRotationAngle,
+                                    totalSlots: _currentSlots.length,
+                                  ),
                                   cachedTextPainters: _textPaintersCache,
                                 ),
                               );

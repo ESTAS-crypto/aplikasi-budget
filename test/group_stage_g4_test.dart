@@ -12,6 +12,8 @@ import 'package:putar_jajan/core/group/widgets/activity_tile.dart';
 import 'package:putar_jajan/core/group/widgets/sync_legend.dart';
 import 'package:putar_jajan/features/group/screens/group_wheel_view.dart';
 import 'package:putar_jajan/features/group/screens/group_activity_screen.dart';
+import 'package:putar_jajan/core/group/widgets/group_realtime_listener.dart';
+import 'package:putar_jajan/core/group/services/clock_sync_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +44,7 @@ void main() {
         payload: {'budget': 150000},
         createdAt: now,
       );
-      expect(spinEvent.formattedSummary, contains('Raka memutar roda: Rp150000'));
+      expect(spinEvent.formattedSummary, contains('Raka memutar roda: Rp150.000'));
 
       final expenseEvent = GroupEventModel(
         eventId: 'e2',
@@ -265,6 +267,9 @@ void main() {
         ),
       ];
 
+      await testPrefs.setString(GroupAuthService.keyFallbackUid, 'uid_1');
+      await testPrefs.setString(GroupAuthService.keyDisplayName, 'Raka');
+
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -297,8 +302,8 @@ void main() {
       expect(find.text('Sisa budget grup'), findsOneWidget);
       expect(find.text('Rp170.000 / Rp200.000'), findsOneWidget);
 
-      // Putar Roda button
-      expect(find.text('PUTAR RODA'), findsOneWidget);
+      // Putar Roda / Ulangi budget button
+      expect(find.text('ULANGI BUDGET'), findsOneWidget);
     });
 
     testWidgets('Layar 18 & Layar 20 render on 320dp and 390dp with textScale 1.3 without overflow', (tester) async {
@@ -405,6 +410,8 @@ void main() {
     testWidgets('Live spectator mode triggers wheel spinning and shows spectator badge', (tester) async {
       final now = DateTime.now();
       final myUid = testAuthService.currentUid!;
+      final clockSync = ClockSyncService();
+      addTearDown(() => clockSync.stopPeriodicSync());
       await testGroupService.setActiveGroupId('grp_spectator');
 
       final activeGroup = GroupModel(
@@ -414,6 +421,7 @@ void main() {
         code: 'SPC123',
         createdAt: now,
         memberCount: 2,
+        playPolicy: 'owner',
       );
 
       final members = [
@@ -443,6 +451,7 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(testPrefs),
             groupAuthServiceProvider.overrideWithValue(testAuthService),
             groupServiceProvider.overrideWithValue(testGroupService),
+            clockSyncServiceProvider.overrideWithValue(clockSync),
             activeGroupIdProvider.overrideWith((ref) => 'grp_spectator'),
             activeGroupStreamProvider.overrideWith((ref) => Stream.value(activeGroup)),
             activeGroupMembersStreamProvider.overrideWith((ref) => Stream.value(members)),
@@ -450,7 +459,9 @@ void main() {
             activeGroupEventsStreamProvider.overrideWith((ref) => Stream.value([])),
           ],
           child: const MaterialApp(
-            home: GroupWheelView(),
+            home: GroupRealtimeNotificationListener(
+              child: GroupWheelView(),
+            ),
           ),
         ),
       );
@@ -458,7 +469,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Initially spectator sees waiting button
-      expect(find.text('MENUNGGU PEMILIK MEMUTAR RODA'), findsOneWidget);
+      expect(find.text('Hanya pemilik yang bisa memutar'), findsOneWidget);
 
       // Owner broadcasts live spin
       await testGroupService.broadcastLiveSpin(
@@ -472,22 +483,25 @@ void main() {
       );
 
       // Pump to trigger stream delivery microtask and then pump frame
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 50));
       await tester.pump();
 
-      // Spectator badge and live button appear
-      expect(find.textContaining('LIVE · Evan Pemilik sedang memutar roda...'), findsOneWidget);
-      expect(find.textContaining('MENONTON: EVAN PEMILIK MEMUTAR RODA...'), findsOneWidget);
+      // Spectator badge and live overlay appear
+      expect(find.text('SIARAN LANGSUNG'), findsOneWidget);
+      expect(find.text('Evan Pemilik memutar roda!'), findsOneWidget);
 
-      // Finish spin animation (5 seconds)
-      await tester.pump(const Duration(seconds: 5));
+      // Fast forward clock past duration (6000ms > 5000ms)
+      clockSync.setOffsetForTesting(6000);
+      await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Results shown in snackbar and session card
-      expect(find.textContaining('🎉 Evan Pemilik menentukan budget grup: Rp100.000!'), findsOneWidget);
+      // Results shown in overlay
+      expect(find.text('🎯 Roda mendarat pada hasil budget!'), findsOneWidget);
+      expect(find.text('Rp100.000'), findsOneWidget);
 
-      // Settle any pending banner/snackbar auto-dismiss timers
-      await tester.pump(const Duration(seconds: 5));
+      // Settle any pending countdown timers
+      await tester.pump(const Duration(seconds: 4));
+      clockSync.stopPeriodicSync();
     });
 
     test('Layar 53 & 54: GroupModel & GroupService Budget Settings & Fixed Mode', () async {
@@ -522,7 +536,7 @@ void main() {
       expect(created, isNotNull);
       expect(created!.budgetMode, 'game'); // default
       expect(created.fixedBudget, 200000); // default
-      expect(created.spinPolicy, 'owner'); // default
+      expect(created.spinPolicy, 'all'); // default
 
       await testGroupService.updateGroupBudgetSettings(
         gid: created.id,

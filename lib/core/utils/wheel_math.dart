@@ -51,9 +51,38 @@ class WheelMath {
     required double currentAngle,
     required int totalSlots,
   }) {
+    if (totalSlots <= 0) return false;
     final segAngle = 360.0 / totalSlots;
     final prevCount = (previousAngle / segAngle).floor();
     final currCount = (currentAngle / segAngle).floor();
     return prevCount != currCount;
+  }
+
+  /// Menghitung sudut lentur jarum pointer (posisi jam 12) secara geometris murni
+  /// berdasarkan posisi pasak/garis pembatas irisan saat ini.
+  /// - Menghilangkan 100% delay atau jarum macet di garis pembatas.
+  /// - Memberikan fisika responsif mekanikal di 60fps/120fps tanpa ketergantungan controller statis.
+  static double calculatePointerFlickAngle({
+    required double currentAngle,
+    required int totalSlots,
+    double pushZone = 7.0,
+    double snapZone = 3.5,
+    double maxDeflection = 13.0,
+  }) {
+    if (totalSlots <= 0) return 0.0;
+    final segAngle = 360.0 / totalSlots;
+    final offset = (currentAngle % segAngle + segAngle) % segAngle;
+    final distToPeg = segAngle - offset;
+
+    if (distToPeg <= pushZone) {
+      // Garis pembatas sedang menabrak dan mendorong jarum pointer ke arah putaran
+      final t = (pushZone - distToPeg) / pushZone;
+      return maxDeflection * t;
+    } else if (offset <= snapZone) {
+      // Jarum baru saja lepas dari garis dan membal elastis ke arah berlawanan
+      final t = (snapZone - offset) / snapZone;
+      return -5.0 * t;
+    }
+    return 0.0;
   }
 }

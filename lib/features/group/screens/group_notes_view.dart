@@ -11,6 +11,7 @@ import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/group/models/group_model.dart';
 import '../../../core/group/models/group_note_model.dart';
+import '../../../core/group/models/group_event_model.dart';
 import '../../../core/group/services/group_auth_service.dart';
 import '../../../core/group/services/group_service.dart';
 import '../../../core/group/services/group_game_service.dart';
@@ -94,10 +95,60 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
   Widget build(BuildContext context) {
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
-    final group = activeGroupAsync.valueOrNull ??
-        (activeGroupId != null && activeGroupId.isNotEmpty
-            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
-            : null);
+    final streamedGroup = activeGroupAsync.valueOrNull;
+    final localGroup = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
+        : null;
+
+    GroupModel? rawGroup = (streamedGroup != null && localGroup != null)
+        ? streamedGroup.copyWith(
+            activeSession: streamedGroup.activeSession ?? localGroup.activeSession,
+          )
+        : (streamedGroup ?? localGroup);
+
+    // Pemulihan Sesi Mandiri (Failsafe): Jika activeSession bernilai null karena delay stream
+    // tetapi ada event putaran roda / game result yang valid di log lokal grup, pulihkan sesi seketika!
+    if (rawGroup != null && rawGroup.activeSession == null && activeGroupId != null && activeGroupId.isNotEmpty) {
+      final evts = ref.read(groupServiceProvider).getLocalEvents(activeGroupId);
+      for (final evt in evts) {
+        if (evt.payload['action'] == 'end_session') break;
+        if ((evt.type == GroupEventType.gameResult || evt.type == GroupEventType.spin) &&
+            evt.payload['valid'] != false &&
+            (evt.payload['amount'] != null || evt.payload['budget'] != null)) {
+          final amt = ((evt.payload['amount'] ?? evt.payload['budget']) as num).toInt();
+          final sessId = evt.payload['sessionId']?.toString() ??
+              'sess_${evt.createdAt.millisecondsSinceEpoch}';
+          final gm = evt.payload['game']?.toString() ?? 'wheel';
+          final recoveredSession = GroupSessionModel(
+            sessionId: sessId,
+            budget: amt,
+            game: gm,
+            startedByUid: evt.actorUid,
+            startedByName: evt.actorName,
+            startedAt: evt.createdAt,
+          );
+          rawGroup = rawGroup!.copyWith(activeSession: recoveredSession);
+          ref.read(groupServiceProvider).saveLocalGroup(rawGroup);
+          break;
+        } else if (evt.type == GroupEventType.sessionStart && evt.payload['budget'] != null) {
+          final amt = (evt.payload['budget'] as num).toInt();
+          final sessId = evt.payload['sessionId']?.toString() ??
+              'sess_${evt.createdAt.millisecondsSinceEpoch}';
+          final recoveredSession = GroupSessionModel(
+            sessionId: sessId,
+            budget: amt,
+            startedByUid: evt.actorUid,
+            startedByName: evt.actorName,
+            startedAt: evt.createdAt,
+          );
+          rawGroup = rawGroup!.copyWith(activeSession: recoveredSession);
+          ref.read(groupServiceProvider).saveLocalGroup(rawGroup);
+          break;
+        }
+      }
+    }
+
+    final group = rawGroup;
 
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
     final members = membersAsync.valueOrNull ?? [];

@@ -334,8 +334,10 @@ class NotificationCoordinator with WidgetsBindingObserver {
     // -------------------------------------------------------------------------
     final myUid = currentUidGetter?.call();
 
-    // 2a. Abaikan aksi diri sendiri (actorUid == uid)
-    if (intent.actorUid != null && myUid != null && intent.actorUid == myUid) {
+    // 2a. Abaikan aksi diri sendiri (actorUid == uid) hanya jika pengguna sedang aktif di dalam aplikasi (resumed).
+    // Jika aplikasi di luar layar (paused/detached/background), tetap izinkan notifikasi sistem di status bar.
+    final isOwnAction = intent.actorUid != null && myUid != null && intent.actorUid == myUid;
+    if (isOwnAction && _lifecycleState == AppLifecycleState.resumed) {
       await _claimStore.tryClaim(
         dedupeKey: key,
         surface: NotificationSurface.dropped,
@@ -541,6 +543,13 @@ class NotificationCoordinator with WidgetsBindingObserver {
           break;
 
         case NotificationSurface.system:
+          if (intent.category == NotificationCategory.spin) {
+            // Event penentuan budget permainan langsung tayang di status bar Android tanpa delay
+            if (onRenderSystem != null) {
+              await onRenderSystem!(intent);
+            }
+            break;
+          }
           if (intent.gid != null) {
             // Penggabungan notifikasi sistem dalam 60 detik per grup (UPDATE 2C Bagian 2)
             final buf = _systemBuffers.putIfAbsent(intent.gid!, () => []);

@@ -131,6 +131,9 @@ class NotificationIntent {
     return (dedupeKey.hashCode & 0x7FFFFFFF);
   }
 
+  /// Menandakan apakah intent ini terkait dengan aktivitas grup
+  bool get isGroupEvent => gid != null && gid!.isNotEmpty;
+
   NotificationIntent copyWith({
     String? dedupeKey,
     NotificationCategory? category,
@@ -356,6 +359,9 @@ class NotificationIntent {
       case 'spin':
       case 'spin_performed':
       case 'wheel_spin':
+      case 'game_result':
+      case 'gameresult':
+      case 'gameResult':
         return NotificationCategory.spin;
       case 'member_join':
       case 'memberJoin':
