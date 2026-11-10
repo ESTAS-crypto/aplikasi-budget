@@ -18,24 +18,6 @@ import 'core/notifications/notifications.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inisialisasi SharedPreferences untuk persistensi lokal dan mode grup
-  final prefs = await SharedPreferences.getInstance();
-  setGlobalSharedPreferences(prefs);
-
-  // Inisialisasi audio sound service sedini mungkin sebelum frame pertama
-  try {
-    await SoundService.instance.initialize();
-  } catch (e) {
-    debugPrint('SoundService main init error: $e');
-  }
-
-  // Inisialisasi lokalisasi tanggal Bahasa Indonesia dengan proteksi try/catch
-  try {
-    await initializeDateFormatting('id_ID', null);
-  } catch (e) {
-    debugPrint('DateFormatting init error: $e');
-  }
-
   // Kunci orientasi ke Portrait untuk kenyamanan penggunaan saat ngedate
   try {
     await SystemChrome.setPreferredOrientations([
@@ -43,13 +25,6 @@ void main() async {
       DeviceOrientation.portraitDown,
     ]);
   } catch (_) {}
-
-  // Inisialisasi Supabase (Free tier PostgreSQL & Realtime)
-  try {
-    await SupabaseConfig.initialize();
-  } catch (e) {
-    debugPrint('Supabase main init error: $e');
-  }
 
   // Atur warna status bar dan navigation bar sistem Android
   SystemChrome.setSystemUIOverlayStyle(
@@ -61,7 +36,34 @@ void main() async {
     ),
   );
 
-  // Mount aplikasi dengan SharedPreferences yang sudah siap
+  // Inisialisasi SharedPreferences dengan pertahanan berlapis (fail-safe)
+  SharedPreferences? prefs;
+  try {
+    prefs = await SharedPreferences.getInstance();
+  } catch (e) {
+    debugPrint('[SharedPreferences] Native init error: $e');
+    try {
+      // Self-healing: jika native storage korup, aktifkan in-memory fallback
+      // ignore: invalid_use_of_visible_for_testing_member
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      debugPrint('[SharedPreferences] In-memory fallback berhasil diaktifkan');
+    } catch (e2) {
+      debugPrint('[SharedPreferences] In-memory init error: $e2');
+    }
+  }
+
+  // Jaminan mutlak: prefs tidak pernah null saat runApp
+  if (prefs == null) {
+    // ignore: invalid_use_of_visible_for_testing_member
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
+  }
+
+  setGlobalSharedPreferences(prefs);
+
+  // Mount aplikasi SEGERA agar frame pertama langsung digambar
+  // dan splash screen native Android langsung terlepas tanpa delay
   runApp(
     ProviderScope(
       overrides: [
@@ -71,11 +73,33 @@ void main() async {
     ),
   );
 
-  // Jalankan inisialisasi background notification secara non-blocking
-  _initBackgroundServices();
+  // Jalankan inisialisasi services secara non-blocking di latar belakang
+  _initBackgroundServices(prefs);
 }
 
-Future<void> _initBackgroundServices() async {
+Future<void> _initBackgroundServices(SharedPreferences prefs) async {
+  // Inisialisasi lokalisasi tanggal Bahasa Indonesia
+  try {
+    await initializeDateFormatting('id_ID', null);
+  } catch (e) {
+    debugPrint('DateFormatting init error: $e');
+  }
+
+  // Inisialisasi audio sound service
+  try {
+    await SoundService.instance.initialize();
+  } catch (e) {
+    debugPrint('SoundService init error: $e');
+  }
+
+  // Inisialisasi Supabase (Free tier PostgreSQL & Realtime)
+  try {
+    await SupabaseConfig.initialize();
+  } catch (e) {
+    debugPrint('Supabase init error: $e');
+  }
+
+  // Inisialisasi notifikasi lokal & pengingat Jumat
   try {
     await NotificationService.instance.initialize();
   } catch (e) {
@@ -83,7 +107,6 @@ Future<void> _initBackgroundServices() async {
   }
 
   try {
-    final prefs = await SharedPreferences.getInstance();
     final reminderEnabled = prefs.getBool('pj_friday_reminder_enabled') ?? true;
     if (reminderEnabled) {
       await NotificationService.instance.scheduleWeeklyFridayReminder();

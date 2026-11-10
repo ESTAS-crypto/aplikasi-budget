@@ -134,15 +134,21 @@ class SoundService {
     if (_initialized) return;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      bool vibration = true;
+      double effectiveVolume = 1.0;
 
-      final vibration = prefs.getBool(_keyVibration) ?? true;
-      final savedVolume = prefs.getDouble(_keyVolume) ?? 1.0;
-      final effectiveVolume = savedVolume <= 0.05 ? 1.0 : savedVolume;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        vibration = prefs.getBool(_keyVibration) ?? true;
+        final savedVolume = prefs.getDouble(_keyVolume) ?? 1.0;
+        effectiveVolume = savedVolume <= 0.05 ? 1.0 : savedVolume;
 
-      await prefs.setBool(_keySound, true);
-      if (savedVolume <= 0.05) {
-        await prefs.setDouble(_keyVolume, 1.0);
+        await prefs.setBool(_keySound, true);
+        if (savedVolume <= 0.05) {
+          await prefs.setDouble(_keyVolume, 1.0);
+        }
+      } catch (e) {
+        debugPrint('[SoundService] SharedPreferences read fallback: $e');
       }
 
       settingsNotifier.value = SoundSettings(

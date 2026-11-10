@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/sound_service.dart';
+import '../../core/group/services/group_auth_service.dart';
 import '../../data/database_provider.dart';
 
 /// Splash Screen resmi sesuai design/source/Splash.dc.html
@@ -86,9 +87,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _isNavigating = true;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final hasCompletedOnboarding = (prefs.getBool('has_seen_onboarding') ?? false) ||
-          (prefs.getBool('has_completed_onboarding') ?? false);
+      SharedPreferences? prefs;
+      try {
+        prefs = ref.read(sharedPreferencesProvider);
+      } catch (_) {
+        prefs = await SharedPreferences.getInstance();
+      }
+      final hasCompletedOnboarding = (prefs?.getBool('has_seen_onboarding') ?? false) ||
+          (prefs?.getBool('has_completed_onboarding') ?? false);
 
       if (!mounted) return;
       try {
@@ -100,7 +106,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       } catch (_) {
         // Fallback jika dijalankan di context tanpa GoRouter (misal widget test)
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        try {
+          context.go('/');
+        } catch (_) {}
+      }
+    }
   }
 
   @override
