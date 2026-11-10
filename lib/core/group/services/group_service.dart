@@ -10,12 +10,16 @@ import '../models/group_member_model.dart';
 import '../models/group_note_model.dart';
 import '../models/group_event_model.dart';
 import '../models/invite_code_model.dart';
+import '../models/live_play_model.dart';
 import '../../utils/rupiah_formatter.dart';
 import 'group_auth_service.dart';
 
 /// Service untuk Operasi Grup Bersama (Local-First dengan Supabase PostgreSQL)
 class GroupService {
   static const String keyActiveGroupId = 'active_group_id';
+
+  /// Generator ID event grup unik deterministik dengan proteksi anti-tabrakan
+  static String generateEventId() => 'evt_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
 
   final dynamic firestore;
   final SupabaseClient? supabase;
@@ -43,6 +47,16 @@ class GroupService {
   final Map<String, List<StreamController<List<GroupNoteModel>>>> _notesControllers = {};
   final Map<String, List<StreamController<GroupModel?>>> _groupControllers = {};
   final Map<String, List<StreamController<Map<String, dynamic>>>> _liveSpinControllers = {};
+  final Map<String, List<StreamController<LivePlayModel?>>> _livePlayControllers = {};
+
+  void _notifyLivePlay(String gid, LivePlayModel? play) {
+    final controllers = _livePlayControllers[gid];
+    if (controllers != null) {
+      for (final c in List.of(controllers)) {
+        if (!c.isClosed) c.add(play);
+      }
+    }
+  }
 
   void _notifyLiveSpin(String gid, Map<String, dynamic> data) {
     final controllers = _liveSpinControllers[gid];
@@ -182,6 +196,14 @@ class GroupService {
       },
     );
     ch.onBroadcast(
+      event: 'live_play_current',
+      callback: (payload) {
+        final play = LivePlayModel.fromMap(Map<String, dynamic>.from(payload));
+        _saveLocalLivePlay(gid, play);
+        _notifyLivePlay(gid, play);
+      },
+    );
+    ch.onBroadcast(
       event: 'presence_pulse',
       callback: (payload) {
         _handlePresencePulse(gid, Map<String, dynamic>.from(payload));
@@ -201,6 +223,104 @@ class GroupService {
 
     _realtimeChannel = ch;
     return _realtimeChannel;
+  }
+
+  String _keyLocalLivePlay(String gid) => 'local_live_play_$gid';
+
+  LivePlayModel? getLocalLivePlay(String gid) {
+    try {
+      final jsonStr = prefs.getString(_keyLocalLivePlay(gid));
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+        return LivePlayModel.fromMap(map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void _saveLocalLivePlay(String gid, LivePlayModel play) {
+    try {
+      prefs.setString(_keyLocalLivePlay(gid), jsonEncode(play.toMap()));
+    } catch (_) {}
+  }
+
+  /// Menonton siaran permainan langsung realtime (F2: groups/{gid}/live/current)
+  Stream<LivePlayModel?> watchLivePlay(String gid) {
+    _ensureChannel(gid);
+    final controller = StreamController<LivePlayModel?>.broadcast();
+    _livePlayControllers.putIfAbsent(gid, () => []).add(controller);
+
+    final cached = getLocalLivePlay(gid);
+    if (cached != null) {
+      controller.add(cached);
+    }
+
+    StreamSubscription? firestoreSub;
+    if (firestore != null) {
+      try {
+        firestoreSub = firestore!
+            .collection('groups')
+            .doc(gid)
+            .collection('live')
+            .doc('current')
+            .snapshots()
+            .listen((doc) {
+          if (doc != null && doc.exists && doc.data() != null) {
+            final data = Map<String, dynamic>.from(doc.data()!);
+            final play = LivePlayModel.fromMap(data);
+            _saveLocalLivePlay(gid, play);
+            controller.add(play);
+          }
+        }, onError: (e) {
+          debugPrint('[GroupService] watchLivePlay Firestore error: $e');
+        });
+      } catch (e) {
+        debugPrint('[GroupService] watchLivePlay Firestore listener error: $e');
+      }
+    }
+
+    controller.onCancel = () {
+      firestoreSub?.cancel();
+      _livePlayControllers[gid]?.remove(controller);
+    };
+
+    return controller.stream;
+  }
+
+  /// Menyiarkan putaran permainan langsung realtime ke seluruh anggota (F2)
+  Future<bool> broadcastLivePlay(String gid, LivePlayModel play) async {
+    // 1. Simpan ke cache lokal & beri tahu listener lokal
+    _saveLocalLivePlay(gid, play);
+    _notifyLivePlay(gid, play);
+
+    // 2. Siarkan via Supabase Realtime channel WebSocket
+    if (supabase != null) {
+      try {
+        final ch = await ensureChannelSubscribed(gid);
+        await ch?.sendBroadcastMessage(
+          event: 'live_play_current',
+          payload: play.toMap(),
+        );
+      } catch (e) {
+        debugPrint('[GroupService] Supabase broadcastLivePlay error: $e');
+      }
+    }
+
+    // 3. Tulis dokumen ke Firestore: groups/{gid}/live/current
+    if (firestore != null) {
+      try {
+        await firestore!
+            .collection('groups')
+            .doc(gid)
+            .collection('live')
+            .doc('current')
+            .set(play.toMap());
+      } catch (e) {
+        debugPrint('[GroupService] Firestore broadcastLivePlay error: $e');
+      }
+    }
+
+    return true;
   }
 
   /// Menonton putaran roda live untuk spectator (anggota grup)
@@ -512,7 +632,7 @@ class GroupService {
     );
 
     final localEvt = GroupEventModel(
-      eventId: 'evt_${now.millisecondsSinceEpoch}',
+      eventId: generateEventId(),
       type: GroupEventType.memberJoin,
       actorUid: uid,
       actorName: creatorName.trim(),
@@ -556,7 +676,7 @@ class GroupService {
         });
 
         final eventMap = {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'gid': gid,
           'actor_uid': uid,
           'actor_name': creatorName.trim(),
@@ -601,7 +721,7 @@ class GroupService {
           'createdAt': now.millisecondsSinceEpoch,
         });
 
-        final eventRef = groupRef.collection('events').doc('evt_${now.millisecondsSinceEpoch}');
+        final eventRef = groupRef.collection('events').doc(generateEventId());
         batch.set(eventRef, {
           'actorUid': uid,
           'actorName': creatorName.trim(),
@@ -752,7 +872,7 @@ class GroupService {
         } catch (_) {}
 
         final joinEvtMap = {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'gid': gid,
           'actor_uid': uid,
           'actor_name': memberName.trim(),
@@ -798,7 +918,7 @@ class GroupService {
         } catch (_) {}
 
         final rejoinEvtMap = {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'gid': gid,
           'actor_uid': uid,
           'actor_name': memberName.trim(),
@@ -890,9 +1010,9 @@ class GroupService {
                 });
                 batch.update(groupRef, {'memberCount': 1});
 
-                final eventRef = groupRef.collection('events').doc('evt_${now.millisecondsSinceEpoch}');
+                final eventRef = groupRef.collection('events').doc(generateEventId());
                 final localJoinEvt = GroupEventModel(
-                  eventId: 'evt_${now.millisecondsSinceEpoch}',
+                  eventId: generateEventId(),
                   type: GroupEventType.memberJoin,
                   actorUid: uid,
                   actorName: memberName.trim(),
@@ -964,7 +1084,7 @@ class GroupService {
     _notifyMembersChanged(mockGid, [mockMember]);
 
     final mockJoinEvt = GroupEventModel(
-      eventId: 'evt_${now.millisecondsSinceEpoch}',
+      eventId: generateEventId(),
       type: GroupEventType.memberJoin,
       actorUid: uid,
       actorName: memberName.trim(),
@@ -1753,7 +1873,7 @@ class GroupService {
     }
 
     final codeEvtMap = {
-      'id': 'evt_${now.millisecondsSinceEpoch}',
+      'id': generateEventId(),
       'gid': gid,
       'actor_uid': uid,
       'actor_name': actorName,
@@ -1825,7 +1945,7 @@ class GroupService {
     }
 
     final localEvt = GroupEventModel(
-      eventId: 'evt_${now.millisecondsSinceEpoch}',
+      eventId: generateEventId(),
       type: GroupEventType.memberLeave,
       actorUid: authService.currentUid ?? '',
       actorName: authService.displayName ?? 'Pemilik',
@@ -1856,7 +1976,7 @@ class GroupService {
         await supabase!.from('groups').update({'member_count': count > 1 ? count - 1 : 1}).eq('id', gid);
 
         final removeEvtMap = {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'gid': gid,
           'actor_uid': authService.currentUid ?? '',
           'actor_name': authService.displayName ?? 'Pemilik',
@@ -1880,7 +2000,7 @@ class GroupService {
         batch.delete(groupRef.collection('members').doc(memberUid));
         batch.update(groupRef, {'memberCount': 0});
 
-        final eventRef = groupRef.collection('events').doc('evt_${now.millisecondsSinceEpoch}');
+        final eventRef = groupRef.collection('events').doc(generateEventId());
         batch.set(eventRef, {
           'actorUid': authService.currentUid ?? '',
           'actorName': authService.displayName ?? 'Pemilik',
@@ -1956,7 +2076,7 @@ class GroupService {
     }
 
     final localLeaveEvt = GroupEventModel(
-      eventId: 'evt_${now.millisecondsSinceEpoch}',
+      eventId: generateEventId(),
       type: GroupEventType.memberLeave,
       actorUid: myUid,
       actorName: myName,
@@ -2075,7 +2195,7 @@ class GroupService {
     final remaining = (totalBudget - currentSpent).clamp(0, totalBudget);
 
     final localEvt = GroupEventModel(
-      eventId: 'evt_${now.millisecondsSinceEpoch}',
+      eventId: generateEventId(),
       type: GroupEventType.expense,
       actorUid: uid,
       actorName: authorName,
@@ -2109,7 +2229,7 @@ class GroupService {
         });
 
         final evtMap = {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'gid': gid,
           'actor_uid': uid,
           'actor_name': authorName,
@@ -2158,10 +2278,10 @@ class GroupService {
             .collection('groups')
             .doc(gid)
             .collection('events')
-            .doc('evt_${now.millisecondsSinceEpoch}');
+            .doc(generateEventId());
 
         batch.set(eventRef, {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'actorUid': uid,
           'actorName': authorName,
           'type': GroupEventType.expense.value,
@@ -2303,7 +2423,7 @@ class GroupService {
     final remaining = (totalBudget - currentSpent).clamp(0, totalBudget);
 
     final localEvt = GroupEventModel(
-      eventId: 'evt_${now.millisecondsSinceEpoch}',
+      eventId: generateEventId(),
       type: GroupEventType.expense,
       actorUid: myUid,
       actorName: myName,
@@ -2327,7 +2447,7 @@ class GroupService {
         await supabase!.from('group_notes').update({'deleted': true}).eq('id', noteId);
 
         final evtMap = {
-          'id': 'evt_${now.millisecondsSinceEpoch}',
+          'id': generateEventId(),
           'gid': gid,
           'actor_uid': myUid,
           'actor_name': myName,
@@ -2364,7 +2484,7 @@ class GroupService {
             .collection('groups')
             .doc(gid)
             .collection('events')
-            .doc('evt_${now.millisecondsSinceEpoch}');
+            .doc(generateEventId());
 
         batch.set(eventRef, {
           'actorUid': myUid,
@@ -3043,4 +3163,15 @@ final unreadActivityCountProvider = Provider<int>((ref) {
   return events.where((e) {
     return e.actorUid != myUid && e.createdAt.isAfter(myMember.lastReadAt);
   }).length;
+});
+
+
+/// StreamProvider untuk memantau siaran langsung putaran/game grup aktif (F2)
+final activeLivePlayStreamProvider = StreamProvider<LivePlayModel?>((ref) {
+  final groupService = ref.watch(groupServiceProvider);
+  final activeGid = ref.watch(activeGroupIdProvider);
+  if (activeGid == null || activeGid.isEmpty) {
+    return Stream.value(null);
+  }
+  return groupService.watchLivePlay(activeGid);
 });

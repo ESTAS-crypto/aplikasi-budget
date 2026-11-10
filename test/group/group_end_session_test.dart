@@ -7,7 +7,6 @@ import 'package:putar_jajan/core/group/models/group_model.dart';
 import 'package:putar_jajan/core/group/models/group_member_model.dart';
 import 'package:putar_jajan/core/group/services/group_service.dart';
 import 'package:putar_jajan/core/group/services/group_auth_service.dart';
-import 'package:putar_jajan/core/group/services/group_game_service.dart';
 import 'package:putar_jajan/core/group/widgets/scope_switcher.dart';
 import 'package:putar_jajan/features/group/screens/group_games_hub_view.dart';
 import 'package:putar_jajan/features/group/screens/group_notes_view.dart';

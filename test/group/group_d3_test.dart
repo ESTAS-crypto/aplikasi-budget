@@ -128,12 +128,27 @@ void main() {
       await tester.pumpWidget(createTestWidget(
         child: const GroupWheelView(),
         group: group,
+        currentUid: ownerUid,
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('ULANGI BUDGET'), findsOneWidget);
+      expect(find.text('Sisa budget grup'), findsOneWidget);
+
+      // Member sees Date berjalan · permainan terkunci
+      await testPrefs.setString(GroupAuthService.keyFallbackUid, memberUid);
+      testAuthService = GroupAuthService(auth: null, prefs: testPrefs);
+
+      await tester.pumpWidget(createTestWidget(
+        child: const GroupWheelView(),
+        group: group,
+        currentUid: memberUid,
       ));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Date berjalan · permainan terkunci'), findsOneWidget);
-      expect(find.text('Sisa budget grup'), findsOneWidget);
     });
 
     testWidgets('playPolicy == owner disables spin for non-owner member', (tester) async {
@@ -157,7 +172,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Hanya pemilik yang bisa memainkan'), findsOneWidget);
+      expect(find.text('Hanya pemilik yang bisa memutar'), findsOneWidget);
     });
   });
 

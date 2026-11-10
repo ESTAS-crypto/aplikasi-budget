@@ -205,14 +205,14 @@ class GroupModel {
     return enabledGames.contains(gameKey.toLowerCase().trim());
   }
 
-  bool canUserPlay(String uid) {
-    if (playPolicy == 'owner') {
-      return ownerUid == uid;
-    }
-    return true;
+  /// Evaluasi izin bermain grup sesuai aturan F1:
+  /// canPlay(group, session, uid)
+  bool canUserPlay(String uid, [GroupSessionModel? session]) {
+    return canPlay(this, session ?? activeSession, uid);
   }
 
-  /// Cek apakah pengguna saat ini adalah pemilik grup
+  /// Cek apakah pengguna saat ini adalah pemilik grup.
+  /// Aturan F1: isOwner = group.ownerUid == uid. Tidak ada sumber lain.
   bool isOwner(String uid) => ownerUid.isNotEmpty && ownerUid == uid;
 
   bool get isSessionLocked {
@@ -465,4 +465,128 @@ class GroupModel {
       coinBase: coinBase ?? this.coinBase,
     );
   }
+}
+
+/// Alasan penolakan izin bermain grup sesuai spesifikasi F1:
+/// PlayDenied {notOwner, sessionLocked, notMember, offlineNoGroup, other}
+enum PlayDenied {
+  none,
+  notOwner,
+  sessionLocked,
+  notMember,
+  offlineNoGroup,
+  other;
+
+  String get message {
+    switch (this) {
+      case PlayDenied.none:
+        return '';
+      case PlayDenied.notOwner:
+        return 'Hanya pemilik yang bisa memutar';
+      case PlayDenied.sessionLocked:
+        return 'Date berjalan, budget sudah ditentukan';
+      case PlayDenied.notMember:
+        return 'Anda bukan anggota grup ini';
+      case PlayDenied.offlineNoGroup:
+        return 'Grup tidak ditemukan';
+      case PlayDenied.other:
+        return 'Permainan tidak tersedia';
+    }
+  }
+
+  /// Format pesan kontekstual jika nama penentu budget diketahui
+  String messageWithAuthor(String? authorName) {
+    if (this == PlayDenied.sessionLocked) {
+      final name = (authorName != null && authorName.trim().isNotEmpty)
+          ? authorName.trim()
+          : 'anggota';
+      return 'Date berjalan, budget sudah ditentukan oleh $name';
+    }
+    return message;
+  }
+}
+
+/// Hasil evaluasi izin bermain grup
+class PlayPermissionResult {
+  final bool allowed;
+  final PlayDenied deniedReason;
+  final String message;
+
+  const PlayPermissionResult({
+    required this.allowed,
+    this.deniedReason = PlayDenied.none,
+    this.message = '',
+  });
+
+  static const ok = PlayPermissionResult(allowed: true, deniedReason: PlayDenied.none);
+}
+
+/// Evaluasi mendalam hak bermain grup sesuai aturan F1:
+/// - isOwner = group.ownerUid == uid. Tidak ada sumber lain.
+/// - Pemilik SELALU boleh memutar atau mengulang, kapan pun, termasuk saat sesi terkunci.
+/// - Anggota mengikuti kebijakan grup:
+///   playPolicy == owner -> anggota tidak boleh ("Hanya pemilik yang bisa memutar")
+///   lockPolicy == lock dan sesi sudah punya budget -> terkunci ("Date berjalan, budget sudah ditentukan oleh {nama}")
+PlayPermissionResult evaluateCanPlay({
+  required GroupModel? group,
+  GroupSessionModel? session,
+  required String uid,
+}) {
+  if (group == null) {
+    return const PlayPermissionResult(
+      allowed: false,
+      deniedReason: PlayDenied.offlineNoGroup,
+      message: 'Grup tidak ditemukan',
+    );
+  }
+
+  if (uid.isEmpty) {
+    return const PlayPermissionResult(
+      allowed: false,
+      deniedReason: PlayDenied.notMember,
+      message: 'Anda bukan anggota grup ini',
+    );
+  }
+
+  // isOwner = group.ownerUid == uid. Tidak ada sumber lain.
+  final isOwner = group.ownerUid == uid;
+
+  // Pemilik SELALU boleh memutar atau mengulang, kapan pun, termasuk saat sesi terkunci.
+  if (isOwner) {
+    return PlayPermissionResult.ok;
+  }
+
+  // Anggota mengikuti kebijakan grup:
+  // playPolicy == owner -> anggota tidak boleh (pesan "Hanya pemilik yang bisa memutar")
+  if (group.playPolicy == 'owner') {
+    return const PlayPermissionResult(
+      allowed: false,
+      deniedReason: PlayDenied.notOwner,
+      message: 'Hanya pemilik yang bisa memutar',
+    );
+  }
+
+  // lockPolicy == lock dan sesi sudah punya budget -> terkunci
+  final effSession = session ?? group.activeSession;
+  final hasBudget = effSession != null &&
+      effSession.sessionId.isNotEmpty &&
+      effSession.budget > 0;
+  final isLocked = (effSession != null && effSession.locked) ||
+      (group.lockPolicy == 'lock' && hasBudget);
+
+  if (isLocked) {
+    final authorName = effSession.startedByName;
+    return PlayPermissionResult(
+      allowed: false,
+      deniedReason: PlayDenied.sessionLocked,
+      message: PlayDenied.sessionLocked.messageWithAuthor(authorName),
+    );
+  }
+
+  return PlayPermissionResult.ok;
+}
+
+/// Fungsi canPlay sesuai spesifikasi F1: canPlay(group, session, uid)
+bool canPlay(GroupModel? group, GroupSessionModel? session, String uid) {
+  return evaluateCanPlay(group: group, session: session, uid: uid).allowed;
 }

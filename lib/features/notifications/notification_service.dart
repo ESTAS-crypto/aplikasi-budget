@@ -624,9 +624,11 @@ class NotificationService {
     } catch (_) {}
   }
 
-  /// Render notifikasi sistem dari NotificationCoordinator dengan ID stabil
+  /// Render notifikasi sistem dari NotificationCoordinator dengan ID stabil per grup
   Future<void> renderSystemIntent(NotificationIntent intent) async {
-    final notifId = intent.stableNotificationId;
+    final notifId = (intent.gid != null && intent.gid!.isNotEmpty)
+        ? (notificationGroupBaseId + (intent.gid!.hashCode.abs() % 90000))
+        : intent.stableNotificationId;
 
     String channelId = channelGroupActivityId;
     String channelName = 'Aktivitas Grup';

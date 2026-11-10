@@ -156,7 +156,7 @@ void main() {
       );
 
       expect(result.success, isFalse);
-      expect(result.message, contains('Hanya pemilik yang bisa memainkan'));
+      expect(result.message, contains('Hanya pemilik yang bisa memutar'));
     });
   });
 

@@ -158,7 +158,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Hanya pemilik yang bisa memainkan'), findsOneWidget);
+      expect(find.text('Hanya pemilik yang bisa memutar'), findsOneWidget);
     });
   });
 

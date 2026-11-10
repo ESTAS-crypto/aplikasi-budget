@@ -35,9 +35,13 @@ class GroupGameService {
     required this.authService,
   });
 
-  /// Cek apakah pengguna saat ini berhak memainkan permainan grup (playPolicy)
-  bool canUserPlay({required GroupModel group, required String uid}) {
-    return group.canUserPlay(uid);
+  /// Cek apakah pengguna saat ini berhak memainkan permainan grup (F1 canPlay)
+  bool canUserPlay({
+    required GroupModel group,
+    required String uid,
+    GroupSessionModel? session,
+  }) {
+    return canPlay(group, session ?? group.activeSession, uid);
   }
 
   /// Cek apakah jenis permainan tertentu diaktifkan oleh pemilik (enabledGames)
@@ -46,11 +50,12 @@ class GroupGameService {
   }
 
   /// Klaim sesi permainan grup & tulis event game_result dalam SATU transaksi/batch
-  /// Aturan multi-klien (Section 2 & 3):
+  /// Aturan multi-klien (F1 & Section 2 & 3):
   /// - Hasil ditentukan DULU di perangkat pemain (Random.secure) memakai pool grup.
   /// - Ditulis sebagai event game_result {game, amount, detail}.
+  /// - Pemilik SELALU boleh memutar atau mengulang, kapan pun, termasuk saat sesi terkunci.
   /// - Bila lockPolicy == lock dan belum ada budget sesi, dibuat session baru {budget = amount, game, locked: true}.
-  /// - Bila 2 orang bermain bersamaan: sesi yang createdAt server-nya paling awal menang,
+  /// - Bila 2 anggota bermain bersamaan: sesi yang createdAt server-nya paling awal menang,
   ///   hasil yang lain ditandai 'tidak berlaku' di feed dan pemainnya melihat pesan ramah.
   /// - Bila lockPolicy == free, hasil terbaru menggantikan budget sesi.
   Future<ClaimSessionResult> claimSessionAndWriteResult({
@@ -73,11 +78,52 @@ class GroupGameService {
       );
     }
 
-    // 1. Validasi hak bermain (playPolicy)
-    if (!currentGroup.canUserPlay(uid)) {
-      return const ClaimSessionResult(
+    final isOwner = currentGroup.ownerUid == uid;
+
+    final effectiveSessionId = customSessionId ??
+        'sess_${now.millisecondsSinceEpoch}_${Random().nextInt(9999)}';
+    final effectiveEventId = customEventId ??
+        'evt_${now.millisecondsSinceEpoch}_${Random().nextInt(999)}';
+
+    // 1. Validasi hak bermain (F1 canPlay & PlayDenied)
+    final existingSession = currentGroup.activeSession;
+    final perm = evaluateCanPlay(
+      group: currentGroup,
+      session: existingSession,
+      uid: uid,
+    );
+    if (!perm.allowed) {
+      if (perm.deniedReason == PlayDenied.sessionLocked && existingSession != null) {
+        final invalidEvt = GroupEventModel(
+          eventId: effectiveEventId,
+          type: GroupEventType.gameResult,
+          actorUid: uid,
+          actorName: actorName,
+          summary: null,
+          payload: {
+            'game': game,
+            'amount': amount,
+            'detail': detail,
+            'valid': false,
+            'sessionId': existingSession.sessionId,
+            'reason': 'race_condition_lost',
+          },
+          createdAt: now,
+        );
+
+        await groupService.recordEventOnly(gid, invalidEvt);
+
+        return ClaimSessionResult(
+          success: false,
+          isRaceConditionLost: true,
+          activeSession: existingSession,
+          event: invalidEvt,
+          message: 'Sesi sudah dimulai oleh ${existingSession.startedByName}. Hasilmu tidak berlaku.',
+        );
+      }
+      return ClaimSessionResult(
         success: false,
-        message: 'Hanya pemilik yang bisa memainkan',
+        message: perm.message,
       );
     }
 
@@ -88,20 +134,14 @@ class GroupGameService {
         message: 'Permainan ini dimatikan oleh pemilik',
       );
     }
-
-    final effectiveSessionId = customSessionId ??
-        'sess_${now.millisecondsSinceEpoch}_${Random().nextInt(9999)}';
-    final effectiveEventId = customEventId ??
-        'evt_${now.millisecondsSinceEpoch}_${Random().nextInt(999)}';
-
-    // 3. Resolusi Race Condition & Lock Policy
-    final existingSession = currentGroup.activeSession;
     final isLocked = currentGroup.lockPolicy == 'lock' &&
         existingSession != null &&
         existingSession.locked &&
         existingSession.sessionId.isNotEmpty;
 
-    if (isLocked) {
+    // Aturan F1: Pemilik SELALU boleh memutar atau mengulang, kapan pun!
+    // Hanya tolak jika BUKAN pemilik dan sesi terkunci.
+    if (isLocked && !isOwner) {
       // Ada sesi locked yang sudah lebih dulu aktif dari pemain lain!
       // Hasil pemain yang kalah balapan ditandai "tidak berlaku" di feed
       final invalidEvt = GroupEventModel(
@@ -260,10 +300,15 @@ class GroupGameService {
       );
     }
 
-    if (!currentGroup.canUserPlay(uid)) {
-      return const ClaimSessionResult(
+    final perm = evaluateCanPlay(
+      group: currentGroup,
+      session: currentGroup.activeSession,
+      uid: uid,
+    );
+    if (!perm.allowed) {
+      return ClaimSessionResult(
         success: false,
-        message: 'Hanya pemilik yang bisa memulai date',
+        message: perm.message,
       );
     }
 

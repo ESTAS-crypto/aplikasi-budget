@@ -324,6 +324,39 @@ class GroupImportantDialog {
       ),
     );
   }
+
+  /// Dialog Konfirmasi Pemilik Memutar Ulang / Mengganti Budget Sesi (F1)
+  static Future<bool?> showConfirmRerunBudget(
+    BuildContext context, {
+    required String startedByName,
+    required int budget,
+  }) async {
+    SoundService.instance.play(Sfx.uiTap);
+    final name = startedByName.trim().isNotEmpty ? startedByName.trim() : 'anggota';
+    final formattedBudget = 'Rp${budget.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+    return _show<bool>(
+      context,
+      barrierDismissible: true,
+      builder: (ctx) => _BaseImportantDialog(
+        badgeColor: AppColors.matahari,
+        badgeIcon: const CustomClockPainter(color: AppColors.ink, strokeWidth: 2.6),
+        title: 'Ulangi Budget?',
+        message: 'Hasil $name $formattedBudget akan diganti.',
+        actions: [
+          _DialogButton(
+            label: 'Batal',
+            backgroundColor: AppColors.surface,
+            onTap: () => Navigator.of(ctx).pop(false),
+          ),
+          _DialogButton(
+            label: 'Ulangi budget',
+            backgroundColor: AppColors.tomat,
+            onTap: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _BaseImportantDialog extends StatelessWidget {

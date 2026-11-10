@@ -465,7 +465,9 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
     required bool canPlay,
     required String myUid,
   }) {
-    final isDimmed = isLocked || !isEnabled;
+    final isOwner = group.isOwner(myUid);
+    final playPerm = evaluateCanPlay(group: group, session: group.activeSession, uid: myUid);
+    final isDimmed = !isEnabled || (!isOwner && isLocked);
 
     return Opacity(
       opacity: isDimmed ? 0.5 : 1.0,
@@ -475,16 +477,13 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
             InAppToast.show(context, message: 'Roda Putar dimatikan oleh pemilik grup');
             return;
           }
-          if (isLocked) {
-            if (group.isOwner(myUid)) {
-              _showEndSessionPrompt(group);
-            } else {
-              InAppToast.show(context, message: 'Date berjalan · permainan terkunci');
-            }
+          if (isOwner) {
+            // Aturan F1: Pemilik SELALU boleh memutar atau mengulang
+            _navigateToGroupGame('wheel');
             return;
           }
-          if (!canPlay) {
-            InAppToast.show(context, message: 'Hanya pemilik yang bisa memainkan');
+          if (!playPerm.allowed) {
+            InAppToast.show(context, message: playPerm.message);
             return;
           }
           _navigateToGroupGame('wheel');
@@ -530,29 +529,30 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Animated Mini Wheel (96x96 circle)
-                  RotationTransition(
-                    turns: _wheelRotationController,
-                    child: Container(
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 4),
-                        gradient: const SweepGradient(
-                          colors: [
-                            Color(0xFFFF6B5A),
-                            Color(0xFFFF9F1C),
-                            Color(0xFFFFD23F),
-                            Color(0xFF3DDBB0),
-                            Color(0xFF6FB1FF),
-                            Color(0xFFB8A4FF),
-                            Color(0xFFFF8FC0),
-                            Color(0xFFB8E986),
-                            Color(0xFFFF6B5A),
-                          ],
+                  // Animated Mini Wheel Neo-Brutalist (96x96) dengan jarum penunjuk
+                  SizedBox(
+                    width: 96,
+                    height: 96,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        RotationTransition(
+                          turns: _wheelRotationController,
+                          child: const CustomPaint(
+                            size: Size(96, 96),
+                            painter: _HubMiniWheelPainter(),
+                          ),
                         ),
-                      ),
+                        // Jarum Penunjuk Atas Neo-Brutalist
+                        const Positioned(
+                          top: -6,
+                          child: CustomPaint(
+                            size: Size(16, 14),
+                            painter: _HubWheelPointerPainter(),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -596,6 +596,7 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
     final envelopeEnabled = group.isGameEnabled('envelope');
     final coinEnabled = group.isGameEnabled('coin');
     final isOwner = group.isOwner(myUid);
+    final playPerm = evaluateCanPlay(group: group, session: group.activeSession, uid: myUid);
 
     return Column(
       children: [
@@ -609,9 +610,10 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
                 isEnabled: diceEnabled,
                 isLocked: isLocked,
                 canPlay: canPlay,
+                isOwner: isOwner,
+                playPerm: playPerm,
                 iconPainter: const DiceIconPainter(),
                 onTap: () => _navigateToGroupGame('dice'),
-                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
               ),
             ),
             const SizedBox(width: 14),
@@ -623,9 +625,10 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
                 isEnabled: capsuleEnabled,
                 isLocked: isLocked,
                 canPlay: canPlay,
+                isOwner: isOwner,
+                playPerm: playPerm,
                 iconPainter: const CapsuleIconPainter(),
                 onTap: () => _navigateToGroupGame('capsule'),
-                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
               ),
             ),
           ],
@@ -641,9 +644,10 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
                 isEnabled: envelopeEnabled,
                 isLocked: isLocked,
                 canPlay: canPlay,
+                isOwner: isOwner,
+                playPerm: playPerm,
                 iconPainter: const EnvelopeIconPainter(),
                 onTap: () => _navigateToGroupGame('envelope'),
-                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
               ),
             ),
             const SizedBox(width: 14),
@@ -655,9 +659,10 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
                 isEnabled: coinEnabled,
                 isLocked: isLocked,
                 canPlay: canPlay,
+                isOwner: isOwner,
+                playPerm: playPerm,
                 iconPainter: const CoinIconPainter(),
                 onTap: () => _navigateToGroupGame('coin'),
-                onLockedTap: isOwner ? () => _showEndSessionPrompt(group) : null,
               ),
             ),
           ],
@@ -673,11 +678,12 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
     required bool isEnabled,
     required bool isLocked,
     required bool canPlay,
+    required bool isOwner,
+    required PlayPermissionResult playPerm,
     required CustomPainter iconPainter,
     required VoidCallback onTap,
-    VoidCallback? onLockedTap,
   }) {
-    final isDimmed = isLocked || !isEnabled;
+    final isDimmed = !isEnabled || (!isOwner && isLocked);
 
     return Opacity(
       opacity: isDimmed ? 0.5 : 1.0,
@@ -687,16 +693,13 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
             InAppToast.show(context, message: '$title dimatikan oleh pemilik grup');
             return;
           }
-          if (isLocked) {
-            if (onLockedTap != null) {
-              onLockedTap();
-            } else {
-              InAppToast.show(context, message: 'Date berjalan · permainan terkunci');
-            }
+          if (isOwner) {
+            // Pemilik selalu boleh bermain / mengulang
+            onTap();
             return;
           }
-          if (!canPlay) {
-            InAppToast.show(context, message: 'Hanya pemilik yang bisa memainkan');
+          if (!playPerm.allowed) {
+            InAppToast.show(context, message: playPerm.message);
             return;
           }
           onTap();
@@ -1087,22 +1090,29 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
     // Layar 56: Sesi Terkunci
     if (isLocked) {
       final isOwner = group.isOwner(myUid);
+      final playPerm = evaluateCanPlay(group: group, session: group.activeSession, uid: myUid);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildPillActionButton(
-            label: 'Date berjalan · permainan terkunci',
-            isDimmed: true,
-            showIcon: true,
-            onTap: () {
-              if (isOwner) {
-                _showEndSessionPrompt(group);
-              } else {
-                InAppToast.show(context, message: 'Date sedang berjalan · Permainan terkunci');
-              }
-            },
-          ),
           if (isOwner) ...[
+            _buildPillActionButton(
+              label: 'ULANGI BUDGET',
+              isDimmed: false,
+              showIcon: true,
+              onTap: () async {
+                final session = group.activeSession;
+                final startedByName = session?.startedByName ?? 'anggota';
+                final currentBudget = session?.budget ?? 0;
+                final confirm = await GroupImportantDialog.showConfirmRerunBudget(
+                  context,
+                  startedByName: startedByName,
+                  budget: currentBudget,
+                );
+                if (confirm == true) {
+                  _navigateToGroupGame('wheel');
+                }
+              },
+            ),
             const SizedBox(height: 10),
             StickerButton.large(
               text: 'AKHIRI DATE GRUP',
@@ -1111,19 +1121,29 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
               borderColor: AppColors.ink,
               onPressed: () => _showEndSessionPrompt(group),
             ),
+          ] else ...[
+            _buildPillActionButton(
+              label: 'Date berjalan · permainan terkunci',
+              isDimmed: true,
+              showIcon: true,
+              onTap: () {
+                InAppToast.show(context, message: playPerm.message);
+              },
+            ),
           ],
         ],
       );
     }
 
     // Layar 55: Belum Ada Budget
-    if (!canPlay) {
+    final playPerm = evaluateCanPlay(group: group, session: group.activeSession, uid: myUid);
+    if (!playPerm.allowed) {
       return _buildPillActionButton(
-        label: 'Hanya pemilik yang bisa memainkan',
+        label: 'Hanya pemilik yang bisa memutar',
         isDimmed: true,
         showIcon: false,
         onTap: () {
-          InAppToast.show(context, message: 'Kebijakan grup: hanya pemilik yang bisa memutar');
+          InAppToast.show(context, message: playPerm.message);
         },
       );
     }
@@ -1197,4 +1217,103 @@ class _GroupGamesHubViewState extends ConsumerState<GroupGamesHubView>
       ),
     );
   }
+}
+
+
+/// Painter Mini Roda Neo-Brutalist untuk Kartu Hero Games Hub (UPDATE F1)
+/// 8 irisan warna solid dengan garis pembatas hitam 2.2px, border tebal 3.5px,
+/// center hub putih, dan pin tengah hitam.
+class _HubMiniWheelPainter extends CustomPainter {
+  const _HubMiniWheelPainter();
+
+  static const List<Color> _palette = [
+    Color(0xFFFF6B5A), // Tomat
+    Color(0xFFFF9F1C), // Jeruk
+    Color(0xFFFFD23F), // Matahari
+    Color(0xFF3DDBB0), // Mint
+    Color(0xFF6FB1FF), // Langit
+    Color(0xFFB8A4FF), // Lavender
+    Color(0xFFFF8FC0), // Permen
+    Color(0xFFB8E986), // Lemon
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width / 2) - 2.5;
+
+    final borderPaint = Paint()
+      ..color = AppColors.ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5;
+
+    final linePaint = Paint()
+      ..color = AppColors.ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+
+    const sweepAngle = (2 * math.pi) / 8;
+
+    for (int i = 0; i < 8; i++) {
+      final startAngle = i * sweepAngle;
+      final fillPaint = Paint()
+        ..color = _palette[i]
+        ..style = PaintingStyle.fill;
+
+      final path = Path()
+        ..moveTo(center.dx, center.dy)
+        ..arcTo(
+          Rect.fromCircle(center: center, radius: radius),
+          startAngle,
+          sweepAngle,
+          false,
+        )
+        ..close();
+
+      canvas.drawPath(path, fillPaint);
+      canvas.drawPath(path, linePaint);
+    }
+
+    // Outer circle border
+    canvas.drawCircle(center, radius, borderPaint);
+
+    // Center hub outer
+    canvas.drawCircle(center, 14, Paint()..color = AppColors.surface);
+    canvas.drawCircle(center, 14, borderPaint);
+
+    // Center pin
+    canvas.drawCircle(center, 5, Paint()..color = AppColors.ink);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Pointer segitiga neo-brutalist penunjuk roda
+class _HubWheelPointerPainter extends CustomPainter {
+  const _HubWheelPointerPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fillPaint = Paint()
+      ..color = AppColors.tomat
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = AppColors.ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4;
+
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

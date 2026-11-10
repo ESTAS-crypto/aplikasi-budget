@@ -14,6 +14,9 @@ import 'group_important_dialog.dart';
 import 'scope_switcher.dart';
 import '../../../features/navigation/app_router.dart';
 import '../../notifications/notifications.dart';
+import '../models/live_play_model.dart';
+import '../services/clock_sync_service.dart';
+import 'live_spin_overlay.dart';
 
 /// Global Realtime Listener untuk Notifikasi Aktivitas Grup (Layar 18-21 & InAppBanner)
 /// Menghubungkan Supabase/Firestore group_events ke InAppBanner dan Notifikasi Sistem Android.
@@ -37,6 +40,8 @@ class _GroupRealtimeNotificationListenerState
   String? _currentListeningGid;
   late final DateTime _listenerStartTime;
   bool _isEvicting = false;
+  LivePlayModel? _activeLivePlay;
+  String? _lastDismissedSpinId;
 
   void _evictUserFromGroup({required String groupName}) {
     if (_isEvicting) return;
@@ -104,6 +109,15 @@ class _GroupRealtimeNotificationListenerState
       _seenEventIds.clear();
       if (activeGid != null && activeGid.isNotEmpty) {
         _loadSeenEventIdsSync(activeGid, prefs);
+        final gs = ref.read(groupServiceProvider);
+        ref.read(clockSyncServiceProvider).startPeriodicSync(
+          activeGid,
+          firestore: gs.firestore,
+          supabase: gs.supabase,
+          uid: ref.read(groupAuthServiceProvider).currentUid,
+        );
+      } else {
+        ref.read(clockSyncServiceProvider).stopPeriodicSync();
       }
     }
 
@@ -452,6 +466,47 @@ class _GroupRealtimeNotificationListenerState
       },
     );
 
-    return widget.child;
+    // Dengarkan siaran putaran live realtime (F2: LiveSpinOverlay)
+    ref.listen<AsyncValue<LivePlayModel?>>(
+      activeLivePlayStreamProvider,
+      (previous, next) {
+        if (!mounted || activeGid == null || activeGid.isEmpty) return;
+        final play = next.valueOrNull;
+        if (play == null) return;
+
+        // Abaikan jika sudah di-dismiss
+        if (play.spinId == _lastDismissedSpinId) return;
+
+        // Abaikan jika aktor adalah diri sendiri (host sudah melihat animasi di layarnya)
+        final auth = ref.read(groupAuthServiceProvider);
+        if (auth.isCurrentUser(play.startedByUid)) return;
+
+        // Abaikan siaran yang lebih tua dari durationMs + 10 detik (jangan memutar ulang)
+        final clockSync = ref.read(clockSyncServiceProvider);
+        if (play.isExpired(clockSync.serverNowMs)) return;
+
+        setState(() {
+          _activeLivePlay = play;
+        });
+      },
+    );
+
+    return Stack(
+      children: [
+        widget.child,
+        if (_activeLivePlay != null)
+          LiveSpinOverlay(
+            play: _activeLivePlay!,
+            onDismiss: () {
+              if (mounted) {
+                setState(() {
+                  _lastDismissedSpinId = _activeLivePlay!.spinId;
+                  _activeLivePlay = null;
+                });
+              }
+            },
+          ),
+      ],
+    );
   }
 }

@@ -257,5 +257,24 @@ Berkas keluaran: `build/app/outputs/flutter-apk/app-release.apk` (Telah diverifi
 .\android\gradlew.bat -p android bundleRelease
 ```
 Berkas keluaran: `build/app/outputs/bundle/release/app-release.aab` (Telah diverifikasi lolos build).
-#   a p l i k a s i - b u d g e t  
+#   a p l i k a s i - b u d g e t 
  
+ 
+
+---
+
+## 🔔 Penjelasan Teknis Notifikasi Luar Aplikasi (Background Push)
+
+### 1. Fakta Teknis
+Listener database realtime (Cloud Firestore snapshot / Supabase WebSocket channel) **hanya hidup selama proses aplikasi aktif di memori**. Ketika aplikasi berada di latar belakang (*background*) dalam waktu lama atau dimatikan/ditutup oleh pengguna (*terminated* / *killed* dari recent apps), sistem operasi Android membekukan koneksi soket sehingga tidak ada yang mendengarkan event baru. Oleh karena itu, notifikasi sistem untuk aktivitas **anggota lain** tidak bisa muncul tanpa adanya pemicu dari sisi server (*push notification*).
+
+### 2. Solusi Rekomendasi: Cloud Functions + FCM Data-Only
+Kode Cloud Function pemicu telah disediakan di folder `functions/index.js`:
+- **Pemicu Otomatis**: Fungsi `onGroupEventCreated` aktif pada dokumen baru di `groups/{gid}/events/{eventId}`.
+- **Pesan Data-Only**: Dikirim tanpa blok `notification` standar, melainkan data JSON berprioritas tinggi (`priority: "high"`). Hal ini memastikan notifikasi dibangun dan disaring secara aman oleh `NotificationCoordinator` di perangkat penerima.
+- **Filter & Deduplikasi Satu Pintu**:
+  - Jika `actorUid == currentUid` (aksi diri sendiri), pesan langsung dibuang tanpa notifikasi (`ownAction`).
+  - Jika aplikasi sedang terbuka di depan (*resumed*), hanya menampilkan `InAppBanner`.
+  - Jika aplikasi di latar atau tertutup, menampilkan notifikasi sistem Android.
+  - Kunci deduplikasi atomik deterministik `evt:{gid}:{eventId}` menjamin setiap kejadian tepat dinotifikasikan satu kali tanpa duplikasi susulan saat aplikasi dibuka kembali.
+- **Estimasi Biaya**: Kuota gratis bulanan Firebase Cloud Functions adalah 2.000.000 panggilan/bulan (gratis Rp0 untuk penggunaan normal grup ngedate), membutuhkan upgrade proyek Firebase ke paket Blaze (*pay-as-you-go*).

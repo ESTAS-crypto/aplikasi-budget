@@ -37,9 +37,9 @@ service cloud.firestore {
       // Read: only members can read group document
       allow read: if isMember(gid);
       
-      // Update: owner can update everything; members can only update activeSession (if playPolicy != 'owner') or memberCount
+      // Update: owner can update everything except ownerUid (ownerUid immutable); members can only update activeSession (if playPolicy != 'owner') or memberCount
       allow update: if isMember(gid) && (
-        isOwner(gid) ||
+        (isOwner(gid) && request.resource.data.ownerUid == resource.data.ownerUid) ||
         (
           // Non-owner cannot modify group settings
           !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -98,6 +98,16 @@ service cloud.firestore {
         allow create: if isMember(gid) &&
           request.resource.data.actorUid == request.auth.uid;
         allow update, delete: if false;
+      }
+      
+      // Subcollection: live (F2: Siaran langsung putaran/game realtime)
+      match /live/{docId} {
+        allow read, write: if isMember(gid);
+      }
+      
+      // Subcollection: _clock_sync (F2: Sinkronisasi jam server)
+      match /_clock_sync/{uid} {
+        allow read, write: if isAuthenticated() && request.auth.uid == uid;
       }
     }
   }

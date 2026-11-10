@@ -15,6 +15,8 @@ import '../../../core/utils/wheel_math.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/group/models/group_model.dart';
 import '../../../core/group/models/group_member_model.dart';
+import '../../../core/group/models/live_play_model.dart';
+import '../../../core/group/services/clock_sync_service.dart';
 import '../../../core/group/services/group_service.dart';
 import '../../../core/group/services/group_auth_service.dart';
 import '../../../core/group/services/group_game_service.dart';
@@ -252,25 +254,57 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     }
   }
 
-  void _showNonOwnerBlockedFeedback(String ownerName, {bool isFixed = false}) {
+  void _showPlayBlockedFeedback(PlayPermissionResult perm) {
     SoundService.instance.play(Sfx.notifWarning);
     HapticFeedback.lightImpact();
     InAppToast.show(
       context,
-      message: 'Hanya pemilik yang bisa memainkan',
+      message: perm.message.isNotEmpty
+          ? perm.message
+          : 'Hanya pemilik yang bisa memutar',
     );
   }
 
-  void _spinWheel({required bool canSpin, required String ownerName, bool isFunSpin = false}) {
+  void _showNonOwnerBlockedFeedback(String? ownerName, {bool isFixed = false}) {
+    SoundService.instance.play(Sfx.notifWarning);
+    HapticFeedback.lightImpact();
+    InAppToast.show(
+      context,
+      message: 'Hanya pemilik yang bisa memutar',
+    );
+  }
+
+  void _spinWheel({
+    required bool canSpin,
+    required String ownerName,
+    bool isFunSpin = false,
+    PlayPermissionResult? playPerm,
+  }) {
     if (!canSpin) {
-      _showNonOwnerBlockedFeedback(ownerName);
+      _showPlayBlockedFeedback(playPerm ??
+          const PlayPermissionResult(
+            allowed: false,
+            deniedReason: PlayDenied.notOwner,
+            message: 'Hanya pemilik yang bisa memutar',
+          ));
       return;
     }
 
     if (_isSpinning) return;
 
-    SoundService.instance.play(Sfx.wheelSpin);
-    HapticFeedback.mediumImpact();
+    // F2: Validasi satu putaran pada satu waktu (jika ada siaran yang sedang berjalan)
+    final activeGid = ref.read(groupServiceProvider).getActiveGroupId();
+    if (activeGid != null) {
+      final currentLive = ref.read(groupServiceProvider).getLocalLivePlay(activeGid);
+      final clockSync = ref.read(clockSyncServiceProvider);
+      if (currentLive != null && !currentLive.isCompleted(clockSync.serverNowMs)) {
+        InAppToast.show(
+          context,
+          message: 'Putaran sedang berlangsung, mohon tunggu sebentar',
+        );
+        return;
+      }
+    }
 
     setState(() {
       _isSpinning = true;
@@ -279,13 +313,15 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       _spectatorActorName = null;
     });
 
+    final secureRandom = math.Random.secure();
     final totalSlots = _currentSlots.length;
     final segAngle = 360.0 / totalSlots;
-    final randomTurns = 5 + math.Random().nextInt(3);
-    final winningIndex = math.Random().nextInt(totalSlots);
+    final randomTurns = 5 + secureRandom.nextInt(3);
+    final winningIndex = secureRandom.nextInt(totalSlots);
+    final wonAmount = _currentSlots[winningIndex];
 
     final jitterRange = segAngle * 0.3;
-    final jitter = (math.Random().nextDouble() * 2 - 1) * jitterRange;
+    final jitter = (secureRandom.nextDouble() * 2 - 1) * jitterRange;
     final targetNormalizedAngle = ((360.0 - (winningIndex * segAngle + segAngle / 2.0) + jitter) % 360.0 + 360.0) % 360.0;
 
     final startNormalized = (_currentRotationAngle % 360.0 + 360.0) % 360.0;
@@ -297,11 +333,38 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
 
     _lastAngleForHaptic = _currentRotationAngle;
 
-    final now = DateTime.now();
-    final spinSessionId = 'sess_${now.millisecondsSinceEpoch}_${math.Random().nextInt(9999)}';
+    final clockSync = ref.read(clockSyncServiceProvider);
+    final serverNowMs = clockSync.serverNowMs;
+    // F2: hitung startAtMs = serverNow + 1500 (jeda agar semua HP sempat menerima)
+    final startAtMs = serverNowMs + 1500;
+    const durationMs = 6000;
+    final spinSessionId = 'sess_${serverNowMs}_${secureRandom.nextInt(9999)}';
     _currentSpinSessionId = spinSessionId;
 
-    _spinController.duration = const Duration(seconds: 5);
+    if (!isFunSpin && activeGid != null) {
+      final authService = ref.read(groupAuthServiceProvider);
+      final livePlay = LivePlayModel(
+        spinId: spinSessionId,
+        game: 'wheel',
+        startAtMs: startAtMs,
+        durationMs: durationMs,
+        laps: randomTurns,
+        resultIndex: winningIndex,
+        finalAngle: targetAngle,
+        amount: wonAmount,
+        startedByUid: authService.currentUid ?? '',
+        startedByName: authService.displayName ?? 'Pemilik',
+        seed: secureRandom.nextInt(1000000),
+        params: {
+          'slots': _currentSlots,
+        },
+      );
+
+      // Siarkan ke groups/{gid}/live/current dan Supabase Realtime
+      ref.read(groupServiceProvider).broadcastLivePlay(activeGid, livePlay);
+    }
+
+    _spinController.duration = const Duration(milliseconds: durationMs);
     _spinAnimation = Tween<double>(
       begin: _currentRotationAngle,
       end: targetAngle,
@@ -312,7 +375,21 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       ),
     );
 
-    _spinController.forward(from: 0.0);
+    // Host juga memulai animasinya pada startAtMs, bukan seketika, supaya sejajar dengan anggota
+    final delayMs = startAtMs - clockSync.serverNowMs;
+    if (delayMs > 0) {
+      Timer(Duration(milliseconds: delayMs), () {
+        if (mounted && _isSpinning) {
+          SoundService.instance.play(Sfx.wheelSpin);
+          HapticFeedback.mediumImpact();
+          _spinController.forward(from: 0.0);
+        }
+      });
+    } else {
+      SoundService.instance.play(Sfx.wheelSpin);
+      HapticFeedback.mediumImpact();
+      _spinController.forward(from: 0.0);
+    }
   }
 
   void _onPanStart(DragStartDetails details, Offset wheelCenter, {required bool canSpin, required String ownerName}) {
@@ -343,34 +420,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final speed = velocity.distance;
 
     if (speed > 400) {
-      final extraTurns = (speed / 300).clamp(3, 7).toInt();
-      final rawTarget = _currentRotationAngle + (extraTurns * 360.0);
-
-      setState(() {
-        _isSpinning = true;
-        _isSpectatorMode = false;
-        _spectatorActorName = null;
-        _spectatorBudget = null;
-      });
-
-      _lastAngleForHaptic = _currentRotationAngle;
-
-      final now = DateTime.now();
-      final spinSessionId = 'sess_${now.millisecondsSinceEpoch}_${math.Random().nextInt(9999)}';
-      _currentSpinSessionId = spinSessionId;
-
-      _spinController.duration = const Duration(seconds: 5);
-      _spinAnimation = Tween<double>(
-        begin: _currentRotationAngle,
-        end: rawTarget,
-      ).animate(
-        CurvedAnimation(
-          parent: _spinController,
-          curve: const Cubic(0.12, 0.7, 0.1, 1.0),
-        ),
-      );
-
-      _spinController.forward(from: 0.0);
+      _spinWheel(canSpin: true, ownerName: '');
     } else {
       SoundService.instance.play(Sfx.wheelLand);
     }
@@ -441,11 +491,15 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final notes = notesAsync.valueOrNull ?? [];
 
     final authService = ref.watch(groupAuthServiceProvider);
-    final myUid = authService.currentUid;
-    final isOwner = authService.isCurrentUser(group.ownerUid) ||
-        members.any((m) => m.role == 'owner' && authService.isCurrentUser(m.uid));
-    final canSpin = group.canUserPlay(myUid ?? '');
+    final myUid = authService.currentUid ?? '';
+    // Aturan F1: isOwner = group.ownerUid == uid. Tidak ada sumber lain.
+    final isOwner = group.ownerUid == myUid;
+    final playPerm = evaluateCanPlay(group: group, session: group.activeSession, uid: myUid);
+    final canSpin = playPerm.allowed;
     final isLocked = group.isSessionLocked;
+    final hasBudget = group.activeSession != null &&
+        group.activeSession!.sessionId.isNotEmpty &&
+        group.activeSession!.budget > 0;
     final isFixed = group.budgetMode == 'fixed';
 
     // Keamanan: Jika user bukan pemilik dan bukan lagi anggota dalam daftar grup ini,
@@ -454,7 +508,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final isCurrentUserMember = members.any((m) =>
         authService.isCurrentUser(m.uid) ||
         (myName != null && myName.isNotEmpty && m.name.toLowerCase().trim() == myName));
-    if (myUid != null && !isOwner && members.isNotEmpty && !isCurrentUserMember) {
+    if (myUid.isNotEmpty && !isOwner && members.isNotEmpty && !isCurrentUserMember) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         ref.read(groupServiceProvider).setActiveGroupId(null);
@@ -845,29 +899,37 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                     ),
                   ),
                 ),
-              ] else if (isLocked) ...[
-                // Sesi Terkunci (Date berjalan)
+              ] else if (isOwner && hasBudget) ...[
+                // Aturan F1: Pemilik SELALU boleh memutar atau mengulang, kapan pun.
+                // Saat sesi sudah punya budget, tombol pemilik berbunyi "Ulangi budget" dan meminta konfirmasi.
                 StickerButton.large(
-                  text: 'Date berjalan · permainan terkunci',
-                  backgroundColor: AppColors.surface,
+                  text: _isSpinning ? 'MEMUTAR...' : 'ULANGI BUDGET',
+                  backgroundColor: AppColors.tomat,
                   textColor: AppColors.ink,
-                  borderColor: AppColors.ink,
-                  onPressed: isOwner
-                      ? () => _confirmEndSession(group)
-                      : () {
-                          InAppToast.show(context, message: 'Date sedang berjalan · Permainan terkunci');
+                  onPressed: _isSpinning
+                      ? null
+                      : () async {
+                          final session = group.activeSession;
+                          final startedByName = session?.startedByName ?? 'anggota';
+                          final currentBudget = session?.budget ?? 0;
+                          final confirm = await GroupImportantDialog.showConfirmRerunBudget(
+                            context,
+                            startedByName: startedByName,
+                            budget: currentBudget,
+                          );
+                          if (confirm == true) {
+                            _spinWheel(canSpin: true, ownerName: ownerName);
+                          }
                         },
                 ),
-                if (isOwner) ...[
-                  const SizedBox(height: 10),
-                  StickerButton.large(
-                    text: 'AKHIRI DATE GRUP',
-                    backgroundColor: AppColors.matahari,
-                    textColor: AppColors.ink,
-                    borderColor: AppColors.ink,
-                    onPressed: () => _confirmEndSession(group),
-                  ),
-                ],
+                const SizedBox(height: 10),
+                StickerButton.large(
+                  text: 'AKHIRI DATE GRUP',
+                  backgroundColor: AppColors.matahari,
+                  textColor: AppColors.ink,
+                  borderColor: AppColors.ink,
+                  onPressed: () => _confirmEndSession(group),
+                ),
               ] else if (canSpin) ...[
                 // Mode Dari Permainan (bisa memutar roda)
                 StickerButton.large(
@@ -939,14 +1001,33 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                     ),
                   ),
                 ),
-              ] else ...[
-                // Mode Dari Permainan (member biasa tidak boleh memutar)
+              ] else if (playPerm.deniedReason == PlayDenied.sessionLocked) ...[
+                // Anggota: Sesi Terkunci (Date berjalan)
                 StickerButton.large(
-                  text: 'Hanya pemilik yang bisa memainkan',
+                  text: 'Date berjalan · permainan terkunci',
                   backgroundColor: AppColors.surface,
                   textColor: AppColors.ink,
                   borderColor: AppColors.ink,
-                  onPressed: () => _showNonOwnerBlockedFeedback(ownerName, isFixed: false),
+                  onPressed: () {
+                    InAppToast.show(
+                      context,
+                      message: playPerm.message,
+                    );
+                  },
+                ),
+              ] else ...[
+                // Anggota: Bukan Pemilik (playPolicy == 'owner')
+                StickerButton.large(
+                  text: 'Hanya pemilik yang bisa memutar',
+                  backgroundColor: AppColors.surface,
+                  textColor: AppColors.ink,
+                  borderColor: AppColors.ink,
+                  onPressed: () {
+                    InAppToast.show(
+                      context,
+                      message: 'Hanya pemilik yang bisa memutar',
+                    );
+                  },
                 ),
                 const SizedBox(height: 10),
                 GestureDetector(
