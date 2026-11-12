@@ -946,7 +946,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppColors.ink, width: 1.8),
                 ),
-                child: const Icon(Icons.construction_rounded, size: 18, color: AppColors.ink),
+                child: const Icon(Icons.sports_esports_rounded, size: 18, color: AppColors.ink),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -954,7 +954,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Mode Permainan Lainnya',
+                      'Mode Permainan Grup',
                       style: AppTypography.titleMedium.copyWith(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -962,7 +962,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                       ),
                     ),
                     Text(
-                      'Dalam tahap pengembangan untuk multiplayer grup',
+                      'Pilih dan mainkan mode permainan alternatif bersama anggota grup',
                       style: AppTypography.bodySmall.copyWith(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -974,26 +974,49 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
             ],
           ),
           const SizedBox(height: 12),
-          _buildUpcomingGameRow(emoji: '🎲', title: 'Kocok Dadu Bersama', subtitle: 'Multiplayer roll dadu live bersama teman'),
+          _buildUpcomingGameRow(
+            emoji: '🎲',
+            title: 'Kocok Dadu Bersama',
+            subtitle: 'Multiplayer roll dadu live bersama teman',
+            route: '/group/dice',
+          ),
           const SizedBox(height: 8),
-          _buildUpcomingGameRow(emoji: '🔮', title: 'Gacha Kapsul Grup', subtitle: 'Tarik tuas gacha bersama anggota'),
+          _buildUpcomingGameRow(
+            emoji: '🔮',
+            title: 'Gacha Kapsul Grup',
+            subtitle: 'Tarik tuas gacha bersama anggota',
+            route: '/group/capsule',
+          ),
           const SizedBox(height: 8),
-          _buildUpcomingGameRow(emoji: '✉️', title: 'Pilih Amplop Misteri', subtitle: 'Tiap anggota memilih amplop kejutan'),
+          _buildUpcomingGameRow(
+            emoji: '✉️',
+            title: 'Pilih Amplop Misteri',
+            subtitle: 'Tiap anggota memilih amplop kejutan',
+            route: '/group/envelope',
+          ),
           const SizedBox(height: 8),
-          _buildUpcomingGameRow(emoji: '🪙', title: 'Lempar Koin Grup', subtitle: 'Tebak koin bareng melipatgandakan budget'),
+          _buildUpcomingGameRow(
+            emoji: '🪙',
+            title: 'Lempar Koin Grup',
+            subtitle: 'Tebak koin bareng melipatgandakan budget',
+            route: '/group/coin',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildUpcomingGameRow({required String emoji, required String title, required String subtitle}) {
+  Widget _buildUpcomingGameRow({
+    required String emoji,
+    required String title,
+    required String subtitle,
+    required String route,
+  }) {
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
-        InAppToast.show(
-          context,
-          message: 'Mode $title sedang disiapkan untuk pembaruan berikutnya!',
-        );
+        HapticFeedback.lightImpact();
+        context.push(route);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1029,19 +1052,34 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.matahari,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppColors.ink, width: 1.2),
+                color: AppColors.mint,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.ink, width: 1.5),
+                boxShadow: const [
+                  BoxShadow(
+                    color: AppColors.ink,
+                    offset: Offset(1.5, 1.5),
+                    blurRadius: 0,
+                  ),
+                ],
               ),
-              child: Text(
-                'SEGERA HADIR',
-                style: AppTypography.chipLabel.copyWith(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.ink,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'MAINKAN',
+                    style: AppTypography.chipLabel.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.ink),
+                ],
               ),
             ),
           ],

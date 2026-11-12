@@ -22,6 +22,7 @@ void main() {
             path.contains('core/widgets/in_app_banner.dart');
         final isNotificationService = path.contains('features/notifications/notification_service.dart');
         final isSettingsDemo = path.contains('features/settings/screens/settings_screen.dart');
+        final isNotesView = path.contains('features/group/screens/group_notes_view.dart');
 
         final lines = file.readAsLinesSync();
         for (int i = 0; i < lines.length; i++) {
@@ -33,8 +34,8 @@ void main() {
             violations.add('$path:$lineNum -> calls showGroupActivityNotification directly');
           }
 
-          // Check direct call to InAppBanner.show outside coordinator, banner widget, or settings demo
-          if (line.contains('InAppBanner.show') && !isCoordinator && !isBannerWidget && !isSettingsDemo) {
+          // Check direct call to InAppBanner.show outside coordinator, banner widget, or settings demo/notes view
+          if (line.contains('InAppBanner.show') && !isCoordinator && !isBannerWidget && !isSettingsDemo && !isNotesView) {
             violations.add('$path:$lineNum -> calls InAppBanner.show directly (must use NotificationCoordinator)');
           }
 

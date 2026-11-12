@@ -86,7 +86,11 @@ class GroupGameService {
         'evt_${now.millisecondsSinceEpoch}_${Random().nextInt(999)}';
 
     // 1. Validasi hak bermain (F1 canPlay & PlayDenied)
-    final existingSession = currentGroup.activeSession;
+    // Abaikan sesi lokal jika sessionId-nya sama dengan customSessionId (optimistic update dari roda lokal)
+    final existingSession = (customSessionId != null &&
+            currentGroup.activeSession?.sessionId == customSessionId)
+        ? null
+        : currentGroup.activeSession;
     final perm = evaluateCanPlay(
       group: currentGroup,
       session: existingSession,

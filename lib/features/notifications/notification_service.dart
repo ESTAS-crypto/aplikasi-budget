@@ -682,8 +682,9 @@ class NotificationService {
       case NotificationCategory.expense:
         channelId = channelGroupActivityId;
         channelName = 'Aktivitas Grup';
-        importance = Importance.defaultImportance;
-        priority = Priority.defaultPriority;
+        importance = Importance.high;
+        priority = Priority.high;
+        soundResource = 'notif_reminder';
         actions = const [
           AndroidNotificationAction(
             actionCatatJajan,
@@ -724,8 +725,9 @@ class NotificationService {
       default:
         channelId = channelGroupActivityId;
         channelName = 'Aktivitas Grup';
-        importance = Importance.defaultImportance;
-        priority = Priority.defaultPriority;
+        importance = Importance.high;
+        priority = Priority.high;
+        soundResource = 'notif_reminder';
         break;
     }
 
@@ -739,7 +741,7 @@ class NotificationService {
       sound: soundResource != null
           ? RawResourceAndroidNotificationSound(soundResource)
           : null,
-      playSound: soundResource != null,
+      playSound: true,
       actions: actions,
       styleInformation: BigTextStyleInformation(
         intent.systemBody,

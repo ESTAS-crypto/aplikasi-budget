@@ -309,22 +309,17 @@ class _GroupRealtimeNotificationListenerState
               } else {
                 category = InAppBannerCategory.expense;
                 bannerTitle = isMe
-                    ? 'Kamu menambahkan $formattedAmount'
-                    : '${evt.actorName} menambahkan $formattedAmount';
-                bannerSubtitle = '$title · Sisa grup $formattedRemaining';
+                    ? 'Kamu mencatat $title'
+                    : '${evt.actorName} mencatat $title';
+                bannerSubtitle = '$formattedAmount · Sisa grup $formattedRemaining';
                 systemMessage =
-                    '${evt.actorName} menambahkan pengeluaran $formattedAmount untuk $title. Sisa budget grup sekarang $formattedRemaining.';
+                    '${evt.actorName} mencatat pengeluaran $formattedAmount untuk $title. Sisa budget grup sekarang $formattedRemaining.';
                 bannerSound = Sfx.coinRecord;
               }
               break;
 
             case GroupEventType.spin:
               final sessId = evt.payload['sessionId']?.toString() ?? '';
-              // Jika putaran ini baru saja mendarat di roda dan sudah ditampilkan secara lokal/instan,
-              // lewati agar tidak muncul dua kali atau tertunda
-              if (sessId.isNotEmpty && ref.read(groupServiceProvider).wasSpinRecentlyShown(sessId)) {
-                continue;
-              }
               if (sessId.isNotEmpty) {
                 ref.read(groupServiceProvider).markSpinAsShown(sessId);
               }
@@ -424,15 +419,26 @@ class _GroupRealtimeNotificationListenerState
 
             case GroupEventType.custom:
               category = InAppBannerCategory.sessionEnd;
-              bannerTitle = isMe
-                  ? 'Nominal roda diperbarui'
-                  : '${evt.actorName} memperbarui nominal roda';
-              bannerSubtitle = evt.summary ?? 'Pilihan nominal roda telah diperbarui.';
-              systemMessage = '${evt.actorName} memperbarui pilihan nominal roda di grup $groupName.';
+              if (evt.payload['action'] == 'end_session') {
+                bannerTitle = isMe
+                    ? 'Kamu mengakhiri date grup'
+                    : '${evt.actorName} mengakhiri date grup';
+                bannerSubtitle = 'Sesi date selesai · Permainan grup kini terbuka';
+                systemMessage = '${evt.actorName} telah mengakhiri sesi date di grup $groupName.';
+              } else {
+                bannerTitle = isMe
+                    ? 'Nominal roda diperbarui'
+                    : '${evt.actorName} memperbarui nominal roda';
+                bannerSubtitle = evt.summary ?? 'Pilihan nominal roda telah diperbarui.';
+                systemMessage = '${evt.actorName} memperbarui pilihan nominal roda di grup $groupName.';
+              }
               bannerSound = Sfx.uiTap;
               break;
 
             case GroupEventType.gameResult:
+              if (evt.payload['valid'] == false) {
+                continue;
+              }
               category = InAppBannerCategory.spin;
               final game = evt.payload['game']?.toString() ?? 'game';
               final gameName = GroupEventModel.formatGameName(game);
@@ -448,27 +454,62 @@ class _GroupRealtimeNotificationListenerState
           }
 
           // SATU PINTU: Kirim NotificationIntent ke NotificationCoordinator
-          final intent = NotificationIntent.groupEvent(
-            gid: activeGid,
-            groupName: groupName,
-            eventId: evt.eventId,
-            eventType: evt.type.value,
-            actorUid: evt.actorUid,
-            actorName: evt.actorName,
-            title: bannerTitle,
-            subtitle: bannerSubtitle,
-            systemBody: systemMessage,
-            amount: (evt.payload['amount'] as num?)?.toInt(),
-            createdAt: evt.createdAt,
-            payload: '/group/activity',
-            extra: {
-              'sound': bannerSound,
-              'isExpense': isExpense,
-              'bannerCategory': category,
-            },
-          );
+          // Untuk orang yang melakukan aksi (isMe == true): hanya muncul notifikasi di dalam aplikasi (InAppBanner).
+          // Untuk orang lain (anggota maupun owner yang tidak melakukan aksi, isMe == false):
+          // muncul notifikasi di dalam aplikasi (InAppBanner) MAUPUN di luar aplikasi (Status Bar Sistem Android)!
+          if (isMe) {
+            if (NotificationCoordinator.instance.currentLifecycleState == AppLifecycleState.resumed) {
+              final selfIntent = NotificationIntent.groupEvent(
+                gid: activeGid,
+                groupName: groupName,
+                eventId: evt.eventId,
+                eventType: evt.type.value,
+                actorUid: evt.actorUid,
+                actorName: evt.actorName,
+                title: bannerTitle,
+                subtitle: bannerSubtitle,
+                systemBody: systemMessage,
+                amount: (evt.payload['amount'] as num?)?.toInt(),
+                createdAt: evt.createdAt,
+                payload: '/group/activity',
+                extra: {
+                  'sound': bannerSound,
+                  'isExpense': isExpense,
+                  'bannerCategory': category,
+                },
+              );
+              await NotificationCoordinator.instance.onRenderBanner?.call(selfIntent);
+            }
+          } else {
+            final intent = NotificationIntent.groupEvent(
+              gid: activeGid,
+              groupName: groupName,
+              eventId: evt.eventId,
+              eventType: evt.type.value,
+              actorUid: evt.actorUid,
+              actorName: evt.actorName,
+              title: bannerTitle,
+              subtitle: bannerSubtitle,
+              systemBody: systemMessage,
+              amount: (evt.payload['amount'] as num?)?.toInt(),
+              createdAt: evt.createdAt,
+              payload: '/group/activity',
+              extra: {
+                'sound': bannerSound,
+                'isExpense': isExpense,
+                'bannerCategory': category,
+              },
+            );
 
-          await ref.read(notificationCoordinatorProvider).dispatch(intent);
+            final decision = await ref.read(notificationCoordinatorProvider).dispatch(intent);
+            // Jika orang lain tersebut sedang membuka aplikasi (surface == banner),
+            // tetap kirimkan juga notifikasi sistem di luar aplikasi (status bar Android)
+            // sehingga mereka menerima notifikasi baik di dalam maupun di luar aplikasi!
+            if (decision.surface == NotificationSurface.banner &&
+                decision.reason == NotificationDropReason.none) {
+              await NotificationCoordinator.instance.onRenderSystem?.call(intent);
+            }
+          }
         }
 
         _saveSeenEventIds(activeGid, prefs);

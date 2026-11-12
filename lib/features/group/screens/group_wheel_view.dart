@@ -198,7 +198,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
 
       // 0ms LOCAL-FIRST: Update dan simpan langsung ke local group agar tab Catatan & seluruh app
       // langsung mengenali budget aktif seketika tanpa harus menunggu respons jaringan!
-      final activeGid = ref.read(groupServiceProvider).getActiveGroupId();
+      final activeGid = ref.read(activeGroupIdProvider) ?? ref.read(groupServiceProvider).getActiveGroupId();
       if (activeGid != null) {
         final localGroup = ref.read(groupServiceProvider).getLocalGroup(activeGid);
         if (localGroup != null) {
@@ -222,8 +222,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       // UPDATE 2D: Klaim sesi dan tulis event dalam satu transaksi
       if (!wasSpectator) {
         final activeGroup = ref.read(activeGroupStreamProvider).valueOrNull ??
-            (ref.read(groupServiceProvider).getActiveGroupId() != null
-                ? ref.read(groupServiceProvider).getLocalGroup(ref.read(groupServiceProvider).getActiveGroupId()!)
+            (activeGid != null
+                ? ref.read(groupServiceProvider).getLocalGroup(activeGid)
                 : null);
         if (activeGroup != null) {
           try {
@@ -445,10 +445,23 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final notesAsync = ref.watch(activeGroupNotesStreamProvider);
     final unreadCount = ref.watch(unreadActivityCountProvider);
 
-    final rawGroup = activeGroupAsync.valueOrNull ??
-        (activeGroupId != null && activeGroupId.isNotEmpty
-            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
-            : null);
+    final streamedGroup = activeGroupAsync.valueOrNull;
+    final localGroup = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
+        : null;
+    final resolvedSession = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? ref.read(groupServiceProvider).resolveEffectiveSession(
+              activeGroupId,
+              streamedGroup?.activeSession,
+              localGroup?.activeSession,
+            )
+        : (streamedGroup?.activeSession ?? localGroup?.activeSession);
+    final rawGroup = (streamedGroup != null || localGroup != null)
+        ? (streamedGroup ?? localGroup)!.copyWith(
+            activeSession: resolvedSession,
+            clearActiveSession: resolvedSession == null,
+          )
+        : null;
 
     if (rawGroup == null) {
       if (activeGroupId != null && activeGroupId.isNotEmpty) {
@@ -537,7 +550,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     final ownerName = ownerMember.name;
 
     // Gunakan sesi live lokal yang baru saja selesai berputar (0ms) jika ada, atau sinkronkan dengan database
-    if (_localLiveSession != null && group.activeSession?.sessionId == _localLiveSession!.sessionId) {
+    if (_localLiveSession != null &&
+        (group.activeSession?.sessionId == _localLiveSession!.sessionId ||
+            ref.read(groupServiceProvider).isSessionEnded(group.id, _localLiveSession))) {
       _localLiveSession = null;
     }
     final session = _localLiveSession ?? group.activeSession;
@@ -1097,6 +1112,12 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       budget: group.activeSession?.budget,
     );
     if (confirm == true) {
+      if (mounted) {
+        setState(() {
+          _localLiveSession = null;
+          _lastSessionId = null;
+        });
+      }
       await ref.read(groupGameServiceProvider).endSession(gid: group.id);
       if (mounted) {
         showStickerSnackbar(context, message: 'Date grup telah diakhiri. Roda siap diputar!');

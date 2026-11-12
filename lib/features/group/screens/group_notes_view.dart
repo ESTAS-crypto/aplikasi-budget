@@ -42,13 +42,17 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
       _didAutoOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _openAddExpenseSheet(group.id, group.activeSession!.sessionId);
+          _openAddExpenseSheet(
+            group.id,
+            group.activeSession!.sessionId,
+            group.activeSession!.budget,
+          );
         }
       });
     }
   }
 
-  void _openAddExpenseSheet(String gid, String sessionId) {
+  void _openAddExpenseSheet(String gid, String sessionId, int sessionBudget) {
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
@@ -57,6 +61,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
       builder: (ctx) => _AddGroupExpenseBottomSheet(
         gid: gid,
         sessionId: sessionId,
+        sessionBudget: sessionBudget,
       ),
     );
   }
@@ -64,6 +69,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
   Future<void> _handleDeleteNote({
     required String gid,
     required GroupNoteModel note,
+    required int sessionBudget,
   }) async {
     final confirmed = await GroupImportantDialog.showConfirmDeleteNote(
       context,
@@ -79,10 +85,8 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
           noteId: note.noteId,
           title: note.title,
           amount: note.amount,
+          sessionBudget: sessionBudget,
         );
-        if (mounted) {
-          showStickerSnackbar(context, message: 'Catatan berhasil dihapus');
-        }
       } catch (e) {
         if (mounted) {
           showStickerSnackbar(context, message: 'Gagal menghapus catatan');
@@ -100,16 +104,26 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
         ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
         : null;
 
-    GroupModel? rawGroup = (streamedGroup != null && localGroup != null)
-        ? streamedGroup.copyWith(
-            activeSession: streamedGroup.activeSession ?? localGroup.activeSession,
+    final resolvedSession = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? ref.read(groupServiceProvider).resolveEffectiveSession(
+              activeGroupId,
+              streamedGroup?.activeSession,
+              localGroup?.activeSession,
+            )
+        : (streamedGroup?.activeSession ?? localGroup?.activeSession);
+
+    GroupModel? rawGroup = (streamedGroup != null || localGroup != null)
+        ? (streamedGroup ?? localGroup)!.copyWith(
+            activeSession: resolvedSession,
+            clearActiveSession: resolvedSession == null,
           )
-        : (streamedGroup ?? localGroup);
+        : null;
 
     // Pemulihan Sesi Mandiri (Failsafe): Jika activeSession bernilai null karena delay stream
-    // tetapi ada event putaran roda / game result yang valid di log lokal grup, pulihkan sesi seketika!
+    // tetapi ada event putaran roda / game result yang valid di log lokal grup (dan belum diakhiri), pulihkan sesi seketika!
     if (rawGroup != null && rawGroup.activeSession == null && activeGroupId != null && activeGroupId.isNotEmpty) {
-      final evts = ref.read(groupServiceProvider).getLocalEvents(activeGroupId);
+      final groupService = ref.read(groupServiceProvider);
+      final evts = groupService.getLocalEvents(activeGroupId);
       for (final evt in evts) {
         if (evt.payload['action'] == 'end_session') break;
         if ((evt.type == GroupEventType.gameResult || evt.type == GroupEventType.spin) &&
@@ -127,8 +141,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
             startedByName: evt.actorName,
             startedAt: evt.createdAt,
           );
-          rawGroup = rawGroup!.copyWith(activeSession: recoveredSession);
-          ref.read(groupServiceProvider).saveLocalGroup(rawGroup);
+          if (!groupService.isSessionEnded(activeGroupId, recoveredSession)) {
+            rawGroup = rawGroup!.copyWith(activeSession: recoveredSession);
+            groupService.saveLocalGroup(rawGroup);
+          }
           break;
         } else if (evt.type == GroupEventType.sessionStart && evt.payload['budget'] != null) {
           final amt = (evt.payload['budget'] as num).toInt();
@@ -141,8 +157,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
             startedByName: evt.actorName,
             startedAt: evt.createdAt,
           );
-          rawGroup = rawGroup!.copyWith(activeSession: recoveredSession);
-          ref.read(groupServiceProvider).saveLocalGroup(rawGroup);
+          if (!groupService.isSessionEnded(activeGroupId, recoveredSession)) {
+            rawGroup = rawGroup!.copyWith(activeSession: recoveredSession);
+            groupService.saveLocalGroup(rawGroup);
+          }
           break;
         }
       }
@@ -337,8 +355,16 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     }
 
     final notesAsync = ref.watch(activeGroupNotesStreamProvider);
-    final notes = notesAsync.value ?? [];
-    final activeNotes = notes.where((n) => !n.deleted).toList();
+    final List<GroupNoteModel> streamedNotes = notesAsync.valueOrNull ?? [];
+    final List<GroupNoteModel> localNotes = ref.read(groupServiceProvider).getLocalNotes(group.id);
+    final Map<String, GroupNoteModel> notesMap = {for (final n in localNotes) n.noteId: n};
+    for (final n in streamedNotes) {
+      notesMap[n.noteId] = n;
+    }
+    final List<GroupNoteModel> allNotes = notesMap.values.toList();
+    final List<GroupNoteModel> activeNotes = allNotes
+        .where((n) => !n.deleted && (n.sessionId == activeSession.sessionId || n.sessionId.isEmpty))
+        .toList();
 
     // Hitung budget secara murni deterministik (append-only)
     final totalSpent = GroupModel.calculateTotalSpent(activeSession.sessionId, activeNotes);
@@ -348,7 +374,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
       notes: activeNotes,
     );
 
-    final hasPendingWrites = notes.any((n) => n.hasPendingWrites);
+    final hasPendingWrites = allNotes.any((n) => n.hasPendingWrites);
     final syncState = hasPendingWrites ? SyncState.menunggu : SyncState.tersinkron;
 
     return Column(
@@ -396,7 +422,11 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                   backgroundColor: AppColors.tomat,
                   height: 50,
                   borderRadius: 16,
-                  onPressed: () => _openAddExpenseSheet(group.id, activeSession.sessionId),
+                  onPressed: () => _openAddExpenseSheet(
+                    group.id,
+                    activeSession.sessionId,
+                    activeSession.budget,
+                  ),
                 ),
                 if (group.isOwner(ref.watch(groupAuthServiceProvider).currentUid ?? '')) ...[
                   const SizedBox(height: 10),
@@ -758,7 +788,11 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                   GestureDetector(
                     onTap: () {
                       SoundService.instance.play(Sfx.uiTap);
-                      _handleDeleteNote(gid: gid, note: note);
+                      _handleDeleteNote(
+                        gid: gid,
+                        note: note,
+                        sessionBudget: group.activeSession?.budget ?? 0,
+                      );
                     },
                     child: Padding(
                       padding: const EdgeInsets.only(top: 4.0),
@@ -785,10 +819,12 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
 class _AddGroupExpenseBottomSheet extends ConsumerStatefulWidget {
   final String gid;
   final String sessionId;
+  final int sessionBudget;
 
   const _AddGroupExpenseBottomSheet({
     required this.gid,
     required this.sessionId,
+    required this.sessionBudget,
   });
 
   @override
@@ -844,6 +880,7 @@ class _AddGroupExpenseBottomSheetState extends ConsumerState<_AddGroupExpenseBot
         sessionId: widget.sessionId,
         title: title,
         amount: amount,
+        sessionBudget: widget.sessionBudget,
       );
 
       // Mainkan suara koin tercatat & getar
@@ -852,7 +889,6 @@ class _AddGroupExpenseBottomSheetState extends ConsumerState<_AddGroupExpenseBot
 
       if (mounted) {
         Navigator.pop(context);
-        showStickerSnackbar(context, message: 'Catatan grup berhasil disimpan!');
       }
     } catch (e) {
       if (mounted) {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'group_note_model.dart';
 
 /// Model Sesi Aktif Permainan & Budget Grup
@@ -399,6 +400,18 @@ class GroupModel {
     final rawLockPolicy = map['lockPolicy'] ?? map['lock_policy'];
     final lockPolicy = rawLockPolicy == 'free' ? 'free' : 'lock';
 
+    GroupSessionModel? parsedSession;
+    if (sessionData is Map) {
+      parsedSession = GroupSessionModel.fromMap(Map<String, dynamic>.from(sessionData));
+    } else if (sessionData is String && sessionData.trim().startsWith('{')) {
+      try {
+        final decoded = jsonDecode(sessionData);
+        if (decoded is Map) {
+          parsedSession = GroupSessionModel.fromMap(Map<String, dynamic>.from(decoded));
+        }
+      } catch (_) {}
+    }
+
     return GroupModel(
       id: id,
       name: (map['name'] as String?)?.trim() ?? 'Grup',
@@ -406,9 +419,7 @@ class GroupModel {
       code: map['code'] as String? ?? '',
       createdAt: parseDate(map['createdAt'] ?? map['created_at']),
       memberCount: ((map['memberCount'] ?? map['member_count']) as num?)?.toInt() ?? 1,
-      activeSession: sessionData is Map
-          ? GroupSessionModel.fromMap(Map<String, dynamic>.from(sessionData))
-          : null,
+      activeSession: parsedSession,
       budgetMode: budgetMode,
       fixedBudget: fixedBudget,
       playPolicy: playPolicy,

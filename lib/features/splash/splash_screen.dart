@@ -74,6 +74,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       // Inisialisasi audio sound service (pre-decode)
       await SoundService.instance.initialize();
 
+      if (!mounted) return;
       // Inisialisasi database Drift & default pools
       final db = ref.read(databaseProvider);
       await db.customSelect('SELECT 1').get();
