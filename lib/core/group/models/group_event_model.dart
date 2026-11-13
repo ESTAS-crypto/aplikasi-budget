@@ -6,9 +6,11 @@ enum GroupEventType {
   spin('spin'),
   gameResult('game_result'),
   expense('expense'),
+  expenseDeleted('expense_deleted'),
   memberJoin('member_join'),
   memberLeave('member_leave'),
   sessionStart('session_start'),
+  sessionEnd('session_end'),
   budgetChanged('budget_changed'),
   codeChanged('code_changed'),
   custom('custom');
@@ -25,6 +27,9 @@ enum GroupEventType {
         return GroupEventType.gameResult;
       case 'expense':
         return GroupEventType.expense;
+      case 'expense_deleted':
+      case 'expensedeleted':
+        return GroupEventType.expenseDeleted;
       case 'member_join':
       case 'memberjoin':
         return GroupEventType.memberJoin;
@@ -34,6 +39,9 @@ enum GroupEventType {
       case 'session_start':
       case 'sessionstart':
         return GroupEventType.sessionStart;
+      case 'session_end':
+      case 'sessionend':
+        return GroupEventType.sessionEnd;
       case 'budget_changed':
       case 'budgetchanged':
         return GroupEventType.budgetChanged;
@@ -109,12 +117,19 @@ class GroupEventModel {
       case GroupEventType.expense:
         final t = payload['title'] ?? 'pengeluaran';
         return '$actorName mencatat "$t"';
+      case GroupEventType.expenseDeleted:
+        final t = payload['title'] ?? 'pengeluaran';
+        return '$actorName menghapus catatan "$t"';
       case GroupEventType.memberJoin:
         return '$actorName bergabung ke grup.';
       case GroupEventType.memberLeave:
         return '$actorName keluar dari grup.';
       case GroupEventType.sessionStart:
         return '$actorName memulai sesi date grup.';
+      case GroupEventType.sessionEnd:
+        final status = payload['status']?.toString().toLowerCase() ?? 'lolos';
+        final statusLabel = status == 'lewat' ? 'Lewat' : 'Lolos';
+        return '$actorName menyelesaikan date: $statusLabel';
       case GroupEventType.budgetChanged:
         return summary ?? '$actorName mengubah pengaturan budget grup.';
       case GroupEventType.codeChanged:
@@ -122,6 +137,30 @@ class GroupEventModel {
       case GroupEventType.custom:
         return summary ?? '$actorName memperbarui pengaturan grup.';
     }
+  }
+
+  /// Mendapatkan sessionId dari payload event bila ada
+  String get sessionId {
+    final raw = payload['sessionId'] ??
+        payload['session_id'] ??
+        payload['endedSessionId'];
+    return raw?.toString().trim() ?? '';
+  }
+
+  /// Mengembalikan salinan GroupEventModel dengan sessionId yang dilengkapi (migrasi aman)
+  GroupEventModel withSessionId(String newSessionId) {
+    if (newSessionId.isEmpty) return this;
+    final updatedPayload = Map<String, dynamic>.from(payload);
+    updatedPayload['sessionId'] = newSessionId;
+    return GroupEventModel(
+      eventId: eventId,
+      type: type,
+      actorUid: actorUid,
+      actorName: actorName,
+      summary: summary,
+      payload: updatedPayload,
+      createdAt: createdAt,
+    );
   }
 
   Map<String, dynamic> toMap() {

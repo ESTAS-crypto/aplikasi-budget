@@ -281,6 +281,14 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
                                   isUnread: true,
                                   isMe: authService.isCurrentUser(e.actorUid),
                                   colorIndex: _findMemberColorIndex(e.actorUid, members),
+                                  onTap: e.sessionId.isNotEmpty
+                                      ? () {
+                                          SoundService.instance.play(Sfx.uiTap);
+                                          context.push(
+                                            '/group/history/$activeGid/${e.sessionId}',
+                                          );
+                                        }
+                                      : null,
                                 )),
                             const SizedBox(height: 12),
                           ],
@@ -313,6 +321,14 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
                                   isUnread: false,
                                   isMe: authService.isCurrentUser(e.actorUid),
                                   colorIndex: _findMemberColorIndex(e.actorUid, members),
+                                  onTap: e.sessionId.isNotEmpty
+                                      ? () {
+                                          SoundService.instance.play(Sfx.uiTap);
+                                          context.push(
+                                            '/group/history/$activeGid/${e.sessionId}',
+                                          );
+                                        }
+                                      : null,
                                 )),
                             const SizedBox(height: 16),
                           ],

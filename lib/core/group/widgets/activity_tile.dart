@@ -17,6 +17,7 @@ class ActivityTile extends StatelessWidget {
   final bool isUnread;
   final int colorIndex;
   final bool isMe;
+  final VoidCallback? onTap;
 
   const ActivityTile({
     super.key,
@@ -24,6 +25,7 @@ class ActivityTile extends StatelessWidget {
     required this.isUnread,
     this.colorIndex = 0,
     this.isMe = false,
+    this.onTap,
   });
 
   static const List<Color> _avatarColors = [
@@ -76,8 +78,15 @@ class ActivityTile extends StatelessWidget {
 
     return Semantics(
       container: true,
+      button: onTap != null,
       label: 'Aktivitas ${isUnread ? "baru: " : ""}$displaySummary',
-      child: card,
+      child: onTap != null
+          ? GestureDetector(
+              onTap: onTap,
+              behavior: HitTestBehavior.opaque,
+              child: card,
+            )
+          : card,
     );
   }
 
@@ -91,7 +100,9 @@ class ActivityTile extends StatelessWidget {
 
     switch (event.type) {
       case GroupEventType.expense:
-        final isDeleted = event.payload['deleted'] == true;
+      case GroupEventType.expenseDeleted:
+        final isDeleted = event.type == GroupEventType.expenseDeleted ||
+            event.payload['deleted'] == true;
         if (isDeleted) {
           subtitle = event.payload['title'] ?? 'pengeluaran';
           lencanaPainter = const CustomTrashPainter(color: AppColors.ink, strokeWidth: 2.2);
@@ -123,6 +134,11 @@ class ActivityTile extends StatelessWidget {
 
       case GroupEventType.sessionStart:
         subtitle = 'Putar roda dan catat jajan!';
+        lencanaPainter = const CustomFlagPainter(color: AppColors.ink, strokeWidth: 2.2);
+        break;
+
+      case GroupEventType.sessionEnd:
+        subtitle = 'Sesi date grup telah selesai';
         lencanaPainter = const CustomFlagPainter(color: AppColors.ink, strokeWidth: 2.2);
         break;
 

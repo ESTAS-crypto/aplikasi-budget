@@ -75,12 +75,34 @@ CREATE TABLE IF NOT EXISTS public.group_notes (
 CREATE TABLE IF NOT EXISTS public.group_events (
     id TEXT PRIMARY KEY,
     gid TEXT NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-    type TEXT NOT NULL, -- 'spin' | 'expense' | 'member_join' | 'member_leave' | 'budget_changed'
+    session_id TEXT DEFAULT NULL,
+    type TEXT NOT NULL, -- 'spin' | 'game_result' | 'expense' | 'expense_deleted' | 'member_join' | 'member_leave' | 'session_start' | 'session_end' | 'budget_changed'
     actor_uid TEXT NOT NULL,
     actor_name TEXT NOT NULL,
     summary TEXT,
     payload JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.group_events ADD COLUMN IF NOT EXISTS session_id TEXT DEFAULT NULL;
+
+-- 5b. TABEL: group_sessions (Riwayat Sesi Date Grup - UPDATE 3B)
+CREATE TABLE IF NOT EXISTS public.group_sessions (
+    id TEXT PRIMARY KEY,
+    gid TEXT NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    started_by_uid TEXT NOT NULL,
+    started_by_name TEXT NOT NULL,
+    ended_at TIMESTAMPTZ DEFAULT NULL,
+    ended_by_uid TEXT DEFAULT NULL,
+    ended_by_name TEXT DEFAULT NULL,
+    budget BIGINT NOT NULL DEFAULT 0,
+    game TEXT NOT NULL DEFAULT 'wheel', -- 'wheel' | 'dice' | 'capsule' | 'envelope' | 'coin' | 'fixed'
+    budget_by_uid TEXT NOT NULL DEFAULT '',
+    budget_by_name TEXT NOT NULL DEFAULT '',
+    detail JSONB DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT 'running', -- 'running' | 'lolos' | 'lewat'
+    total_spent BIGINT NOT NULL DEFAULT 0
 );
 
 -- 6. TABEL: invite_codes
@@ -97,6 +119,7 @@ ALTER TABLE public.groups REPLICA IDENTITY FULL;
 ALTER TABLE public.group_members REPLICA IDENTITY FULL;
 ALTER TABLE public.group_notes REPLICA IDENTITY FULL;
 ALTER TABLE public.group_events REPLICA IDENTITY FULL;
+ALTER TABLE public.group_sessions REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
@@ -129,7 +152,11 @@ ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invite_codes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon read/write group_sessions" ON public.group_sessions;
+CREATE POLICY "Allow anon read/write group_sessions" ON public.group_sessions FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow anon read/write groups" ON public.groups;
 CREATE POLICY "Allow anon read/write groups" ON public.groups FOR ALL USING (true) WITH CHECK (true);

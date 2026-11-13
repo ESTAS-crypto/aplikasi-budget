@@ -286,7 +286,9 @@ class _GroupRealtimeNotificationListenerState
 
           switch (evt.type) {
             case GroupEventType.expense:
-              final isDeleted = evt.payload['deleted'] == true;
+            case GroupEventType.expenseDeleted:
+              final isDeleted = evt.type == GroupEventType.expenseDeleted ||
+                  evt.payload['deleted'] == true;
               final amount = (evt.payload['amount'] as num?)?.toInt() ?? 0;
               // Guard: Catatan pengeluaran tidak boleh Rp0 kecuali jika catatan dihapus
               if (amount <= 0 && !isDeleted) {
@@ -417,9 +419,11 @@ class _GroupRealtimeNotificationListenerState
               bannerSound = Sfx.uiTap;
               break;
 
+            case GroupEventType.sessionEnd:
             case GroupEventType.custom:
               category = InAppBannerCategory.sessionEnd;
-              if (evt.payload['action'] == 'end_session') {
+              if (evt.type == GroupEventType.sessionEnd ||
+                  evt.payload['action'] == 'end_session') {
                 bannerTitle = isMe
                     ? 'Kamu mengakhiri date grup'
                     : '${evt.actorName} mengakhiri date grup';

@@ -18,6 +18,7 @@ import '../history/history_screen.dart';
 import '../group/screens/join_or_create_group_screen.dart';
 import '../group/screens/group_invite_screen.dart';
 import '../group/screens/group_activity_screen.dart';
+import '../group/screens/group_date_detail_screen.dart';
 import '../group/screens/group_budget_settings_screen.dart';
 import '../group/screens/group_dice_screen.dart';
 import '../group/screens/group_capsule_screen.dart';
@@ -226,6 +227,30 @@ final appRouter = GoRouter(
         state: state,
         child: const GroupActivityScreen(),
       ),
+    ),
+    GoRoute(
+      path: '/group/history/:gid/:sessionId',
+      parentNavigatorKey: rootNavigatorKey,
+      pageBuilder: (context, state) {
+        final gid = state.pathParameters['gid'] ?? '';
+        final sessionId = state.pathParameters['sessionId'] ?? '';
+        final tabParam = state.uri.queryParameters['tab'];
+        GroupDateDetailTab initialTab = GroupDateDetailTab.ringkasan;
+        if (tabParam == 'catatan' || tabParam == 'notes') {
+          initialTab = GroupDateDetailTab.catatan;
+        } else if (tabParam == 'linimasa' || tabParam == 'timeline') {
+          initialTab = GroupDateDetailTab.linimasa;
+        }
+        return _buildCustomTransitionPage(
+          context: context,
+          state: state,
+          child: GroupDateDetailScreen(
+            groupId: gid,
+            sessionId: sessionId,
+            initialTab: initialTab,
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/group/dice',

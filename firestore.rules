@@ -77,7 +77,21 @@ service cloud.firestore {
           (request.auth.uid == uid || isOwner(gid));
       }
       
-      // Subcollection: notes (Append-only catatan budget)
+      // Subcollection: sessions (Riwayat sesi date grup - UPDATE 3B)
+      // Dokumen sesi TIDAK dihapus saat date selesai; sesi yang sudah berakhir
+      // hanya boleh diubah oleh pemilik grup (atau saat hitung ulang totalSpent & status).
+      match /sessions/{sessionId} {
+        allow read: if isMember(gid);
+        allow create: if isMember(gid) &&
+          request.resource.data.budget is number &&
+          request.resource.data.budget >= 0;
+        allow update: if isMember(gid) &&
+          (resource.data.endedAt == null || isOwner(gid));
+        allow delete: if false;
+      }
+
+      // Subcollection: notes (Append-only catatan budget, ubah & tombstone hapus)
+      // Hanya pembuat catatan (authorUid) atau pemilik grup (ownerUid) yang boleh mengubah atau menghapus.
       match /notes/{noteId} {
         allow read: if isMember(gid);
         allow create: if isMember(gid) &&
@@ -86,7 +100,10 @@ service cloud.firestore {
           request.resource.data.amount > 0;
           
         allow update: if isMember(gid) &&
-          (resource.data.authorUid == request.auth.uid || isOwner(gid));
+          (resource.data.authorUid == request.auth.uid || isOwner(gid)) &&
+          request.resource.data.authorUid == resource.data.authorUid &&
+          request.resource.data.amount is number &&
+          request.resource.data.amount > 0;
           
         allow delete: if isMember(gid) &&
           (resource.data.authorUid == request.auth.uid || isOwner(gid));

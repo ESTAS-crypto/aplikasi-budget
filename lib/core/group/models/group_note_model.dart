@@ -33,6 +33,7 @@ class GroupNoteModel {
       'amount': amount,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'deleted': deleted,
+      if (hasPendingWrites) 'hasPendingWrites': true,
     };
   }
 
@@ -48,6 +49,7 @@ class GroupNoteModel {
     }
 
     final parsedId = noteId.isNotEmpty ? noteId : ((map['id'] as String?) ?? '');
+    final pendingFromMap = map['hasPendingWrites'] as bool? ?? false;
     return GroupNoteModel(
       noteId: parsedId,
       sessionId: (map['sessionId'] ?? map['session_id']) as String? ?? '',
@@ -57,11 +59,12 @@ class GroupNoteModel {
       amount: (map['amount'] as num?)?.toInt() ?? 0,
       createdAt: parseDate(map['createdAt'] ?? map['created_at']),
       deleted: map['deleted'] as bool? ?? false,
-      hasPendingWrites: hasPendingWrites,
+      hasPendingWrites: hasPendingWrites || pendingFromMap,
     );
   }
 
   GroupNoteModel copyWith({
+    String? sessionId,
     String? title,
     int? amount,
     bool? deleted,
@@ -69,7 +72,7 @@ class GroupNoteModel {
   }) {
     return GroupNoteModel(
       noteId: noteId,
-      sessionId: sessionId,
+      sessionId: sessionId ?? this.sessionId,
       authorUid: authorUid,
       authorName: authorName,
       title: title ?? this.title,

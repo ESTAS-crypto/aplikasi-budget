@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/group/painters/group_icons_painter.dart';
 import '../../core/group/services/group_service.dart';
+import '../../core/group/widgets/scope_switcher.dart';
+import '../group/screens/group_history_view.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/painters/sticker_icons.dart';
@@ -21,6 +23,11 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentScope = ref.watch(appScopeProvider);
+    if (currentScope == AppScope.grup) {
+      return const GroupHistoryView();
+    }
+
     final finishedDatesAsync = ref.watch(finishedDatesStreamProvider);
     final streak = ref.watch(currentStreakProvider);
     final unreadCount = ref.watch(unreadActivityCountProvider);
@@ -152,7 +159,16 @@ class HistoryScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // Pemilih Pribadi / Grup (ScopeSwitcher)
+              ScopeSwitcher(
+                currentScope: AppScope.pribadi,
+                onScopeChanged: (newScope) {
+                  ref.read(appScopeProvider.notifier).state = newScope;
+                },
+              ),
+              const SizedBox(height: 14),
 
               // Kartu Matahari Hero: "Beruntun lolos budget"
               StickerCard.hero(

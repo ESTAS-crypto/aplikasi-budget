@@ -1,14 +1,23 @@
 import 'dart:convert';
 import 'group_note_model.dart';
 
-/// Model Sesi Aktif Permainan & Budget Grup
+/// Model Sesi Aktif & Riwayat Sesi (Date) Grup: /groups/{gid}/sessions/{sessionId}
 class GroupSessionModel {
   final String sessionId;
+  final String gid;
   final int budget;
   final String game; // 'wheel' | 'dice' | 'capsule' | 'envelope' | 'coin' | 'fixed'
   final String startedByUid;
   final String startedByName;
   final DateTime startedAt;
+  final DateTime? endedAt;
+  final String? endedByUid;
+  final String? endedByName;
+  final String budgetByUid;
+  final String budgetByName;
+  final dynamic detail; // rincian hasil permainan: dadu, irisan, kapsul, amplop, koin, atau kosong untuk fixed
+  final String status; // 'running' | 'lolos' | 'lewat'
+  final int totalSpent;
   final bool locked;
   final String? turnLockedByUid; // untuk Lempar Koin turn-lock
   final String? turnLockedByName;
@@ -16,16 +25,42 @@ class GroupSessionModel {
 
   const GroupSessionModel({
     required this.sessionId,
+    this.gid = '',
     required this.budget,
     this.game = 'wheel',
     required this.startedByUid,
     required this.startedByName,
     required this.startedAt,
+    this.endedAt,
+    this.endedByUid,
+    this.endedByName,
+    String? budgetByUid,
+    String? budgetByName,
+    this.detail,
+    this.status = 'running',
+    this.totalSpent = 0,
     this.locked = true,
     this.turnLockedByUid,
     this.turnLockedByName,
     this.turnLockedAt,
-  });
+  })  : budgetByUid = budgetByUid ?? startedByUid,
+        budgetByName = budgetByName ?? startedByName;
+
+  bool get isEnded =>
+      endedAt != null || status == 'lolos' || status == 'lewat';
+
+  bool get isRunning => !isEnded;
+
+  /// Status: Lolos bila totalSpent <= budget, selain itu Lewat
+  bool get isLolos => totalSpent <= budget;
+
+  bool get isLewat => totalSpent > budget;
+
+  /// Hemat = budget - totalSpent
+  int get hemat => budget - totalSpent;
+
+  /// Selisih bila lewat (totalSpent - budget), 0 bila lolos
+  int get overBudgetAmount => totalSpent > budget ? totalSpent - budget : 0;
 
   bool get isTurnLocked {
     if (turnLockedByUid == null || turnLockedByUid!.isEmpty) return false;
@@ -44,24 +79,43 @@ class GroupSessionModel {
 
   GroupSessionModel copyWith({
     String? sessionId,
+    String? gid,
     int? budget,
     String? game,
     String? startedByUid,
     String? startedByName,
     DateTime? startedAt,
+    DateTime? endedAt,
+    String? endedByUid,
+    String? endedByName,
+    String? budgetByUid,
+    String? budgetByName,
+    dynamic detail,
+    String? status,
+    int? totalSpent,
     bool? locked,
     String? turnLockedByUid,
     String? turnLockedByName,
     DateTime? turnLockedAt,
     bool clearTurnLock = false,
+    bool clearEnded = false,
   }) {
     return GroupSessionModel(
       sessionId: sessionId ?? this.sessionId,
+      gid: gid ?? this.gid,
       budget: budget ?? this.budget,
       game: game ?? this.game,
       startedByUid: startedByUid ?? this.startedByUid,
       startedByName: startedByName ?? this.startedByName,
       startedAt: startedAt ?? this.startedAt,
+      endedAt: clearEnded ? null : (endedAt ?? this.endedAt),
+      endedByUid: clearEnded ? null : (endedByUid ?? this.endedByUid),
+      endedByName: clearEnded ? null : (endedByName ?? this.endedByName),
+      budgetByUid: budgetByUid ?? this.budgetByUid,
+      budgetByName: budgetByName ?? this.budgetByName,
+      detail: detail ?? this.detail,
+      status: status ?? this.status,
+      totalSpent: totalSpent ?? this.totalSpent,
       locked: locked ?? this.locked,
       turnLockedByUid:
           clearTurnLock ? null : (turnLockedByUid ?? this.turnLockedByUid),
@@ -74,8 +128,10 @@ class GroupSessionModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': sessionId,
       'sessionId': sessionId,
       'session_id': sessionId,
+      if (gid.isNotEmpty) 'gid': gid,
       'budget': budget,
       'game': game,
       'startedByUid': startedByUid,
@@ -84,6 +140,20 @@ class GroupSessionModel {
       'started_by_name': startedByName,
       'startedAt': startedAt.millisecondsSinceEpoch,
       'started_at': startedAt.toIso8601String(),
+      if (endedAt != null) 'endedAt': endedAt!.millisecondsSinceEpoch,
+      if (endedAt != null) 'ended_at': endedAt!.toIso8601String(),
+      if (endedByUid != null) 'endedByUid': endedByUid,
+      if (endedByUid != null) 'ended_by_uid': endedByUid,
+      if (endedByName != null) 'endedByName': endedByName,
+      if (endedByName != null) 'ended_by_name': endedByName,
+      'budgetByUid': budgetByUid,
+      'budget_by_uid': budgetByUid,
+      'budgetByName': budgetByName,
+      'budget_by_name': budgetByName,
+      if (detail != null) 'detail': detail,
+      'status': status,
+      'totalSpent': totalSpent,
+      'total_spent': totalSpent,
       'locked': locked,
       if (turnLockedByUid != null) 'turnLockedByUid': turnLockedByUid,
       if (turnLockedByUid != null) 'turn_locked_by_uid': turnLockedByUid,
@@ -103,29 +173,62 @@ class GroupSessionModel {
       return DateTime.now();
     }
 
-    final rawTurnLockedAt = map['turnLockedAt'] ?? map['turn_locked_at'];
-    DateTime? turnLockedAt;
-    if (rawTurnLockedAt != null) {
-      if (rawTurnLockedAt is int) {
-        turnLockedAt = DateTime.fromMillisecondsSinceEpoch(rawTurnLockedAt);
-      } else if (rawTurnLockedAt is String) {
-        turnLockedAt = DateTime.tryParse(rawTurnLockedAt);
-      }
+    DateTime? parseNullableDate(dynamic val) {
+      if (val == null) return null;
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      if (val is String) return DateTime.tryParse(val);
+      return null;
     }
+
+    final turnLockedAt =
+        parseNullableDate(map['turnLockedAt'] ?? map['turn_locked_at']);
+    final endedAt = parseNullableDate(map['endedAt'] ?? map['ended_at']);
 
     final rawLocked = map['locked'];
     final locked = rawLocked is bool ? rawLocked : true;
 
+    final startedByUid =
+        (map['startedByUid'] ?? map['started_by_uid']) as String? ?? '';
+    final startedByName =
+        ((map['startedByName'] ?? map['started_by_name']) as String?)?.trim() ??
+            'Anggota';
+    final budgetByUid =
+        (map['budgetByUid'] ?? map['budget_by_uid']) as String? ?? startedByUid;
+    final budgetByName =
+        ((map['budgetByName'] ?? map['budget_by_name']) as String?)?.trim() ??
+            startedByName;
+
+    final budget = (map['budget'] as num?)?.toInt() ?? 0;
+    final totalSpent =
+        (map['totalSpent'] ?? map['total_spent'] as num?)?.toInt() ?? 0;
+    final rawStatus = (map['status'] as String?)?.trim().toLowerCase();
+    final String status;
+    if (rawStatus == 'lolos' || rawStatus == 'lewat' || rawStatus == 'running') {
+      status = rawStatus!;
+    } else if (endedAt != null) {
+      status = totalSpent <= budget ? 'lolos' : 'lewat';
+    } else {
+      status = 'running';
+    }
+
     return GroupSessionModel(
-      sessionId: (map['sessionId'] ?? map['session_id']) as String? ?? '',
-      budget: (map['budget'] as num?)?.toInt() ?? 0,
+      sessionId:
+          (map['sessionId'] ?? map['session_id'] ?? map['id']) as String? ?? '',
+      gid: (map['gid'] as String?) ?? '',
+      budget: budget,
       game: (map['game'] as String?)?.trim() ?? 'wheel',
-      startedByUid:
-          (map['startedByUid'] ?? map['started_by_uid']) as String? ?? '',
-      startedByName:
-          ((map['startedByName'] ?? map['started_by_name']) as String?)?.trim() ??
-              'Anggota',
+      startedByUid: startedByUid,
+      startedByName: startedByName,
       startedAt: parseDate(map['startedAt'] ?? map['started_at']),
+      endedAt: endedAt,
+      endedByUid: (map['endedByUid'] ?? map['ended_by_uid']) as String?,
+      endedByName:
+          ((map['endedByName'] ?? map['ended_by_name']) as String?)?.trim(),
+      budgetByUid: budgetByUid,
+      budgetByName: budgetByName,
+      detail: map['detail'],
+      status: status,
+      totalSpent: totalSpent,
       locked: locked,
       turnLockedByUid:
           (map['turnLockedByUid'] ?? map['turn_locked_by_uid']) as String?,
