@@ -44,7 +44,7 @@ class GroupNoteModel {
   }) {
     DateTime parseDate(dynamic val) {
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is String) return DateTime.tryParse(val)?.toLocal() ?? DateTime.now();
       return DateTime.now();
     }
 

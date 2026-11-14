@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../theme/putar_theme.dart';
 
-/// Menampilkan snackbar neo-brutalist (latar Ink, teks Krim, aksi Urungkan Kuning, durasi 3 detik).
+/// Menampilkan snackbar bertema (latar Ink, teks bg, aksi Urungkan kuning/secondary, durasi 3 detik).
 void showStickerSnackbar(
   BuildContext context, {
   required String message,
@@ -10,6 +9,7 @@ void showStickerSnackbar(
   String undoLabel = 'Urungkan',
   Duration duration = const Duration(seconds: 3),
 }) {
+  final t = PutarTheme.of(context);
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
 
@@ -24,16 +24,16 @@ void showStickerSnackbar(
       content: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.ink,
-          borderRadius: BorderRadius.circular(22),
+          color: t.ink,
+          borderRadius: BorderRadius.circular(t.cardRadius),
           border: Border.all(
-            color: AppColors.ink,
-            width: 2.5,
+            color: t.borderColor,
+            width: t.subtleBorderWidth,
           ),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.shadowColor,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -43,8 +43,8 @@ void showStickerSnackbar(
             Expanded(
               child: Text(
                 message,
-                style: AppTypography.bodyLargeBold.copyWith(
-                  color: AppColors.cream,
+                style: t.bodyLargeBold.copyWith(
+                  color: t.bg,
                 ),
               ),
             ),
@@ -57,8 +57,8 @@ void showStickerSnackbar(
                 },
                 child: Text(
                   undoLabel,
-                  style: AppTypography.bodyLargeBold.copyWith(
-                    color: AppColors.matahari,
+                  style: t.bodyLargeBold.copyWith(
+                    color: t.secondary,
                   ),
                 ),
               ),

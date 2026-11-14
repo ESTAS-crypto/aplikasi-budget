@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
+import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/painters/sticker_icons.dart';
 import '../../../core/group/services/group_service.dart';
@@ -18,6 +18,7 @@ import '../../../core/group/widgets/scope_switcher.dart';
 import '../../notifications/notification_service.dart';
 import '../widgets/bookmark_tab_bar.dart';
 import '../widgets/theme_preview_painters.dart';
+import 'theme_selection_screen.dart';
 
 /// Halaman Pengaturan Terpadu (Aplikasi & Grup) sesuai Setelan1.dc.html
 /// Memadukan pengaturan aplikasi dan grup dengan navigasi penanda buku (bookmark tabs)
@@ -118,6 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showEditNameDialog() {
     SoundService.instance.play(Sfx.uiTap);
+    final t = context.putarTheme;
     final authService = ref.read(groupAuthServiceProvider);
     final currentName = authService.displayName ?? 'Kamu';
     final controller = TextEditingController(text: currentName);
@@ -125,17 +127,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: AppColors.ink, width: 3.2),
+          borderRadius: BorderRadius.circular(t.cardRadius),
+          side: BorderSide(color: t.ink, width: 3.2),
         ),
         title: Text(
           'Ubah Nama Tampilan',
-          style: AppTypography.titleMedium.copyWith(
+          style: t.titleMedium.copyWith(
             fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
         content: Column(
@@ -144,21 +146,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             Text(
               'Nama ini akan terlihat oleh anggota grup dan pada catatan jajan kamu.',
-              style: AppTypography.bodySmall.copyWith(
+              style: t.bodySmall.copyWith(
                 fontSize: 12,
-                color: const Color(0xFF5B4B7A),
+                color: t.textSecondary,
               ),
             ),
             const SizedBox(height: 14),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: t.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.ink, width: 2.5),
-                boxShadow: const [
+                border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(2, 2),
+                    color: t.shadowColor,
+                    offset: t.miniShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
@@ -167,9 +169,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 controller: controller,
                 maxLength: 15,
                 autofocus: true,
-                style: AppTypography.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
+                style: t.bodyMedium.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.ink,
                 ),
                 decoration: const InputDecoration(
                   counterText: '',
@@ -189,18 +191,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             child: Text(
               'Batal',
-              style: AppTypography.buttonSmall.copyWith(
-                color: AppColors.textSecondary,
+              style: t.buttonSmall.copyWith(
+                color: t.textSecondary,
                 fontSize: 13,
               ),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.matahari,
-              foregroundColor: AppColors.ink,
+              backgroundColor: t.secondary,
+              foregroundColor: t.ink,
               elevation: 0,
-              side: const BorderSide(color: AppColors.ink, width: 2.2),
+              side: BorderSide(color: t.ink, width: 2.2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -227,9 +229,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             child: Text(
               'Simpan',
-              style: AppTypography.buttonSmall.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+              style: t.buttonSmall.copyWith(
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
                 fontSize: 13,
               ),
             ),
@@ -265,8 +267,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -292,21 +295,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3.0),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: t.borderWidth),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.shadowColor,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const CustomPaint(
-                          size: Size(20, 20),
-                          painter: CustomBackIconPainter(strokeWidth: 3.0),
+                        child: CustomPaint(
+                          size: const Size(20, 20),
+                          painter: CustomBackIconPainter(
+                            color: t.ink,
+                            strokeWidth: 3.0,
+                          ),
                         ),
                       ),
                     ),
@@ -318,10 +324,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Pengaturan',
-                        style: AppTypography.displayMedium.copyWith(
+                        style: t.displayMedium.copyWith(
                           fontSize: 25,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -370,6 +376,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // TAB 1: PENGATURAN APLIKASI (Sesuai Setelan1.dc.html)
   // =========================================================================
   Widget _buildAplikasiTab(BuildContext context) {
+    final t = context.putarTheme;
+    final activeTheme = ref.watch(themeControllerProvider);
     final soundSettings = ref.watch(soundSettingsProvider);
     final soundNotifier = ref.read(soundSettingsProvider.notifier);
     final authService = ref.watch(groupAuthServiceProvider);
@@ -384,7 +392,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // KARTU 1: TEMA
+          // KARTU 1: TEMA (generik terhadap PutarTheme.allThemes)
           _buildNeoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -394,10 +402,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Text(
                       'Tema',
-                      style: AppTypography.titleMedium.copyWith(
+                      style: t.titleMedium.copyWith(
                         fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     Flexible(
@@ -406,16 +414,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppColors.matahari,
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: AppColors.ink, width: 2.0),
+                            color: t.secondary,
+                            borderRadius: BorderRadius.circular(t.chipRadius),
+                            border: Border.all(color: t.ink, width: 2.0),
                           ),
                           child: Text(
-                            'Dipakai: Pasar Malam',
-                            style: AppTypography.buttonSmall.copyWith(
+                            'Dipakai: ${activeTheme.displayName}',
+                            style: t.buttonSmall.copyWith(
                               fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -426,149 +434,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    // Opsi 1: Pasar Malam (Aktif)
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          SoundService.instance.play(Sfx.uiTap);
-                          InAppBanner.show(
-                            context,
-                            title: '🎪 Tema Utama',
-                            subtitle: 'Tema Pasar Malam sedang aktif sebagai tema utama aplikasi.',
-                            category: InAppBannerCategory.sessionEnd,
-                          );
-                        },
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: AppColors.ink, width: 3.5),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: AppColors.ink,
-                                    offset: Offset(3, 3),
-                                    blurRadius: 0,
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  const SizedBox(
-                                    height: 56,
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 54,
-                                        height: 54,
-                                        child: CustomPaint(
-                                          painter: PasarMalamWheelPainter(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Pasar Malam',
-                                    style: AppTypography.bodySmall.copyWith(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.ink,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Checkmark Badge Pojok Kanan Atas
-                            Positioned(
-                              top: -8,
-                              right: -6,
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
-                                  color: AppColors.tomat,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: AppColors.ink, width: 2.5),
-                                ),
-                                alignment: Alignment.center,
-                                child: const CustomPaint(
-                                  size: Size(13, 13),
-                                  painter: CustomCheckIconPainter(
-                                    color: Colors.white,
-                                    strokeWidth: 3.0,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                    for (int i = 0; i < PutarTheme.allThemes.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildThemeMiniCard(
+                          context: context,
+                          t: t,
+                          option: PutarTheme.allThemes[i],
+                          isSelected:
+                              PutarTheme.allThemes[i].id == activeTheme.id,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Opsi 2: Kucing Manis (Dalam Pengembangan / Maintenance)
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          SoundService.instance.play(Sfx.notifWarning);
-                          InAppBanner.show(
-                            context,
-                            title: '🚧 Sedang Dikembangkan',
-                            subtitle: 'Tema Kucing Manis sedang dalam tahap pengembangan! Nantikan segera ya~',
-                            category: InAppBannerCategory.budgetWarning80,
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: AppColors.ink, width: 2.5),
-                          ),
-                          child: Column(
-                            children: [
-                              const SizedBox(
-                                height: 56,
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 54,
-                                    height: 54,
-                                    child: CustomPaint(
-                                      painter: KucingManisPainter(),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Kucing Manis',
-                                style: AppTypography.bodySmall.copyWith(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Lihat Semua Tema Action
+                // Lihat Semua Tema Action -> Layar 22 (ThemeSelectionScreen)
                 GestureDetector(
                   onTap: () {
-                    SoundService.instance.play(Sfx.notifWarning);
-                    InAppBanner.show(
-                      context,
-                      title: '🎨 Galeri Tema',
-                      subtitle: 'Fitur katalog tema kustom sedang disiapkan untuk update berikutnya!',
-                      category: InAppBannerCategory.budgetWarning80,
-                    );
+                    SoundService.instance.play(Sfx.uiTap);
+                    if (GoRouter.maybeOf(context) != null) {
+                      context.push('/themes');
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ThemeSelectionScreen(),
+                        ),
+                      );
+                    }
                   },
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -577,19 +470,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Text(
                           'Lihat semua tema',
-                          style: AppTypography.buttonSmall.copyWith(
+                          style: t.buttonSmall.copyWith(
                             fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const SizedBox(
+                        SizedBox(
                           width: 16,
                           height: 16,
                           child: CustomPaint(
                             painter: CustomForwardIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.5,
                             ),
                           ),
@@ -610,10 +503,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Text(
                   'Suara dan getar',
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -659,10 +552,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         flex: 3,
                         child: Text(
                           'Volume efek',
-                          style: AppTypography.titleMedium.copyWith(
+                          style: t.titleMedium.copyWith(
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
+                            fontWeight: t.weightBold,
+                            color: t.ink,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -674,10 +567,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         child: SliderTheme(
                           data: SliderThemeData(
                             trackHeight: 12,
-                            activeTrackColor: AppColors.matahari,
-                            inactiveTrackColor: AppColors.cream,
-                            thumbColor: Colors.white,
-                            overlayColor: AppColors.matahari.withValues(alpha: 0.2),
+                            activeTrackColor: t.secondary,
+                            inactiveTrackColor: t.bg,
+                            thumbColor: t.surface,
+                            overlayColor: t.secondary.withValues(alpha: 0.2),
                             thumbShape: const RoundSliderThumbShape(
                               enabledThumbRadius: 10,
                               elevation: 2,
@@ -715,10 +608,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Text(
                   'Notifikasi',
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -748,12 +641,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: _buildSettingRow(
                     title: 'Notifikasi grup',
                     subtitle: '$groupName · jenis dan bisukan',
-                    trailing: const SizedBox(
+                    trailing: SizedBox(
                       width: 18,
                       height: 18,
                       child: CustomPaint(
                         painter: CustomForwardIconPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 2.5,
                         ),
                       ),
@@ -770,16 +663,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: _isNotificationPermissionGranted ? AppColors.mint : AppColors.tomat,
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: AppColors.ink, width: 2.0),
+                        color: _isNotificationPermissionGranted ? t.success : t.danger,
+                        borderRadius: BorderRadius.circular(t.chipRadius),
+                        border: Border.all(color: t.ink, width: 2.0),
                       ),
                       child: Text(
                         _isNotificationPermissionGranted ? 'Aktif' : 'Nonaktif',
-                        style: AppTypography.buttonSmall.copyWith(
+                        style: t.buttonSmall.copyWith(
                           fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: _isNotificationPermissionGranted ? AppColors.ink : Colors.white,
+                          fontWeight: t.weightExtraBold,
+                          color: _isNotificationPermissionGranted ? t.ink : t.surface,
                         ),
                       ),
                     ),
@@ -801,19 +694,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Text(
                         'Nama tampilan',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5B4B7A),
+                          fontWeight: t.weightSemiBold,
+                          color: t.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         displayName,
-                        style: AppTypography.titleMedium.copyWith(
+                        style: t.titleMedium.copyWith(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -826,23 +719,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                     decoration: BoxDecoration(
-                      color: AppColors.lavender,
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      color: t.accentPurple,
+                      borderRadius: BorderRadius.circular(t.chipRadius),
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2, 2),
+                          color: t.shadowColor,
+                          offset: t.miniShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Text(
                       'Ubah',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -864,10 +757,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
               child: Text(
                 'Putar Jajan v1.0',
-                style: AppTypography.bodySmall.copyWith(
+                style: t.bodySmall.copyWith(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF5B4B7A),
+                  fontWeight: t.weightSemiBold,
+                  color: t.textSecondary,
                 ),
               ),
             ),
@@ -881,6 +774,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // TAB 2: PENGATURAN GRUP (Notifikasi & Aksi Grup)
   // =========================================================================
   Widget _buildGrupTab(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final group = activeGroupAsync.valueOrNull;
     final gid = group?.id ?? ref.read(groupServiceProvider).getActiveGroupId();
@@ -909,34 +803,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: AppColors.langit,
+                      color: t.accentBlue,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.ink, width: 2.5),
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: CustomPaint(
-                        size: Size(26, 26),
-                        painter: CustomShareIconPainter(color: AppColors.ink),
+                        size: const Size(26, 26),
+                        painter: CustomShareIconPainter(color: t.ink),
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
                   Text(
                     'Belum Bergabung ke Grup',
-                    style: AppTypography.titleMedium.copyWith(
+                    style: t.titleMedium.copyWith(
                       fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Gabung atau buat grup bersama teman untuk mengatur notifikasi aktivitas belanja dan putaran roda.',
-                    style: AppTypography.bodySmall.copyWith(
+                    style: t.bodySmall.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF5B4B7A),
+                      fontWeight: t.weightMedium,
+                      color: t.textSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -950,13 +844,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: AppColors.matahari,
+                        color: t.secondary,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.ink, width: 2.5),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.shadowColor,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
@@ -964,10 +858,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       alignment: Alignment.center,
                       child: Text(
                         'Gabung atau Buat Grup',
-                        style: AppTypography.buttonSmall.copyWith(
+                        style: t.buttonSmall.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -1001,19 +895,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Text(
                         'Grup Aktif',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5B4B7A),
+                          fontWeight: t.weightSemiBold,
+                          color: t.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         groupName,
-                        style: AppTypography.titleMedium.copyWith(
+                        style: t.titleMedium.copyWith(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1021,10 +915,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const SizedBox(height: 2),
                       Text(
                         isOwner ? 'Peran: Pemilik Grup' : 'Peran: Anggota',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isOwner ? AppColors.jeruk : AppColors.textSecondary,
+                          fontWeight: t.weightBold,
+                          color: isOwner ? t.accentOrange : t.textSecondary,
                         ),
                       ),
                     ],
@@ -1038,23 +932,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: AppColors.ink, width: 2.2),
-                      boxShadow: const [
+                      color: t.secondary,
+                      borderRadius: BorderRadius.circular(t.chipRadius),
+                      border: Border.all(color: t.ink, width: 2.2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2, 2),
+                          color: t.shadowColor,
+                          offset: t.miniShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Text(
                       'Kelola',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -1075,19 +969,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Text(
                           'Nominal Roda Grup',
-                          style: AppTypography.titleMedium.copyWith(
+                          style: t.titleMedium.copyWith(
                             fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${group.effectiveSlots.length} pilihan nominal aktif di roda jajan',
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF5B4B7A),
+                            fontWeight: t.weightMedium,
+                            color: t.textSecondary,
                           ),
                         ),
                       ],
@@ -1102,23 +996,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
-                        color: AppColors.matahari,
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: AppColors.ink, width: 2.2),
-                        boxShadow: const [
+                        color: t.secondary,
+                        borderRadius: BorderRadius.circular(t.chipRadius),
+                        border: Border.all(color: t.ink, width: 2.2),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(2, 2),
+                            color: t.shadowColor,
+                            offset: t.miniShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       child: Text(
                         'Atur',
-                        style: AppTypography.buttonSmall.copyWith(
+                        style: t.buttonSmall.copyWith(
                           fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -1142,19 +1036,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         children: [
                           Text(
                             'Bisukan grup',
-                            style: AppTypography.titleMedium.copyWith(
+                            style: t.titleMedium.copyWith(
                               fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Matikan semua notifikasi grup ini sementara',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF5B4B7A),
+                              fontWeight: t.weightMedium,
+                              color: t.textSecondary,
                             ),
                           ),
                         ],
@@ -1172,14 +1066,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 if (settings.isCurrentlyMuted) ...[
                   const SizedBox(height: 12),
-                  const Divider(color: Color(0x2222163A), height: 1),
+                  Divider(color: t.dividerTint, height: 1),
                   const SizedBox(height: 10),
                   Text(
                     'Durasi bisukan',
-                    style: AppTypography.bodySmall.copyWith(
+                    style: t.bodySmall.copyWith(
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
+                      fontWeight: t.weightBold,
+                      color: t.ink,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1220,10 +1114,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Text(
                   'Jenis notifikasi grup',
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1285,13 +1179,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: t.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.tomat, width: 2.5),
-                  boxShadow: const [
+                  border: Border.all(color: t.danger, width: t.subtleBorderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(2.5, 2.5),
+                      color: t.shadowColor,
+                      offset: const Offset(2.5, 2.5),
                       blurRadius: 0,
                     ),
                   ],
@@ -1299,10 +1193,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 alignment: Alignment.center,
                 child: Text(
                   'Keluar dari Grup',
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.tomat,
+                    fontWeight: t.weightExtraBold,
+                    color: t.danger,
                   ),
                 ),
               ),
@@ -1316,17 +1210,165 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // =========================================================================
   // HELPER WIDGETS
   // =========================================================================
+  Widget _buildThemeMiniCard({
+    required BuildContext context,
+    required PutarTheme t,
+    required PutarTheme option,
+    required bool isSelected,
+  }) {
+    final previewPainter = option.mascot == PutarMascotKind.mochi
+        ? (option.id == PutarTheme.kucingManis.id
+            ? const KucingManisPainter() as CustomPainter
+            : null)
+        : PasarMalamWheelPainter.fromTheme(option);
+
+    final disableAnimations =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final animDuration =
+        disableAnimations ? Duration.zero : const Duration(milliseconds: 420);
+    Offset? tapOrigin;
+
+    return GestureDetector(
+      key: ValueKey('settings_theme_card_${option.id}'),
+      onTapDown: (details) => tapOrigin = details.globalPosition,
+      onTap: () async {
+        SoundService.instance.play(Sfx.uiTap);
+        if (isSelected) {
+          InAppBanner.show(
+            context,
+            title: 'Tema Utama',
+            subtitle:
+                'Tema ${option.displayName} sedang aktif digunakan saat ini.',
+            category: InAppBannerCategory.sessionEnd,
+          );
+          return;
+        }
+        await ref
+            .read(themeControllerProvider.notifier)
+            .setTheme(option, origin: tapOrigin);
+        if (!context.mounted) return;
+        InAppBanner.show(
+          context,
+          title: 'Tema Diganti',
+          subtitle: 'Sekarang memakai tema ${option.displayName}.',
+          category: InAppBannerCategory.sessionEnd,
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: animDuration,
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: option.surface,
+              borderRadius: BorderRadius.circular(t.smallCardRadius),
+              border: Border.all(
+                color: t.ink,
+                width: isSelected ? t.heroBorderWidth : t.subtleBorderWidth,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
+                        blurRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 56,
+                  child: Center(
+                    child: previewPainter != null
+                        ? SizedBox(
+                            width: 54,
+                            height: 54,
+                            child: CustomPaint(painter: previewPainter),
+                          )
+                        : ThemePreviewThumbnail(
+                            themeOption: option,
+                            size: 54,
+                            animate: false,
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  option.displayName,
+                  style: t.bodySmall.copyWith(
+                    fontSize: 13,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: -8,
+            right: -6,
+            child: AnimatedSwitcher(
+              duration: animDuration,
+              switchInCurve: Curves.linear,
+              switchOutCurve: Curves.linear,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                ),
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.72, end: 1.0)
+                      .chain(CurveTween(curve: Curves.easeOutBack))
+                      .animate(animation),
+                  child: child,
+                ),
+              ),
+              child: isSelected
+                  ? Container(
+                      key: ValueKey('settings_theme_check_${option.id}'),
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: t.danger,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: t.ink,
+                          width: t.subtleBorderWidth,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: CustomPaint(
+                        size: const Size(13, 13),
+                        painter: CustomCheckIconPainter(
+                          color: t.surface,
+                          strokeWidth: 3.0,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNeoCard({required Widget child}) {
+    final t = context.putarTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.ink, width: 3.0),
-        boxShadow: const [
+        color: t.surface,
+        borderRadius: BorderRadius.circular(t.cardRadius),
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(4, 4),
+            color: t.shadowColor,
+            offset: t.standardShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -1341,14 +1383,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required Widget trailing,
     bool isLast = false,
   }) {
+    final t = context.putarTheme;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         border: isLast
             ? null
-            : const Border(
+            : Border(
                 bottom: BorderSide(
-                  color: Color(0x2222163A),
+                  color: t.dividerTint,
                   width: 1.5,
                 ),
               ),
@@ -1361,19 +1404,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                    fontWeight: t.weightBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF5B4B7A),
+                    fontWeight: t.weightMedium,
+                    color: t.textSecondary,
                   ),
                 ),
               ],
@@ -1392,6 +1435,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final t = context.putarTheme;
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -1402,14 +1446,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.matahari : Colors.white,
+            color: isSelected ? t.secondary : t.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.ink, width: 2.0),
+            border: Border.all(color: t.ink, width: 2.0),
             boxShadow: isSelected
-                ? const [
+                ? [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(2, 2),
+                      color: t.shadowColor,
+                      offset: t.miniShadowOffset,
                       blurRadius: 0,
                     ),
                   ]
@@ -1420,10 +1464,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             fit: BoxFit.scaleDown,
             child: Text(
               label,
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: AppColors.ink,
+                fontWeight: isSelected ? t.weightExtraBold : t.weightSemiBold,
+                color: t.ink,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,

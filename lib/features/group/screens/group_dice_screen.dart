@@ -13,8 +13,7 @@ import '../../../core/group/services/group_game_service.dart';
 import '../../../core/group/widgets/member_avatar.dart';
 import '../../../core/group/widgets/group_important_dialog.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/widgets/in_app_toast.dart';
@@ -142,6 +141,28 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
       TextDirection.ltr,
     );
 
+    // Jika catatan grup sebelumnya masih ada (budget > 0), tanyakan persetujuan terlebih dahulu.
+    // Jika catatan grup kosong, langsung pasang hasil dadu ke catatan grup.
+    final groupService = ref.read(groupServiceProvider);
+    final existingSession = groupService.getEffectiveActiveSession(group.id, group);
+    if (existingSession != null && existingSession.budget > 0) {
+      final accepted = await GroupImportantDialog.showConfirmAcceptGameBudget(
+        context,
+        budget: won,
+        currentBudget: existingSession.budget,
+        gameName: 'Lempar Dadu',
+      );
+      if (!mounted) return;
+      if (accepted != true) {
+        InAppToast.show(
+          context,
+          message:
+              'Hasil dadu dibatalkan. Catatan grup tetap ${RupiahFormatter.format(existingSession.budget)}.',
+        );
+        return;
+      }
+    }
+
     // Klaim sesi dan tulis event dalam satu transaksi atomik
     final gameService = ref.read(groupGameServiceProvider);
     final claimResult = await gameService.claimSessionAndWriteResult(
@@ -172,30 +193,44 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
+    final groupService = ref.read(groupServiceProvider);
 
-    final group = activeGroupAsync.valueOrNull ??
-        (activeGroupId != null && activeGroupId.isNotEmpty
-            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
-            : null);
+    final streamedGroup = activeGroupAsync.valueOrNull;
+    final localGroup = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? groupService.getLocalGroup(activeGroupId)
+        : null;
+    final rawGroup = streamedGroup ?? localGroup;
+    final resolvedSession = rawGroup != null
+        ? groupService.resolveEffectiveSession(
+            rawGroup.id,
+            streamedGroup?.activeSession,
+            localGroup?.activeSession,
+          )
+        : null;
+    final group = rawGroup?.copyWith(
+      activeSession: resolvedSession,
+      clearActiveSession: resolvedSession == null,
+    );
 
     if (group == null) {
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBackButton(),
+                _buildBackButton(t),
                 const SizedBox(height: 40),
                 Center(
                   child: Text(
                     'Grup tidak ditemukan',
-                    style: AppTypography.displayMedium.copyWith(fontSize: 20),
+                    style: t.displayMedium.copyWith(fontSize: 20),
                   ),
                 ),
               ],
@@ -230,7 +265,7 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
     final currentBudget = session?.budget ?? _wonAmount ?? 0;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -240,15 +275,15 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
               // 1. Top Bar: Tombol Kembali & Judul Layar
               Row(
                 children: [
-                  _buildBackButton(),
+                  _buildBackButton(t),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
                       'Kocok Dadu',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -261,23 +296,23 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: t.borderColor, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     '$_diceCount dadu × nominal pilihanmu',
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -285,19 +320,20 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
               const SizedBox(height: 10),
 
               // 3. Group Status Strip (Layar 57: Avatar, Nama Grup, "3 online · giliran semua · hasil dilihat semua")
-              _buildGroupStatusStrip(group: group, members: members, canPlay: canPlay),
+              _buildGroupStatusStrip(t: t, group: group, members: members, canPlay: canPlay),
               const SizedBox(height: 24),
 
               // 4. Dice Arena (Height 230, Bg #FFE9A8, Dadu 1-3)
-              _buildDiceArena(),
+              _buildDiceArena(t),
               const SizedBox(height: 22),
 
               // 5. Kartu Hasil Pop Reveal
-              _buildResultCard(session: session),
+              _buildResultCard(t: t, session: session),
               const SizedBox(height: 20),
 
               // 6. Pilihan Kelipatan (Chips)
               _buildMultiplierSection(
+                t: t,
                 presets: sortedPresets,
                 canPlay: canPlay,
                 isLocked: isLocked,
@@ -305,11 +341,12 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
               const SizedBox(height: 26),
 
               // 7. Budget Grup Bar untuk Date Ini
-              _buildBudgetStatusBar(budget: currentBudget, isLocked: isLocked),
+              _buildBudgetStatusBar(t: t, budget: currentBudget, isLocked: isLocked),
               const SizedBox(height: 12),
 
               // 8. Tombol Aksi KOCOK DADU
               _buildActionButton(
+                t: t,
                 group: group,
                 canPlay: canPlay,
                 isLocked: isLocked,
@@ -321,7 +358,7 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
     );
   }
 
-  Widget _buildBackButton() {
+  Widget _buildBackButton(PutarTheme t) {
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
@@ -335,25 +372,25 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ink, width: 3),
-          boxShadow: const [
+          border: Border.all(color: t.borderColor, width: t.borderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.shadowColor,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
         ),
         alignment: Alignment.center,
-        child: const SizedBox(
+        child: SizedBox(
           width: 22,
           height: 22,
           child: CustomPaint(
             painter: CustomBackIconPainter(
-              color: AppColors.ink,
-              strokeWidth: 3.0,
+              color: t.ink,
+              strokeWidth: t.borderWidth,
             ),
           ),
         ),
@@ -362,6 +399,7 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
   }
 
   Widget _buildGroupStatusStrip({
+    required PutarTheme t,
     required GroupModel group,
     required List<GroupMemberModel> members,
     required bool canPlay,
@@ -376,13 +414,13 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -420,10 +458,10 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                   'Grup · ${group.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                     height: 1.2,
                   ),
                 ),
@@ -431,10 +469,10 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                   '$onlineCount online · $turnPolicyLabel · hasil dilihat semua',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    fontWeight: t.weightSemiBold,
+                    color: t.textSecondary,
                   ),
                 ),
               ],
@@ -445,19 +483,19 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
     );
   }
 
-  Widget _buildDiceArena() {
+  Widget _buildDiceArena(PutarTheme t) {
     return Container(
       height: 230,
       clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE9A8),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        color: t.accentWarmSoft,
+        borderRadius: BorderRadius.circular(t.cardRadius),
+        border: Border.all(color: t.borderColor, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(4, 4),
+            color: t.shadowColor,
+            offset: t.standardShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -482,7 +520,7 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                     width: 180,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: AppColors.ink.withValues(alpha: 0.25),
+                      color: t.ink.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -499,10 +537,10 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_diceCount, (index) {
                   final dieBg = index == 0
-                      ? AppColors.surface
+                      ? t.surface
                       : index == 1
-                          ? AppColors.langit
-                          : const Color(0xFFFF8FC0); // Pink untuk dadu ke-3
+                          ? t.accentBlue
+                          : t.accentPink; // Pink untuk dadu ke-3
                   final dieSize = _diceCount == 1
                       ? 116.0
                       : _diceCount == 2
@@ -529,7 +567,10 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
     );
   }
 
-  Widget _buildResultCard({required GroupSessionModel? session}) {
+  Widget _buildResultCard({
+    required PutarTheme t,
+    required GroupSessionModel? session,
+  }) {
     if (_isRolling) {
       return const SizedBox(height: 72);
     }
@@ -542,13 +583,13 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -558,19 +599,19 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
             children: [
               Text(
                 'Kocok dadu untuk menentukan budget grup',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Rp0',
-                style: AppTypography.displayMedium.copyWith(
+                style: t.displayMedium.copyWith(
                   fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ],
@@ -584,13 +625,13 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -600,19 +641,19 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
             children: [
               Text(
                 'Total $sum × ${RupiahFormatter.format(_selectedMultiplier)} = budget kamu',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 RupiahFormatter.format(displayedAmount),
-                style: AppTypography.displayLarge.copyWith(
+                style: t.displayLarge.copyWith(
                   fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                   height: 1.1,
                 ),
               ),
@@ -624,6 +665,7 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
   }
 
   Widget _buildMultiplierSection({
+    required PutarTheme t,
     required List<int> presets,
     required bool canPlay,
     required bool isLocked,
@@ -633,9 +675,9 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
       children: [
         Text(
           'Kelipatan',
-          style: AppTypography.titleMedium.copyWith(
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+          style: t.titleMedium.copyWith(
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
             fontSize: 16,
           ),
         ),
@@ -659,14 +701,14 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.matahari : AppColors.surface,
+                      color: isSelected ? t.secondary : t.surface,
                       borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: AppColors.ink, width: 3),
+                      border: Border.all(color: t.borderColor, width: t.borderWidth),
                       boxShadow: isSelected
-                          ? const [
+                          ? [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(3, 3),
+                                color: t.shadowColor,
+                                offset: t.smallShadowOffset,
                                 blurRadius: 0,
                               ),
                             ]
@@ -675,10 +717,10 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     child: Text(
                       RupiahFormatter.format(m),
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -691,7 +733,11 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
     );
   }
 
-  Widget _buildBudgetStatusBar({required int budget, required bool isLocked}) {
+  Widget _buildBudgetStatusBar({
+    required PutarTheme t,
+    required int budget,
+    required bool isLocked,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -700,18 +746,18 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
           children: [
             Text(
               'Budget grup untuk date ini',
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
             Text(
               RupiahFormatter.format(budget),
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -720,21 +766,21 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
         Container(
           height: 14,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.ink, width: 3),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
             widthFactor: budget > 0 ? 1.0 : 0.0,
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.mint,
+                color: t.success,
                 borderRadius: BorderRadius.circular(6),
                 border: Border(
                   right: BorderSide(
-                    color: budget > 0 ? AppColors.ink : Colors.transparent,
-                    width: 3,
+                    color: budget > 0 ? t.borderColor : Colors.transparent,
+                    width: t.borderWidth,
                   ),
                 ),
               ),
@@ -744,10 +790,10 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
         const SizedBox(height: 4),
         Text(
           'Permainan lain terkunci sampai date selesai.',
-          style: AppTypography.bodySmall.copyWith(
+          style: t.bodySmall.copyWith(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            fontWeight: t.weightSemiBold,
+            color: t.textSecondary,
           ),
         ),
       ],
@@ -755,20 +801,28 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
   }
 
   Future<void> _confirmEndSession(GroupModel group) async {
+    final groupService = ref.read(groupServiceProvider);
+    final summary = groupService.getActiveSessionSummary(group.id);
     final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
       context,
       groupName: group.name,
-      budget: group.activeSession?.budget,
+      budget: summary.budget > 0 ? summary.budget : group.activeSession?.budget,
+      totalSpent: summary.totalSpent,
+      itemCount: summary.itemCount,
     );
     if (confirm == true) {
       await ref.read(groupGameServiceProvider).endSession(gid: group.id);
       if (mounted) {
+        setState(() {
+          _wonAmount = null;
+        });
         InAppToast.show(context, message: 'Date grup telah diakhiri. Permainan kini terbuka!');
       }
     }
   }
 
   Widget _buildActionButton({
+    required PutarTheme t,
     required GroupModel group,
     required bool canPlay,
     required bool isLocked,
@@ -798,9 +852,9 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
       children: [
         StickerButton.large(
           text: label,
-          backgroundColor: isEnabled ? AppColors.tomat : AppColors.surface,
-          textColor: AppColors.ink,
-          borderColor: AppColors.ink,
+          backgroundColor: isEnabled ? t.primary : t.surface,
+          textColor: t.ink,
+          borderColor: t.borderColor,
           onPressed: isEnabled
               ? () => _handleRoll(group, canPlay, isLocked)
               : (isLocked && isOwner ? () => _confirmEndSession(group) : null),
@@ -809,9 +863,9 @@ class _GroupDiceScreenState extends ConsumerState<GroupDiceScreen>
           const SizedBox(height: 10),
           StickerButton.large(
             text: 'AKHIRI DATE GRUP',
-            backgroundColor: AppColors.matahari,
-            textColor: AppColors.ink,
-            borderColor: AppColors.ink,
+            backgroundColor: t.secondary,
+            textColor: t.ink,
+            borderColor: t.borderColor,
             onPressed: () => _confirmEndSession(group),
           ),
         ],
@@ -840,8 +894,9 @@ class _AnimatedDie extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     if (!isRolling) {
-      return _buildDieBody(value);
+      return _buildDieBody(theme, value);
     }
 
     return AnimatedBuilder(
@@ -891,7 +946,7 @@ class _AnimatedDie extends StatelessWidget {
             offset: Offset(0, translateY),
             child: Transform.rotate(
               angle: rotation * math.pi / 180,
-              child: _buildDieBody(displayVal),
+              child: _buildDieBody(theme, displayVal),
             ),
           ),
         );
@@ -899,25 +954,25 @@ class _AnimatedDie extends StatelessWidget {
     );
   }
 
-  Widget _buildDieBody(int val) {
+  Widget _buildDieBody(PutarTheme theme, int val) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(size * 0.24),
-        border: Border.all(color: AppColors.ink, width: 4),
-        boxShadow: const [
+        border: Border.all(color: theme.borderColor, width: 4),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(5, 5),
+            color: theme.shadowColor,
+            offset: theme.dialogShadowOffset,
             blurRadius: 0,
           ),
         ],
       ),
       padding: EdgeInsets.all(size * 0.13),
       child: CustomPaint(
-        painter: _DieDotsPainter(val),
+        painter: _DieDotsPainter(val, dotColor: theme.ink),
       ),
     );
   }
@@ -925,13 +980,14 @@ class _AnimatedDie extends StatelessWidget {
 
 class _DieDotsPainter extends CustomPainter {
   final int value;
+  final Color dotColor;
 
-  const _DieDotsPainter(this.value);
+  const _DieDotsPainter(this.value, {required this.dotColor});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.ink
+      ..color = dotColor
       ..style = PaintingStyle.fill;
 
     final dotRadius = size.width * 0.11;
@@ -986,5 +1042,6 @@ class _DieDotsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DieDotsPainter oldDelegate) => oldDelegate.value != value;
+  bool shouldRepaint(covariant _DieDotsPainter oldDelegate) =>
+      oldDelegate.value != value || oldDelegate.dotColor != dotColor;
 }

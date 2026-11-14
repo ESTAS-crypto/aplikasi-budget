@@ -100,16 +100,16 @@ void main() {
       await tester.tap(find.text('AKHIRI DATE GRUP'));
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Dialog konfirmasi muncul
-      expect(find.text('Akhiri Date Grup?'), findsOneWidget);
-      expect(find.text('Akhiri Date'), findsOneWidget);
+      // Dialog konfirmasi muncul (Hgrup3)
+      expect(find.text('Selesaikan date ini?'), findsOneWidget);
+      expect(find.text('Selesaikan'), findsOneWidget);
 
       // Konfirmasi akhiri
-      await tester.tap(find.text('Akhiri Date'));
+      await tester.tap(find.text('Selesaikan'));
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets('GroupNotesView menampilkan tombol AKHIRI DATE GRUP saat ada sesi aktif untuk pemilik',
+    testWidgets('GroupNotesView menampilkan tombol Selesaikan date saat ada sesi aktif untuk pemilik',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
@@ -165,20 +165,25 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Memastikan tombol AKHIRI DATE GRUP muncul di catatan
-      expect(find.text('AKHIRI DATE GRUP'), findsOneWidget);
+      // Memastikan CTA Catat jajan & Selesaikan date (Hgrup3) muncul untuk pemilik
+      expect(find.text('Catat jajan'), findsOneWidget);
+      expect(find.text('Selesaikan date'), findsOneWidget);
+      expect(
+        find.text('Tombol Selesaikan date hanya tampil untuk pemilik grup'),
+        findsOneWidget,
+      );
 
-      // Tap tombol AKHIRI DATE GRUP
-      await tester.ensureVisible(find.text('AKHIRI DATE GRUP'));
-      await tester.tap(find.text('AKHIRI DATE GRUP'));
+      // Tap tombol Selesaikan date
+      await tester.ensureVisible(find.text('Selesaikan date'));
+      await tester.tap(find.text('Selesaikan date'));
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Dialog konfirmasi muncul
-      expect(find.text('Akhiri Date Grup?'), findsOneWidget);
-      expect(find.text('Akhiri Date'), findsOneWidget);
+      // Dialog konfirmasi muncul (Hgrup3)
+      expect(find.text('Selesaikan date ini?'), findsOneWidget);
+      expect(find.text('Selesaikan'), findsOneWidget);
 
       // Konfirmasi
-      await tester.tap(find.text('Akhiri Date'));
+      await tester.tap(find.text('Selesaikan'));
       await tester.pump(const Duration(milliseconds: 300));
     });
   });

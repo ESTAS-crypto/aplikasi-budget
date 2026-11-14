@@ -7,8 +7,7 @@ import '../../../core/group/models/group_model.dart';
 import '../../../core/group/services/group_service.dart';
 import '../../../core/group/painters/group_icons_painter.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/widgets/in_app_toast.dart';
@@ -152,17 +151,24 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final groupService = ref.watch(groupServiceProvider);
     final groupStream = groupService.watchGroup(widget.groupId);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.ink),
+          icon: CustomPaint(
+            size: const Size(22, 22),
+            painter: CustomBackIconPainter(
+              color: t.ink,
+              strokeWidth: 2.8,
+            ),
+          ),
           onPressed: () {
             SoundService.instance.play(Sfx.uiTap);
             context.pop();
@@ -170,10 +176,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         ),
         title: Text(
           'Budget & Permainan',
-          style: AppTypography.titleMedium.copyWith(
+          style: t.titleMedium.copyWith(
             fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
         centerTitle: true,
@@ -183,7 +189,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         builder: (context, snapshot) {
           final group = snapshot.data ?? groupService.getLocalGroup(widget.groupId);
           if (group == null) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.ink));
+            return Center(child: CircularProgressIndicator(color: t.ink));
           }
 
           _initFromGroup(group);
@@ -199,17 +205,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // 1. Selector Mode Budget: "Dari Permainan" vs "Angka Tetap"
-                      _buildModeSelector(isOwner: isOwner),
+                      _buildModeSelector(t: t, isOwner: isOwner),
                       const SizedBox(height: 18),
 
                       // 2. Konten Spesifik per Mode
                       if (_budgetMode == 'game')
-                        _buildGameModeSection(isOwner: isOwner)
+                        _buildGameModeSection(t: t, isOwner: isOwner)
                       else
-                        _buildFixedModeSection(isOwner: isOwner),
+                        _buildFixedModeSection(t: t, isOwner: isOwner),
 
                       // 3. Section Permainan Lainnya (Segera Hadir / Maintenance)
-                      _buildUpcomingGamesSection(),
+                      _buildUpcomingGamesSection(t),
 
                       const SizedBox(height: 24),
                     ],
@@ -220,16 +226,16 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
               // 3. Bottom Bar Aksi
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
+                decoration: BoxDecoration(
+                  color: t.surface,
                   border: Border(
-                    top: BorderSide(color: AppColors.ink, width: 2.5),
+                    top: BorderSide(color: t.borderColor, width: t.subtleBorderWidth),
                   ),
                 ),
                 child: isOwner
                     ? StickerButton(
                         text: _isSaving ? 'Menyimpan...' : 'Simpan Pengaturan',
-                        backgroundColor: AppColors.mint,
+                        backgroundColor: t.success,
                         height: 52,
                         borderRadius: 16,
                         onPressed: _isSaving ? null : _handleSave,
@@ -237,15 +243,15 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                     : Container(
                         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                         decoration: BoxDecoration(
-                          color: AppColors.cream,
+                          color: t.bg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.ink, width: 2),
+                          border: Border.all(color: t.borderColor, width: 2),
                         ),
                         child: Text(
                           'Hanya pemilik grup yang dapat mengubah pengaturan budget.',
-                          style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w600,
+                          style: t.bodySmall.copyWith(
+                            color: t.ink,
+                            fontWeight: t.weightSemiBold,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -259,17 +265,20 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
   }
 
   /// 1. Neo-Brutalist Mode Selector Segment
-  Widget _buildModeSelector({required bool isOwner}) {
+  Widget _buildModeSelector({
+    required PutarTheme t,
+    required bool isOwner,
+  }) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.ink, width: 2.5),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(2.5, 2.5),
+            color: t.shadowColor,
+            offset: const Offset(2.5, 2.5),
             blurRadius: 0,
           ),
         ],
@@ -278,6 +287,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         children: [
           Expanded(
             child: _buildModeTab(
+              t: t,
               label: 'Dari Permainan',
               iconName: 'wheel',
               isSelected: _budgetMode == 'game',
@@ -292,6 +302,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
           const SizedBox(width: 4),
           Expanded(
             child: _buildModeTab(
+              t: t,
               label: 'Angka Tetap',
               iconName: 'tag',
               isSelected: _budgetMode == 'fixed',
@@ -309,6 +320,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
   }
 
   Widget _buildModeTab({
+    required PutarTheme t,
     required String label,
     required String iconName,
     required bool isSelected,
@@ -320,14 +332,14 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.matahari : Colors.transparent,
+          color: isSelected ? t.secondary : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: AppColors.ink, width: 2) : null,
+          border: isSelected ? Border.all(color: t.borderColor, width: 2) : null,
           boxShadow: isSelected
-              ? const [
+              ? [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(1.5, 1.5),
+                    color: t.shadowColor,
+                    offset: const Offset(1.5, 1.5),
                     blurRadius: 0,
                   ),
                 ]
@@ -336,10 +348,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         alignment: Alignment.center,
         child: Text(
           label,
-          style: AppTypography.bodyLargeBold.copyWith(
+          style: t.bodyLargeBold.copyWith(
             fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: AppColors.ink,
+            fontWeight: isSelected ? t.weightExtraBold : t.weightSemiBold,
+            color: t.ink,
           ),
         ),
       ),
@@ -347,7 +359,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
   }
 
   /// 2A. Mode "Dari Permainan" (Layar 53)
-  Widget _buildGameModeSection({required bool isOwner}) {
+  Widget _buildGameModeSection({
+    required PutarTheme t,
+    required bool isOwner,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -355,23 +370,23 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.langit,
+            color: t.info,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.ink, width: 2),
+            border: Border.all(color: t.borderColor, width: 2),
           ),
           child: Row(
             children: [
-              const CustomPaint(
-                size: Size(16, 16),
-                painter: CustomGearPainter(color: AppColors.ink),
+              CustomPaint(
+                size: const Size(16, 16),
+                painter: CustomGearPainter(color: t.ink),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Budget tiap sesi ditentukan dari hasil putaran roda jajan.',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightBold,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -384,13 +399,13 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.ink, width: 2.5),
-            boxShadow: const [
+            border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(3, 3),
+                color: t.shadowColor,
+                offset: t.smallShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -400,24 +415,25 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
             children: [
               Text(
                 'Siapa boleh memutar roda?',
-                style: AppTypography.titleMedium.copyWith(
+                style: t.titleMedium.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Tentukan anggota mana yang memiliki hak memutar roda sesi.',
-                style: AppTypography.bodySmall.copyWith(
+                style: t.bodySmall.copyWith(
                   fontSize: 12,
-                  color: AppColors.ink.withValues(alpha: 0.7),
+                  color: t.ink.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 14),
 
               // Pilihan 1: Hanya Pemilik
               _buildPolicyOption(
+                t: t,
                 title: 'Hanya Pemilik Grup',
                 subtitle: 'Hanya pemilik yang dapat memutar roda sesi.',
                 isSelected: _spinPolicy == 'owner',
@@ -431,6 +447,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
 
               // Pilihan 2: Semua Anggota
               _buildPolicyOption(
+                t: t,
                 title: 'Semua Anggota',
                 subtitle: 'Semua anggota grup yang online bebas memutar roda.',
                 isSelected: _spinPolicy == 'all',
@@ -449,13 +466,13 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.ink, width: 2.5),
-            boxShadow: const [
+            border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(3, 3),
+                color: t.shadowColor,
+                offset: t.smallShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -468,22 +485,22 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 children: [
                   Text(
                     'Nominal Roda Grup',
-                    style: AppTypography.titleMedium.copyWith(
+                    style: t.titleMedium.copyWith(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.cream,
+                      color: t.bg,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.ink, width: 1.8),
+                      border: Border.all(color: t.borderColor, width: 1.8),
                     ),
                     child: Text(
                       '${_slots.length} dari maks. 12',
-                      style: AppTypography.buttonSmall.copyWith(fontSize: 11),
+                      style: t.buttonSmall.copyWith(fontSize: 11),
                     ),
                   ),
                 ],
@@ -496,17 +513,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 runSpacing: 8,
                 children: List.generate(_slots.length, (index) {
                   final amount = _slots[index];
-                  final color = AppColors.getWheelColor(index);
+                  final color = t.getWheelColor(index);
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: color,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.ink, width: 2),
-                      boxShadow: const [
+                      border: Border.all(color: t.borderColor, width: 2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2, 2),
+                          color: t.shadowColor,
+                          offset: t.miniShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
@@ -516,19 +533,19 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                       children: [
                         Text(
                           RupiahFormatter.formatCompact(amount),
-                          style: AppTypography.buttonSmall.copyWith(
+                          style: t.buttonSmall.copyWith(
                             fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                         if (isOwner) ...[
                           const SizedBox(width: 6),
                           GestureDetector(
                             onTap: () => _removeSlot(index),
-                            child: const CustomPaint(
-                              size: Size(12, 12),
-                              painter: CustomCrossPainter(color: AppColors.ink, strokeWidth: 2.2),
+                            child: CustomPaint(
+                              size: const Size(12, 12),
+                              painter: CustomCrossPainter(color: t.ink, strokeWidth: 2.2),
                             ),
                           ),
                         ],
@@ -547,9 +564,9 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                         height: 48,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 2),
+                          border: Border.all(color: t.borderColor, width: 2),
                         ),
                         child: TextField(
                           controller: _slotInputController,
@@ -561,12 +578,12 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                           decoration: InputDecoration(
                             border: InputBorder.none,
                             hintText: 'Rp 75.000',
-                            hintStyle: AppTypography.bodyMedium.copyWith(
-                              color: AppColors.ink.withValues(alpha: 0.4),
+                            hintStyle: t.bodyMedium.copyWith(
+                              color: t.ink.withValues(alpha: 0.4),
                             ),
                           ),
-                          style: AppTypography.bodyLargeBold.copyWith(
-                            color: AppColors.ink,
+                          style: t.bodyLargeBold.copyWith(
+                            color: t.ink,
                           ),
                         ),
                       ),
@@ -578,13 +595,13 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                         height: 48,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: AppColors.matahari,
+                          color: t.secondary,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 2),
-                          boxShadow: const [
+                          border: Border.all(color: t.borderColor, width: 2),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(2, 2),
+                              color: t.shadowColor,
+                              offset: t.miniShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
@@ -592,9 +609,9 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                         alignment: Alignment.center,
                         child: Text(
                           'Tambah',
-                          style: AppTypography.buttonSmall.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
+                          style: t.buttonSmall.copyWith(
+                            color: t.ink,
+                            fontWeight: t.weightExtraBold,
                           ),
                         ),
                       ),
@@ -610,6 +627,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
   }
 
   Widget _buildPolicyOption({
+    required PutarTheme t,
     required String title,
     required String subtitle,
     required bool isSelected,
@@ -621,17 +639,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.cream : AppColors.surface,
+          color: isSelected ? t.bg : t.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: AppColors.ink,
-            width: isSelected ? 2.5 : 1.8,
+            color: t.borderColor,
+            width: isSelected ? t.subtleBorderWidth : 1.8,
           ),
           boxShadow: isSelected
-              ? const [
+              ? [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(2, 2),
+                    color: t.shadowColor,
+                    offset: t.miniShadowOffset,
                     blurRadius: 0,
                   ),
                 ]
@@ -644,17 +662,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
               height: 22,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? AppColors.tomat : AppColors.surface,
-                border: Border.all(color: AppColors.ink, width: 2),
+                color: isSelected ? t.primary : t.surface,
+                border: Border.all(color: t.borderColor, width: 2),
               ),
               child: isSelected
                   ? Center(
                       child: Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.surface,
+                          color: t.surface,
                         ),
                       ),
                     )
@@ -667,18 +685,18 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 children: [
                   Text(
                     title,
-                    style: AppTypography.bodyLargeBold.copyWith(
+                    style: t.bodyLargeBold.copyWith(
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: AppTypography.bodySmall.copyWith(
+                    style: t.bodySmall.copyWith(
                       fontSize: 11,
-                      color: AppColors.ink.withValues(alpha: 0.7),
+                      color: t.ink.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -691,7 +709,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
   }
 
   /// 2B. Mode "Angka Tetap" (Layar 54)
-  Widget _buildFixedModeSection({required bool isOwner}) {
+  Widget _buildFixedModeSection({
+    required PutarTheme t,
+    required bool isOwner,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -699,23 +720,23 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.mint,
+            color: t.success,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.ink, width: 2),
+            border: Border.all(color: t.borderColor, width: 2),
           ),
           child: Row(
             children: [
-              const CustomPaint(
-                size: Size(16, 16),
-                painter: CustomCheckIconPainter(color: AppColors.ink),
+              CustomPaint(
+                size: const Size(16, 16),
+                painter: CustomCheckIconPainter(color: t.ink),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Budget date langsung ditentukan nominal tetap tanpa harus memutar roda.',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightBold,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -728,13 +749,13 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.ink, width: 2.5),
-            boxShadow: const [
+            border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(3, 3),
+                color: t.shadowColor,
+                offset: t.smallShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -744,10 +765,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
             children: [
               Text(
                 'Nominal Budget per Date',
-                style: AppTypography.titleMedium.copyWith(
+                style: t.titleMedium.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
               const SizedBox(height: 12),
@@ -756,9 +777,9 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.cream,
+                  color: t.bg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.ink, width: 2.5),
+                  border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
                 ),
                 child: isOwner
                     ? TextField(
@@ -773,10 +794,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                           final p = RupiahFormatter.parse(val);
                           setState(() => _fixedBudget = p);
                         },
-                        style: AppTypography.displayMedium.copyWith(
+                        style: t.displayMedium.copyWith(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.ink,
+                          color: t.ink,
                         ),
                         decoration: const InputDecoration(
                           border: InputBorder.none,
@@ -785,10 +806,10 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                       )
                     : Text(
                         RupiahFormatter.format(_fixedBudget),
-                        style: AppTypography.displayMedium.copyWith(
+                        style: t.displayMedium.copyWith(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.ink,
+                          color: t.ink,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -799,9 +820,9 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 // Chip Pilih Cepat
                 Text(
                   'Pilih Cepat',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -815,14 +836,14 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isSel ? AppColors.matahari : AppColors.surface,
+                          color: isSel ? t.secondary : t.surface,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.ink, width: 2),
+                          border: Border.all(color: t.borderColor, width: 2),
                           boxShadow: isSel
-                              ? const [
+                              ? [
                                   BoxShadow(
-                                    color: AppColors.ink,
-                                    offset: Offset(2, 2),
+                                    color: t.shadowColor,
+                                    offset: t.miniShadowOffset,
                                     blurRadius: 0,
                                   ),
                                 ]
@@ -830,9 +851,9 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                         ),
                         child: Text(
                           RupiahFormatter.formatCompact(amount),
-                          style: AppTypography.buttonSmall.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                          style: t.buttonSmall.copyWith(
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ),
@@ -844,18 +865,18 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 // Chip Tambah Cepat
                 Text(
                   'Tambah Cepat',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   children: [
-                    _buildDeltaChip('+10rb', 10000),
-                    _buildDeltaChip('+50rb', 50000),
-                    _buildDeltaChip('+100rb', 100000),
+                    _buildDeltaChip(t, '+10rb', 10000),
+                    _buildDeltaChip(t, '+50rb', 50000),
+                    _buildDeltaChip(t, '+100rb', 100000),
                   ],
                 ),
               ],
@@ -868,25 +889,25 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.permen.withValues(alpha: 0.4),
+            color: t.accentPink.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.ink, width: 2),
+            border: Border.all(color: t.borderColor, width: 2),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CustomPaint(
-                size: Size(18, 18),
-                painter: CustomInfoCirclePainter(color: AppColors.ink, strokeWidth: 2.2),
+              CustomPaint(
+                size: const Size(18, 18),
+                painter: CustomInfoCirclePainter(color: t.ink, strokeWidth: 2.2),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Berlaku untuk date berikutnya; date yang sedang berjalan tidak berubah.',
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                    fontWeight: t.weightBold,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -897,39 +918,39 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
     );
   }
 
-  Widget _buildDeltaChip(String label, int delta) {
+  Widget _buildDeltaChip(PutarTheme t, String label, int delta) {
     return GestureDetector(
       onTap: () => _addFixedBudget(delta),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.cream,
+          color: t.bg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.ink, width: 1.8),
+          border: Border.all(color: t.borderColor, width: 1.8),
         ),
         child: Text(
           label,
-          style: AppTypography.buttonSmall.copyWith(
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+          style: t.buttonSmall.copyWith(
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildUpcomingGamesSection() {
+  Widget _buildUpcomingGamesSection(PutarTheme t) {
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(top: 18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.ink, width: 2.5),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -942,11 +963,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
+                  color: t.secondary,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.ink, width: 1.8),
+                  border: Border.all(color: t.borderColor, width: 1.8),
                 ),
-                child: const Icon(Icons.sports_esports_rounded, size: 18, color: AppColors.ink),
+                child: CustomPaint(
+                  size: const Size(18, 18),
+                  painter: CustomGamepadIconPainter(
+                    color: t.ink,
+                    strokeWidth: 2.2,
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -955,17 +982,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                   children: [
                     Text(
                       'Mode Permainan Grup',
-                      style: AppTypography.titleMedium.copyWith(
+                      style: t.titleMedium.copyWith(
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     Text(
                       'Pilih dan mainkan mode permainan alternatif bersama anggota grup',
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: t.textSecondary,
                       ),
                     ),
                   ],
@@ -975,6 +1002,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
           ),
           const SizedBox(height: 12),
           _buildUpcomingGameRow(
+            t: t,
             emoji: '🎲',
             title: 'Kocok Dadu Bersama',
             subtitle: 'Multiplayer roll dadu live bersama teman',
@@ -982,6 +1010,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
           ),
           const SizedBox(height: 8),
           _buildUpcomingGameRow(
+            t: t,
             emoji: '🔮',
             title: 'Gacha Kapsul Grup',
             subtitle: 'Tarik tuas gacha bersama anggota',
@@ -989,6 +1018,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
           ),
           const SizedBox(height: 8),
           _buildUpcomingGameRow(
+            t: t,
             emoji: '✉️',
             title: 'Pilih Amplop Misteri',
             subtitle: 'Tiap anggota memilih amplop kejutan',
@@ -996,6 +1026,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
           ),
           const SizedBox(height: 8),
           _buildUpcomingGameRow(
+            t: t,
             emoji: '🪙',
             title: 'Lempar Koin Grup',
             subtitle: 'Tebak koin bareng melipatgandakan budget',
@@ -1007,6 +1038,7 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
   }
 
   Widget _buildUpcomingGameRow({
+    required PutarTheme t,
     required String emoji,
     required String title,
     required String subtitle,
@@ -1021,9 +1053,9 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.cream,
+          color: t.bg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.ink, width: 1.8),
+          border: Border.all(color: t.borderColor, width: 1.8),
         ),
         child: Row(
           children: [
@@ -1035,17 +1067,17 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 children: [
                   Text(
                     title,
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: AppTypography.bodySmall.copyWith(
+                    style: t.bodySmall.copyWith(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                      color: t.textSecondary,
                     ),
                   ),
                 ],
@@ -1054,13 +1086,13 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.mint,
+                color: t.success,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.ink, width: 1.5),
-                boxShadow: const [
+                border: Border.all(color: t.borderColor, width: 1.5),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(1.5, 1.5),
+                    color: t.shadowColor,
+                    offset: const Offset(1.5, 1.5),
                     blurRadius: 0,
                   ),
                 ],
@@ -1070,15 +1102,21 @@ class _GroupBudgetSettingsScreenState extends ConsumerState<GroupBudgetSettingsS
                 children: [
                   Text(
                     'MAINKAN',
-                    style: AppTypography.chipLabel.copyWith(
+                    style: t.chipLabel.copyWith(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.ink,
+                      color: t.ink,
                       letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.ink),
+                  CustomPaint(
+                    size: const Size(12, 12),
+                    painter: CustomForwardIconPainter(
+                      color: t.ink,
+                      strokeWidth: 2.6,
+                    ),
+                  ),
                 ],
               ),
             ),

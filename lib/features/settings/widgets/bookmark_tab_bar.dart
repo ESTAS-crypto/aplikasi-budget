@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/sound_service.dart';
 
-/// Bilah Tab Penanda Buku Neo-Brutalist (Bookmark Tabs)
+/// Bilah Tab Penanda Buku bertema (Bookmark Tabs)
 /// Memberikan sensasi index penanda buku binder fisik dengan animasi in/out.
 class BookmarkTabBar extends StatelessWidget {
   final int selectedIndex;
@@ -17,6 +16,7 @@ class BookmarkTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
       child: Row(
@@ -24,20 +24,22 @@ class BookmarkTabBar extends StatelessWidget {
         children: [
           Expanded(
             child: _buildBookmarkTab(
+              theme: t,
               index: 0,
               label: 'Aplikasi',
               subLabel: 'Umum & Audio',
-              activeColor: AppColors.matahari,
+              activeColor: t.secondary,
               isSelected: selectedIndex == 0,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: _buildBookmarkTab(
+              theme: t,
               index: 1,
               label: 'Grup',
               subLabel: 'Aktivitas & Notif',
-              activeColor: AppColors.langit,
+              activeColor: t.info,
               isSelected: selectedIndex == 1,
             ),
           ),
@@ -47,12 +49,20 @@ class BookmarkTabBar extends StatelessWidget {
   }
 
   Widget _buildBookmarkTab({
+    required PutarTheme theme,
     required int index,
     required String label,
     required String subLabel,
     required Color activeColor,
     required bool isSelected,
   }) {
+    final activeShadowOffset = theme.standardShadowOffset.dx == 0
+        ? const Offset(0, 4)
+        : const Offset(3.5, 3.5);
+    final inactiveShadowOffset = theme.standardShadowOffset.dx == 0
+        ? const Offset(0, 2)
+        : const Offset(1.5, 1.5);
+
     return GestureDetector(
       onTap: () {
         if (!isSelected) {
@@ -69,7 +79,7 @@ class BookmarkTabBar extends StatelessWidget {
           vertical: isSelected ? 10 : 8,
         ),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor : Colors.white,
+          color: isSelected ? activeColor : theme.surface,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(18),
             topRight: Radius.circular(18),
@@ -77,13 +87,13 @@ class BookmarkTabBar extends StatelessWidget {
             bottomRight: Radius.circular(10),
           ),
           border: Border.all(
-            color: AppColors.ink,
-            width: isSelected ? 3.0 : 2.2,
+            color: theme.borderColor,
+            width: isSelected ? theme.borderWidth : 2.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: isSelected ? const Offset(3.5, 3.5) : const Offset(1.5, 1.5),
+              color: theme.shadowColor,
+              offset: isSelected ? activeShadowOffset : inactiveShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -91,12 +101,13 @@ class BookmarkTabBar extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Penanda bulat kecil khas binder
             Container(
               width: 10,
               height: 10,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.ink : AppColors.ink.withValues(alpha: 0.3),
+                color: isSelected
+                    ? theme.ink
+                    : theme.ink.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
             ),
@@ -108,10 +119,11 @@ class BookmarkTabBar extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: AppTypography.titleMedium.copyWith(
+                    style: theme.titleMedium.copyWith(
                       fontSize: isSelected ? 15 : 14,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                      color: AppColors.ink,
+                      fontWeight:
+                          isSelected ? theme.weightExtraBold : theme.weightBold,
+                      color: theme.ink,
                       height: 1.1,
                     ),
                     maxLines: 1,
@@ -120,10 +132,12 @@ class BookmarkTabBar extends StatelessWidget {
                   const SizedBox(height: 1),
                   Text(
                     subLabel,
-                    style: AppTypography.bodySmall.copyWith(
+                    style: theme.bodySmall.copyWith(
                       fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? AppColors.ink.withValues(alpha: 0.75) : const Color(0xFF5B4B7A),
+                      fontWeight: theme.weightSemiBold,
+                      color: isSelected
+                          ? theme.ink.withValues(alpha: 0.75)
+                          : theme.textSecondary,
                       height: 1.0,
                     ),
                     maxLines: 1,
@@ -138,4 +152,3 @@ class BookmarkTabBar extends StatelessWidget {
     );
   }
 }
-

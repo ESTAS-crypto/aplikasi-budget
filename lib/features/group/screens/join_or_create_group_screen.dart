@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/widgets/sticker_button.dart';
 import '../../../core/widgets/sticker_card.dart';
 import '../../../core/widgets/sticker_snackbar.dart';
@@ -199,16 +198,17 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const CustomPaint(
-            size: Size(22, 22),
-            painter: CustomBackArrowPainter(color: AppColors.ink),
+          icon: CustomPaint(
+            size: const Size(22, 22),
+            painter: CustomBackArrowPainter(color: t.ink),
           ),
           onPressed: () {
             SoundService.instance.play(Sfx.uiTap);
@@ -217,7 +217,7 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
         ),
         title: Text(
           'Grup Bersama',
-          style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
+          style: t.titleMedium.copyWith(color: t.ink),
         ),
       ),
       body: SafeArea(
@@ -228,41 +228,41 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Kartu Profil Anggota
-              _buildProfileCard(),
+              _buildProfileCard(t),
               const SizedBox(height: 16),
 
               // Kartu 1: Buat Grup Baru
-              _buildCreateGroupCard(),
+              _buildCreateGroupCard(t),
               const SizedBox(height: 20),
 
               // Pemisah ATAU Neo-Brutalist
-              _buildOrDivider(),
+              _buildOrDivider(t),
               const SizedBox(height: 20),
 
               // Kartu 2: Gabung Grup dengan Kode
-              _buildJoinGroupCard(),
+              _buildJoinGroupCard(t),
               const SizedBox(height: 16),
 
               // Catatan Koneksi Internet
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: t.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.ink, width: 2.0),
+                  border: Border.all(color: t.ink, width: 2.0),
                 ),
                 child: Row(
                   children: [
-                    const CustomPaint(
-                      size: Size(18, 18),
-                      painter: CustomInfoCirclePainter(color: AppColors.textSecondary),
+                    CustomPaint(
+                      size: const Size(18, 18),
+                      painter: CustomInfoCirclePainter(color: t.textSecondary),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Membuat atau bergabung ke grup membutuhkan koneksi internet untuk menyinkronkan data.',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                        style: t.bodySmall.copyWith(
+                          color: t.textSecondary,
                           fontSize: 11,
                         ),
                       ),
@@ -278,17 +278,17 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
     );
   }
 
-  Widget _buildProfileCard() {
+  Widget _buildProfileCard(PutarTheme t) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.ink, width: 2.5),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -310,11 +310,11 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
                   children: [
                     Text(
                       'Nama Tampilan Kamu',
-                      style: AppTypography.bodyLargeBold.copyWith(fontSize: 14),
+                      style: t.bodyLargeBold.copyWith(fontSize: 14),
                     ),
                     Text(
                       'Terlihat oleh anggota grup lain',
-                      style: AppTypography.bodySmall.copyWith(fontSize: 11),
+                      style: t.bodySmall.copyWith(fontSize: 11),
                     ),
                   ],
                 ),
@@ -336,27 +336,27 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
               hintText: 'Nama kamu (1-20 karakter)',
               counterText: '',
               filled: true,
-              fillColor: AppColors.cream,
+              fillColor: t.bg,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.ink, width: 2),
+                borderSide: BorderSide(color: t.ink, width: 2),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.ink, width: 2),
+                borderSide: BorderSide(color: t.ink, width: 2),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.ink, width: 2.5),
+                borderSide: BorderSide(color: t.ink, width: t.subtleBorderWidth),
               ),
             ),
-            style: AppTypography.bodyLargeBold.copyWith(fontSize: 14),
+            style: t.bodyLargeBold.copyWith(fontSize: 14),
           ),
           const SizedBox(height: 10),
           Text(
             'Pilih Warna Avatar:',
-            style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w700),
+            style: t.bodySmall.copyWith(fontWeight: t.weightBold),
           ),
           const SizedBox(height: 6),
           FittedBox(
@@ -377,27 +377,27 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
                     height: 28,
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.getWheelColor(index),
+                      color: t.getWheelColor(index),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.ink,
+                        color: t.ink,
                         width: isSelected ? 2.8 : 1.5,
                       ),
                       boxShadow: isSelected
-                          ? const [
+                          ? [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(1, 2),
+                                color: t.shadowColor,
+                                offset: const Offset(1, 2),
                                 blurRadius: 0,
                               ),
                             ]
                           : null,
                     ),
                     child: isSelected
-                        ? const Center(
+                        ? Center(
                             child: CustomPaint(
-                              size: Size(13, 13),
-                              painter: CustomCheckPainter(color: AppColors.ink, strokeWidth: 2.2),
+                              size: const Size(13, 13),
+                              painter: CustomCheckPainter(color: t.ink, strokeWidth: 2.2),
                             ),
                           )
                         : null,
@@ -411,10 +411,10 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
     );
   }
 
-  Widget _buildCreateGroupCard() {
+  Widget _buildCreateGroupCard(PutarTheme t) {
     return StickerCard(
-      backgroundColor: AppColors.surface,
-      borderColor: AppColors.ink,
+      backgroundColor: t.surface,
+      borderColor: t.ink,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -424,20 +424,20 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
+                  color: t.secondary,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.ink, width: 1.8),
+                  border: Border.all(color: t.ink, width: 1.8),
                 ),
                 child: Text(
                   'BARU',
-                  style: AppTypography.buttonSmall.copyWith(fontSize: 10),
+                  style: t.buttonSmall.copyWith(fontSize: 10),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Buat Grup Baru',
-                  style: AppTypography.titleMedium.copyWith(fontSize: 16),
+                  style: t.titleMedium.copyWith(fontSize: 16),
                 ),
               ),
             ],
@@ -450,27 +450,27 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
               hintText: 'Contoh: Ngedate Seru / Makan Enak',
               counterText: '',
               filled: true,
-              fillColor: AppColors.cream,
+              fillColor: t.bg,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.ink, width: 2),
+                borderSide: BorderSide(color: t.ink, width: 2),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.ink, width: 2),
+                borderSide: BorderSide(color: t.ink, width: 2),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.ink, width: 2.5),
+                borderSide: BorderSide(color: t.ink, width: t.subtleBorderWidth),
               ),
             ),
-            style: AppTypography.bodyLargeBold.copyWith(fontSize: 15),
+            style: t.bodyLargeBold.copyWith(fontSize: 15),
           ),
           const SizedBox(height: 14),
           StickerButton(
             text: _isLoading ? 'Membuat...' : 'Buat Grup',
-            backgroundColor: AppColors.matahari,
+            backgroundColor: t.secondary,
             onPressed: _isLoading ? null : _handleCreateGroup,
           ),
         ],
@@ -478,12 +478,12 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
     );
   }
 
-  Widget _buildOrDivider() {
+  Widget _buildOrDivider(PutarTheme t) {
     return Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Divider(
-            color: AppColors.ink,
+            color: t.ink,
             thickness: 2,
           ),
         ),
@@ -491,18 +491,18 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
           margin: const EdgeInsets.symmetric(horizontal: 12),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.cream,
+            color: t.bg,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ink, width: 2),
+            border: Border.all(color: t.ink, width: 2),
           ),
           child: Text(
             'ATAU',
-            style: AppTypography.buttonSmall.copyWith(fontSize: 11),
+            style: t.buttonSmall.copyWith(fontSize: 11),
           ),
         ),
-        const Expanded(
+        Expanded(
           child: Divider(
-            color: AppColors.ink,
+            color: t.ink,
             thickness: 2,
           ),
         ),
@@ -510,12 +510,12 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
     );
   }
 
-  Widget _buildJoinGroupCard() {
+  Widget _buildJoinGroupCard(PutarTheme t) {
     final canJoin = _inviteCode.length == 6 && !_isLoading;
 
     return StickerCard(
-      backgroundColor: AppColors.surface,
-      borderColor: AppColors.ink,
+      backgroundColor: t.surface,
+      borderColor: t.ink,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -529,12 +529,12 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
                   children: [
                     Text(
                       'Gabung Grup Teman',
-                      style: AppTypography.titleMedium.copyWith(fontSize: 16),
+                      style: t.titleMedium.copyWith(fontSize: 16),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Ketik atau tempel 6 karakter kode:',
-                      style: AppTypography.bodySmall.copyWith(fontSize: 12),
+                      style: t.bodySmall.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -544,13 +544,13 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.ink, width: 2),
-                    boxShadow: const [
+                    border: Border.all(color: t.ink, width: 2),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(2, 2),
+                        color: t.shadowColor,
+                        offset: t.miniShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
@@ -558,14 +558,14 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CustomPaint(
-                        size: Size(13, 13),
-                        painter: CustomPastePainter(color: AppColors.ink),
+                      CustomPaint(
+                        size: const Size(13, 13),
+                        painter: CustomPastePainter(color: t.ink),
                       ),
                       const SizedBox(width: 5),
                       Text(
                         'Tempel',
-                        style: AppTypography.buttonSmall.copyWith(fontSize: 11),
+                        style: t.buttonSmall.copyWith(fontSize: 11),
                       ),
                     ],
                   ),
@@ -585,7 +585,7 @@ class _JoinOrCreateGroupScreenState extends ConsumerState<JoinOrCreateGroupScree
           const SizedBox(height: 16),
           StickerButton(
             text: _isLoading ? 'Memeriksa...' : 'Gabung Grup',
-            backgroundColor: AppColors.mint,
+            backgroundColor: t.success,
             onPressed: canJoin ? _handleJoinGroup : null,
           ),
         ],

@@ -13,8 +13,7 @@ import '../../../core/group/services/group_game_service.dart';
 import '../../../core/group/widgets/member_avatar.dart';
 import '../../../core/group/widgets/group_important_dialog.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/widgets/in_app_toast.dart';
@@ -204,14 +203,42 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
   Future<void> _takeBudget(GroupModel group, String myUid) async {
     if (_isFlipping) return;
 
+    final gameService = ref.read(groupGameServiceProvider);
+    final groupService = ref.read(groupServiceProvider);
+    final existingSession = groupService.getEffectiveActiveSession(group.id, group);
+
+    // Jika catatan grup sebelumnya masih ada (budget > 0), tanyakan persetujuan terlebih dahulu.
+    // Jika catatan grup kosong, langsung pasang hasil koin ke catatan grup.
+    if (existingSession != null && existingSession.budget > 0) {
+      final accepted = await GroupImportantDialog.showConfirmAcceptGameBudget(
+        context,
+        budget: _currentAmount,
+        currentBudget: existingSession.budget,
+        gameName: 'Lempar Koin',
+      );
+      if (!mounted) return;
+      if (accepted != true) {
+        if (_heldTurnLock) {
+          await gameService.releaseCoinTurn(gid: group.id, uid: myUid);
+          _heldTurnLock = false;
+        }
+        if (mounted) {
+          InAppToast.show(
+            context,
+            message:
+                'Hasil koin dibatalkan. Catatan grup tetap ${RupiahFormatter.format(existingSession.budget)}.',
+          );
+        }
+        return;
+      }
+    }
+
     SoundService.instance.play(Sfx.winLolos);
     HapticFeedback.heavyImpact();
 
     setState(() {
       _isFinished = true;
     });
-
-    final gameService = ref.read(groupGameServiceProvider);
 
     // Tulis hasil permainan & klaim sesi grup
     final claimResult = await gameService.claimSessionAndWriteResult(
@@ -246,30 +273,44 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
+    final groupService = ref.read(groupServiceProvider);
 
-    final group = activeGroupAsync.valueOrNull ??
-        (activeGroupId != null && activeGroupId.isNotEmpty
-            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
-            : null);
+    final streamedGroup = activeGroupAsync.valueOrNull;
+    final localGroup = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? groupService.getLocalGroup(activeGroupId)
+        : null;
+    final rawGroup = streamedGroup ?? localGroup;
+    final resolvedSession = rawGroup != null
+        ? groupService.resolveEffectiveSession(
+            rawGroup.id,
+            streamedGroup?.activeSession,
+            localGroup?.activeSession,
+          )
+        : null;
+    final group = rawGroup?.copyWith(
+      activeSession: resolvedSession,
+      clearActiveSession: resolvedSession == null,
+    );
 
     if (group == null) {
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBackButton(),
+                _buildBackButton(t),
                 const SizedBox(height: 40),
                 Center(
                   child: Text(
                     'Grup tidak ditemukan',
-                    style: AppTypography.displayMedium.copyWith(fontSize: 20),
+                    style: t.displayMedium.copyWith(fontSize: 20),
                   ),
                 ),
               ],
@@ -305,7 +346,7 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     final isCoinClaimed = (session != null && session.budget > 0);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -315,15 +356,15 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
               // 1. Top Bar: Tombol Kembali & Judul Layar
               Row(
                 children: [
-                  _buildBackButton(),
+                  _buildBackButton(t),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
                       'Lempar Koin',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -336,23 +377,23 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: t.borderColor, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     'Gambar x2 · Angka setengah',
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -360,30 +401,32 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
               const SizedBox(height: 10),
 
               // 3. Group Status Strip
-              _buildGroupStatusStrip(group: group, members: members, canPlay: canPlay),
+              _buildGroupStatusStrip(t: t, group: group, members: members, canPlay: canPlay),
               const SizedBox(height: 18),
 
               // 4. Arena Lempar Koin 300px
-              _buildCoinArena(),
+              _buildCoinArena(t),
               const SizedBox(height: 16),
 
               // 5. Indikator Lemparan (1 dari 3)
-              _buildFlipIndicators(),
+              _buildFlipIndicators(t),
               const SizedBox(height: 14),
 
               // 6. Kartu Hasil Pop Reveal
               _buildResultCard(
+                t: t,
                 session: session,
                 isSpectatorResult: isSpectatorResult,
               ),
               const SizedBox(height: 24),
 
               // 7. Bar Budget Grup untuk Date Ini
-              _buildBudgetStatusBar(budget: currentBudget, isLocked: isLocked),
+              _buildBudgetStatusBar(t: t, budget: currentBudget, isLocked: isLocked),
               const SizedBox(height: 12),
 
               // 8. Tombol Aksi (LEMPAR KOIN / LEMPAR LAGI & AMBIL)
               _buildActionButtons(
+                t: t,
                 group: group,
                 canPlay: canPlay,
                 isLocked: isLocked,
@@ -400,7 +443,7 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     );
   }
 
-  Widget _buildBackButton() {
+  Widget _buildBackButton(PutarTheme t) {
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
@@ -414,25 +457,25 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ink, width: 3),
-          boxShadow: const [
+          border: Border.all(color: t.borderColor, width: t.borderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.shadowColor,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
         ),
         alignment: Alignment.center,
-        child: const SizedBox(
+        child: SizedBox(
           width: 22,
           height: 22,
           child: CustomPaint(
             painter: CustomBackIconPainter(
-              color: AppColors.ink,
-              strokeWidth: 3.0,
+              color: t.ink,
+              strokeWidth: t.borderWidth,
             ),
           ),
         ),
@@ -441,6 +484,7 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
   }
 
   Widget _buildGroupStatusStrip({
+    required PutarTheme t,
     required GroupModel group,
     required List<GroupMemberModel> members,
     required bool canPlay,
@@ -455,13 +499,13 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -498,10 +542,10 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
                   'Grup · ${group.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                     height: 1.2,
                   ),
                 ),
@@ -509,10 +553,10 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
                   '$onlineCount online · $turnPolicyLabel · hasil dilihat semua',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    fontWeight: t.weightSemiBold,
+                    color: t.textSecondary,
                   ),
                 ),
               ],
@@ -523,17 +567,17 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     );
   }
 
-  Widget _buildCoinArena() {
+  Widget _buildCoinArena(PutarTheme theme) {
     return Container(
       height: 300,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE9A8),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        color: theme.accentWarmSoft,
+        borderRadius: BorderRadius.circular(theme.cardRadius),
+        border: Border.all(color: theme.borderColor, width: theme.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(4, 4),
+            color: theme.shadowColor,
+            offset: theme.standardShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -570,7 +614,7 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
                     width: 130,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: AppColors.ink.withValues(alpha: opacity),
+                      color: theme.ink.withValues(alpha: opacity),
                       borderRadius: BorderRadius.circular(50),
                     ),
                   ),
@@ -645,16 +689,16 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     );
   }
 
-  Widget _buildFlipIndicators() {
+  Widget _buildFlipIndicators(PutarTheme t) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
           'Lemparan ${_flipCount.clamp(0, 3)} dari 3',
-          style: AppTypography.buttonSmall.copyWith(
+          style: t.buttonSmall.copyWith(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
         const SizedBox(width: 10),
@@ -665,8 +709,8 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
             height: 22,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: i <= _flipCount ? AppColors.mint : Colors.white,
-              border: Border.all(color: AppColors.ink, width: 3),
+              color: i <= _flipCount ? t.success : t.surface,
+              border: Border.all(color: t.borderColor, width: t.borderWidth),
             ),
           ),
       ],
@@ -674,6 +718,7 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
   }
 
   Widget _buildResultCard({
+    required PutarTheme t,
     required GroupSessionModel? session,
     required bool isSpectatorResult,
   }) {
@@ -687,13 +732,13 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.ink, width: 3),
-              boxShadow: const [
+              color: t.surface,
+              borderRadius: BorderRadius.circular(t.cardRadius),
+              border: Border.all(color: t.borderColor, width: t.borderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(4, 4),
+                  color: t.shadowColor,
+                  offset: t.standardShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -703,19 +748,19 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
               children: [
                 Text(
                   'Hasil Lempar Koin grup',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightBold,
+                    color: t.textSecondary,
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   RupiahFormatter.format(session.budget),
-                  style: AppTypography.displayLarge.copyWith(
+                  style: t.displayLarge.copyWith(
                     fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                     height: 1.1,
                   ),
                 ),
@@ -731,13 +776,13 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -747,19 +792,19 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
             children: [
               Text(
                 'Nominal dasar',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 RupiahFormatter.format(_currentAmount),
-                style: AppTypography.displayMedium.copyWith(
+                style: t.displayMedium.copyWith(
                   fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ],
@@ -776,13 +821,13 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -792,19 +837,19 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
             children: [
               Text(
                 '$sideText${RupiahFormatter.format(last.beforeAmount)} jadi',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 RupiahFormatter.format(_currentAmount),
-                style: AppTypography.displayLarge.copyWith(
+                style: t.displayLarge.copyWith(
                   fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                   height: 1.1,
                 ),
               ),
@@ -815,7 +860,11 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     );
   }
 
-  Widget _buildBudgetStatusBar({required int budget, required bool isLocked}) {
+  Widget _buildBudgetStatusBar({
+    required PutarTheme t,
+    required int budget,
+    required bool isLocked,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -824,18 +873,18 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
           children: [
             Text(
               'Budget grup untuk date ini',
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
             Text(
               RupiahFormatter.format(budget),
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -844,18 +893,18 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
         Container(
           height: 14,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.ink, width: 3),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
             widthFactor: budget > 0 ? 1.0 : 0.0,
             child: Container(
-              decoration: const BoxDecoration(
-                color: AppColors.mint,
+              decoration: BoxDecoration(
+                color: t.success,
                 border: Border(
-                  right: BorderSide(color: AppColors.ink, width: 3),
+                  right: BorderSide(color: t.borderColor, width: t.borderWidth),
                 ),
               ),
             ),
@@ -864,10 +913,10 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
         const SizedBox(height: 4),
         Text(
           'Permainan lain terkunci sampai date selesai.',
-          style: AppTypography.bodySmall.copyWith(
+          style: t.bodySmall.copyWith(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            fontWeight: t.weightSemiBold,
+            color: t.textSecondary,
           ),
         ),
       ],
@@ -875,20 +924,32 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
   }
 
   Future<void> _confirmEndSession(GroupModel group) async {
+    final groupService = ref.read(groupServiceProvider);
+    final summary = groupService.getActiveSessionSummary(group.id);
     final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
       context,
       groupName: group.name,
-      budget: group.activeSession?.budget,
+      budget: summary.budget > 0 ? summary.budget : group.activeSession?.budget,
+      totalSpent: summary.totalSpent,
+      itemCount: summary.itemCount,
     );
     if (confirm == true) {
       await ref.read(groupGameServiceProvider).endSession(gid: group.id);
       if (mounted) {
+        setState(() {
+          _hasStarted = false;
+          _isFinished = false;
+          _flipCount = 0;
+          _history.clear();
+          _heldTurnLock = false;
+        });
         InAppToast.show(context, message: 'Date grup telah diakhiri. Permainan kini terbuka!');
       }
     }
   }
 
   Widget _buildActionButtons({
+    required PutarTheme t,
     required GroupModel group,
     required bool canPlay,
     required bool isLocked,
@@ -902,9 +963,9 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     if (!canPlay) {
       return StickerButton.large(
         text: 'Hanya pemilik yang bisa memainkan',
-        backgroundColor: AppColors.surface,
-        textColor: AppColors.textSecondary,
-        borderColor: AppColors.ink,
+        backgroundColor: t.surface,
+        textColor: t.textSecondary,
+        borderColor: t.borderColor,
         onPressed: null,
       );
     }
@@ -918,18 +979,18 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
         children: [
           StickerButton.large(
             text: 'Date berjalan · permainan terkunci',
-            backgroundColor: AppColors.surface,
-            textColor: AppColors.textSecondary,
-            borderColor: AppColors.ink,
+            backgroundColor: t.surface,
+            textColor: t.textSecondary,
+            borderColor: t.borderColor,
             onPressed: isOwner ? () => _confirmEndSession(group) : null,
           ),
           if (isOwner) ...[
             const SizedBox(height: 10),
             StickerButton.large(
               text: 'AKHIRI DATE GRUP',
-              backgroundColor: AppColors.matahari,
-              textColor: AppColors.ink,
-              borderColor: AppColors.ink,
+              backgroundColor: t.secondary,
+              textColor: t.ink,
+              borderColor: t.borderColor,
               onPressed: () => _confirmEndSession(group),
             ),
           ],
@@ -942,9 +1003,9 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
       final locker = session?.turnLockedByName ?? 'anggota lain';
       return StickerButton.large(
         text: 'Giliran dimainkan $locker',
-        backgroundColor: AppColors.surface,
-        textColor: AppColors.textSecondary,
-        borderColor: AppColors.ink,
+        backgroundColor: t.surface,
+        textColor: t.textSecondary,
+        borderColor: t.borderColor,
         onPressed: null,
       );
     }
@@ -953,9 +1014,9 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     if (isCoinClaimed && !_hasStarted) {
       return StickerButton.large(
         text: 'KOIN SUDAH DIAMBIL',
-        backgroundColor: AppColors.surface,
-        textColor: AppColors.textSecondary,
-        borderColor: AppColors.ink,
+        backgroundColor: t.surface,
+        textColor: t.textSecondary,
+        borderColor: t.borderColor,
         onPressed: null,
       );
     }
@@ -964,9 +1025,9 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     if (!_hasStarted) {
       return StickerButton.large(
         text: 'LEMPAR KOIN',
-        backgroundColor: AppColors.tomat,
-        textColor: AppColors.ink,
-        borderColor: AppColors.ink,
+        backgroundColor: t.primary,
+        textColor: t.ink,
+        borderColor: t.borderColor,
         onPressed: _isFlipping ? null : () => _flip(group, canPlay, isLocked, myUid, myName),
       );
     }
@@ -978,10 +1039,10 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
           Expanded(
             child: StickerButton(
               height: 58,
-              borderRadius: 29,
-              backgroundColor: _isFlipping ? AppColors.surface : AppColors.tomat,
-              textColor: AppColors.ink,
-              borderColor: AppColors.ink,
+              borderRadius: t.pillButtonRadius,
+              backgroundColor: _isFlipping ? t.surface : t.primary,
+              textColor: t.ink,
+              borderColor: t.borderColor,
               text: 'LEMPAR LAGI',
               onPressed: _isFlipping ? null : () => _flip(group, canPlay, isLocked, myUid, myName),
             ),
@@ -990,10 +1051,10 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
           Expanded(
             child: StickerButton(
               height: 58,
-              borderRadius: 29,
-              backgroundColor: _isFlipping ? AppColors.surface : AppColors.mint,
-              textColor: AppColors.ink,
-              borderColor: AppColors.ink,
+              borderRadius: t.pillButtonRadius,
+              backgroundColor: _isFlipping ? t.surface : t.success,
+              textColor: t.ink,
+              borderColor: t.borderColor,
               text: 'AMBIL',
               onPressed: _isFlipping ? null : () => _takeBudget(group, myUid),
             ),
@@ -1005,9 +1066,9 @@ class _GroupCoinScreenState extends ConsumerState<GroupCoinScreen>
     // 7. Sudah 3 lemparan atau selesai -> Tombol AMBIL BUDGET
     return StickerButton.large(
       text: 'AMBIL BUDGET (${RupiahFormatter.format(_currentAmount)})',
-      backgroundColor: AppColors.mint,
-      textColor: AppColors.ink,
-      borderColor: AppColors.ink,
+      backgroundColor: t.success,
+      textColor: t.ink,
+      borderColor: t.borderColor,
       onPressed: _isFlipping ? null : () => _takeBudget(group, myUid),
     );
   }
@@ -1019,15 +1080,16 @@ class _CoinFaceGambar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.matahari,
+        color: t.secondary,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.ink, width: 4.5),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: 4.5),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -1040,17 +1102,17 @@ class _CoinFaceGambar extends StatelessWidget {
               width: 66,
               height: 66,
               child: CustomPaint(
-                painter: _CoinLogoPainter(),
+                painter: _CoinLogoPainter(theme: t),
               ),
             ),
             const SizedBox(height: 2),
             Text(
               'GAMBAR',
-              style: AppTypography.chipLabel.copyWith(
+              style: t.chipLabel.copyWith(
                 fontSize: 10,
                 letterSpacing: 1.2,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -1066,15 +1128,16 @@ class _CoinFaceAngka extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.jeruk,
+        color: t.accentOrange,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.ink, width: 4.5),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: 4.5),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -1085,20 +1148,20 @@ class _CoinFaceAngka extends StatelessWidget {
           children: [
             Text(
               '½',
-              style: AppTypography.displayLarge.copyWith(
+              style: t.displayLarge.copyWith(
                 fontSize: 58,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
                 height: 1.0,
               ),
             ),
             Text(
               'ANGKA',
-              style: AppTypography.chipLabel.copyWith(
+              style: t.chipLabel.copyWith(
                 fontSize: 10,
                 letterSpacing: 1.2,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -1110,24 +1173,28 @@ class _CoinFaceAngka extends StatelessWidget {
 
 /// Custom Painter untuk Logo Roda Koin
 class _CoinLogoPainter extends CustomPainter {
+  final PutarTheme theme;
+
+  const _CoinLogoPainter({required this.theme});
+
   @override
   void paint(Canvas canvas, Size size) {
     final strokePaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5
       ..strokeJoin = StrokeJoin.round;
 
     final coralPaint = Paint()
-      ..color = AppColors.tomat
+      ..color = theme.accentCoral
       ..style = PaintingStyle.fill;
 
     final mintPaint = Paint()
-      ..color = AppColors.mint
+      ..color = theme.accentMint
       ..style = PaintingStyle.fill;
 
     final whitePaint = Paint()
-      ..color = Colors.white
+      ..color = theme.surface
       ..style = PaintingStyle.fill;
 
     final center = Offset(size.width / 2, size.height / 2);
@@ -1161,12 +1228,13 @@ class _CoinLogoPainter extends CustomPainter {
 
     // Titik Mata Hitam & Hub Putih
     final eyePos = Offset(center.dx + radius * 0.45, center.dy - radius * 0.45);
-    canvas.drawCircle(eyePos, 4, Paint()..color = AppColors.ink);
+    canvas.drawCircle(eyePos, 4, Paint()..color = theme.ink);
 
     canvas.drawCircle(center, 7, whitePaint);
     canvas.drawCircle(center, 7, strokePaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CoinLogoPainter oldDelegate) =>
+      oldDelegate.theme != theme;
 }

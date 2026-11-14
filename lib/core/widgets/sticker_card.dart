@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/putar_theme.dart';
 
-/// Kartu neo-brutalist dengan border tebal 3px dan bayangan keras tanpa blur.
+/// Kartu neo-brutalist dengan border tebal dan bayangan keras tanpa blur.
 class StickerCard extends StatelessWidget {
   final Widget child;
-  final Color backgroundColor;
-  final Color borderColor;
-  final Color shadowColor;
-  final double borderWidth;
-  final double borderRadius;
-  final Offset shadowOffset;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? shadowColor;
+  final double? borderWidth;
+  final double? borderRadius;
+  final Offset? shadowOffset;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final bool isHero;
@@ -18,25 +18,25 @@ class StickerCard extends StatelessWidget {
   const StickerCard({
     super.key,
     required this.child,
-    this.backgroundColor = AppColors.surface,
-    this.borderColor = AppColors.ink,
-    this.shadowColor = AppColors.ink,
-    this.borderWidth = 3.0,
-    this.borderRadius = 22.0,
-    this.shadowOffset = const Offset(4, 4),
+    this.backgroundColor,
+    this.borderColor,
+    this.shadowColor,
+    this.borderWidth,
+    this.borderRadius,
+    this.shadowOffset,
     this.padding = const EdgeInsets.all(16.0),
     this.margin,
     this.isHero = false,
     this.onTap,
   });
 
-  /// Factory untuk kartu hero (offset shadow 6,6)
+  /// Factory untuk kartu hero
   factory StickerCard.hero({
     Key? key,
     required Widget child,
-    Color backgroundColor = AppColors.matahari,
-    Color borderColor = AppColors.ink,
-    Color shadowColor = AppColors.ink,
+    Color? backgroundColor,
+    Color? borderColor,
+    Color? shadowColor,
     EdgeInsetsGeometry? padding = const EdgeInsets.all(20.0),
     EdgeInsetsGeometry? margin,
     VoidCallback? onTap,
@@ -46,9 +46,6 @@ class StickerCard extends StatelessWidget {
       backgroundColor: backgroundColor,
       borderColor: borderColor,
       shadowColor: shadowColor,
-      borderWidth: 3.5,
-      borderRadius: 22.0,
-      shadowOffset: const Offset(6, 6),
       padding: padding,
       margin: margin,
       isHero: true,
@@ -59,21 +56,29 @@ class StickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveShadow = isHero ? const Offset(6, 6) : shadowOffset;
-    final effectiveBorderWidth = isHero ? 3.5 : borderWidth;
+    final t = context.putarTheme;
+    final effectiveBg =
+        backgroundColor ?? (isHero ? t.warning : t.surface);
+    final effectiveBorder = borderColor ?? t.borderColor;
+    final effectiveShadowColor = shadowColor ?? t.shadowColor;
+    final effectiveRadius = borderRadius ?? t.cardRadius;
+    final effectiveShadow = shadowOffset ??
+        (isHero ? t.heroShadowOffset : t.standardShadowOffset);
+    final effectiveBorderWidth = borderWidth ??
+        (isHero ? t.heroBorderWidth : t.borderWidth);
 
     Widget cardBody = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(borderRadius),
+        color: effectiveBg,
+        borderRadius: BorderRadius.circular(effectiveRadius),
         border: Border.all(
-          color: borderColor,
+          color: effectiveBorder,
           width: effectiveBorderWidth,
         ),
         boxShadow: [
           BoxShadow(
-            color: shadowColor,
+            color: effectiveShadowColor,
             offset: effectiveShadow,
             blurRadius: 0,
             spreadRadius: 0,

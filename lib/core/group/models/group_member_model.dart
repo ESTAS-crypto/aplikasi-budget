@@ -35,14 +35,23 @@ class GroupMemberModel {
   factory GroupMemberModel.fromMap(String uid, Map<String, dynamic> map) {
     DateTime parseDate(dynamic val) {
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is String) return DateTime.tryParse(val)?.toLocal() ?? DateTime.now();
       return DateTime.now();
+    }
+
+    DateTime parseReadDate(dynamic val) {
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      if (val is String) {
+        return DateTime.tryParse(val)?.toLocal() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+      }
+      return DateTime.fromMillisecondsSinceEpoch(0);
     }
 
     DateTime? parseNullableDate(dynamic val) {
       if (val == null) return null;
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val);
+      if (val is String) return DateTime.tryParse(val)?.toLocal();
       return null;
     }
 
@@ -53,7 +62,7 @@ class GroupMemberModel {
       colorIndex: ((map['colorIndex'] ?? map['color_index']) as num?)?.toInt() ?? 0,
       role: map['role'] as String? ?? 'member',
       joinedAt: parseDate(map['joinedAt'] ?? map['joined_at']),
-      lastReadAt: parseDate(map['lastReadAt'] ?? map['last_read_at']),
+      lastReadAt: parseReadDate(map['lastReadAt'] ?? map['last_read_at']),
       lastSeenAt: parseNullableDate(map['lastSeenAt'] ?? map['last_seen_at']),
     );
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../painters/group_icons_painter.dart';
 
 /// Avatar Anggota Grup Neo-Brutalist
@@ -31,7 +30,8 @@ class MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = AppColors.getWheelColor(colorIndex);
+    final t = context.putarTheme;
+    final bgColor = t.getWheelColor(colorIndex);
     final initials = _getInitials(name);
 
     return SizedBox(
@@ -48,23 +48,23 @@ class MemberAvatar extends StatelessWidget {
               color: bgColor,
               borderRadius: BorderRadius.circular(size * 0.32),
               border: Border.all(
-                color: AppColors.ink,
+                color: t.ink,
                 width: 2.5,
               ),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(2, 2),
+                  color: t.ink,
+                  offset: t.miniShadowOffset,
                   blurRadius: 0,
                 ),
               ],
             ),
             child: Text(
               initials,
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: size * 0.40,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ),
@@ -75,20 +75,20 @@ class MemberAvatar extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
+                  color: t.secondary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.ink, width: 1.8),
-                  boxShadow: const [
+                  border: Border.all(color: t.ink, width: 1.8),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(1, 1),
+                      color: t.ink,
+                      offset: const Offset(1, 1),
                       blurRadius: 0,
                     ),
                   ],
                 ),
-                child: const CustomPaint(
-                  size: Size(11, 11),
-                  painter: CustomCrownPainter(color: AppColors.ink, strokeWidth: 2.0),
+                child: CustomPaint(
+                  size: const Size(11, 11),
+                  painter: CustomCrownPainter(color: t.ink, strokeWidth: 2.0),
                 ),
               ),
             ),

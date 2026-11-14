@@ -1,10 +1,28 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/painters/mochi_painter.dart';
+import '../../../core/theme/putar_theme.dart';
 
-/// Painter 100% vector untuk roda mini tema Pasar Malam (sesuai Setelan1.dc.html)
+/// Painter 100% vector untuk roda mini bertema (default: Pasar Malam sesuai Setelan1.dc.html)
 class PasarMalamWheelPainter extends CustomPainter {
-  const PasarMalamWheelPainter();
+  final List<Color> colors;
+  final Color inkColor;
+  final Color hubColor;
+
+  const PasarMalamWheelPainter({
+    this.colors = sliceColors,
+    this.inkColor = PutarTheme.kPasarMalamInk,
+    this.hubColor = PutarTheme.kPasarMalamSurface,
+  });
+
+  /// Membangun painter pratinjau roda mini langsung dari token `PutarTheme`.
+  factory PasarMalamWheelPainter.fromTheme(PutarTheme theme) {
+    return PasarMalamWheelPainter(
+      colors: theme.wheelPalette.isNotEmpty ? theme.wheelPalette : sliceColors,
+      inkColor: theme.ink,
+      hubColor: theme.surface,
+    );
+  }
 
   static const List<Color> sliceColors = [
     Color(0xFFFF6B5A), // Tomat
@@ -23,22 +41,23 @@ class PasarMalamWheelPainter extends CustomPainter {
     final radius = (size.width / 2) - 1.5;
     final rect = Rect.fromCircle(center: center, radius: radius);
 
-    final sweepAngle = (2 * math.pi) / sliceColors.length;
+    final palette = colors.isNotEmpty ? colors : sliceColors;
+    final sweepAngle = (2 * math.pi) / palette.length;
 
     // Irisan warna-warni
     final slicePaint = Paint()..style = PaintingStyle.fill;
-    for (int i = 0; i < sliceColors.length; i++) {
-      slicePaint.color = sliceColors[i];
+    for (int i = 0; i < palette.length; i++) {
+      slicePaint.color = palette[i];
       canvas.drawArc(rect, i * sweepAngle, sweepAngle, true, slicePaint);
     }
 
     // Garis pembagi radial
     final linePaint = Paint()
-      ..color = AppColors.ink
+      ..color = inkColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
-    for (int i = 0; i < sliceColors.length; i++) {
+    for (int i = 0; i < palette.length; i++) {
       final angle = i * sweepAngle;
       final x = center.dx + radius * math.cos(angle);
       final y = center.dy + radius * math.sin(angle);
@@ -47,27 +66,30 @@ class PasarMalamWheelPainter extends CustomPainter {
 
     // Border lingkaran luar
     final borderPaint = Paint()
-      ..color = AppColors.ink
+      ..color = inkColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
     canvas.drawCircle(center, radius, borderPaint);
 
     // Titik pusat putih (center hub)
     final hubPaint = Paint()
-      ..color = Colors.white
+      ..color = hubColor
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius * 0.3, hubPaint);
     canvas.drawCircle(center, radius * 0.3, borderPaint..strokeWidth = 2.0);
 
     // Titik pusat tinta (center dot)
     final dotPaint = Paint()
-      ..color = AppColors.ink
+      ..color = inkColor
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius * 0.1, dotPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant PasarMalamWheelPainter oldDelegate) =>
+      oldDelegate.colors != colors ||
+      oldDelegate.inkColor != inkColor ||
+      oldDelegate.hubColor != hubColor;
 }
 
 /// Painter 100% vector untuk kucing manis (sesuai SVG Setelan1.dc.html)
@@ -241,5 +263,106 @@ class KucingManisPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Thumbnail pratinjau bertema yang sepenuhnya data-driven terhadap `PutarTheme`.
+/// Mendukung animasi naik-turun lembut untuk tema bermaskot (Tema1.dc.html)
+/// dan tetap menghormati `MediaQuery.disableAnimations`.
+class ThemePreviewThumbnail extends StatefulWidget {
+  final PutarTheme themeOption;
+  final double size;
+  final bool animate;
+
+  const ThemePreviewThumbnail({
+    super.key,
+    required this.themeOption,
+    this.size = 54.0,
+    this.animate = false,
+  });
+
+  @override
+  State<ThemePreviewThumbnail> createState() => _ThemePreviewThumbnailState();
+}
+
+class _ThemePreviewThumbnailState extends State<ThemePreviewThumbnail>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bobController;
+
+  @override
+  void initState() {
+    super.initState();
+    _bobController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncBobAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant ThemePreviewThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animate != widget.animate ||
+        oldWidget.themeOption.mascot != widget.themeOption.mascot) {
+      _syncBobAnimation();
+    }
+  }
+
+  void _syncBobAnimation() {
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final shouldAnimate =
+        widget.animate && widget.themeOption.mascot != null && !disableAnimations;
+    if (shouldAnimate) {
+      if (!_bobController.isAnimating) {
+        _bobController.repeat(reverse: true);
+      }
+    } else {
+      _bobController.stop();
+      _bobController.value = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _bobController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final painter = widget.themeOption.mascot == PutarMascotKind.mochi
+        ? MochiPainter.fromTheme(widget.themeOption)
+        : PasarMalamWheelPainter.fromTheme(widget.themeOption);
+
+    final art = ExcludeSemantics(
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: CustomPaint(painter: painter),
+      ),
+    );
+
+    if (!widget.animate || widget.themeOption.mascot == null) {
+      return art;
+    }
+
+    return AnimatedBuilder(
+      animation: _bobController,
+      builder: (context, child) {
+        final dy =
+            -6.0 * Curves.easeInOut.transform(_bobController.value);
+        return Transform.translate(
+          offset: Offset(0, dy),
+          child: child,
+        );
+      },
+      child: art,
+    );
+  }
 }
 

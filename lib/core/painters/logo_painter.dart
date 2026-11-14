@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/putar_theme.dart';
+import 'mochi_painter.dart';
 
 /// CustomPainter untuk Logo resmi "Putar Jajan"
 /// Roda dengan satu irisan terlepas: "bagian yang boleh dijajani".
@@ -14,11 +15,11 @@ class LogoPainter extends CustomPainter {
   final double strokeWidthRatio;
 
   const LogoPainter({
-    this.wheelColor = AppColors.tomat,
-    this.sliceColor = AppColors.matahari,
-    this.inkColor = AppColors.ink,
-    this.hubColor = AppColors.surface,
-    this.coinColor = AppColors.ink,
+    this.wheelColor = PutarTheme.kPasarMalamTomat,
+    this.sliceColor = PutarTheme.kPasarMalamMatahari,
+    this.inkColor = PutarTheme.kPasarMalamInk,
+    this.hubColor = PutarTheme.kPasarMalamSurface,
+    this.coinColor = PutarTheme.kPasarMalamInk,
     this.strokeWidthRatio = 3.5,
   });
 
@@ -52,14 +53,13 @@ class LogoPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     // 1. Badan Roda: M50 50 L81.2 32 A36 36 0 1 1 50 14 Z
-    // Dari (50,50) ke (81.2, 32) [-30 deg], lalu busur R36 searah jarum jam ke (50, 14) [-90 deg], lalu Z ke (50,50)
     final wheelPath = Path();
     wheelPath.moveTo(50, 50);
-    wheelPath.lineTo(81.177, 32.0); // 50 + 36 * cos(-30 deg), 50 + 36 * sin(-30 deg)
+    wheelPath.lineTo(81.177, 32.0);
     wheelPath.arcTo(
       Rect.fromCircle(center: const Offset(50, 50), radius: 36),
-      -30 * math.pi / 180, // dari -30 derajat
-      300 * math.pi / 180, // menyapu 300 derajat searah jarum jam ke -90 derajat (270)
+      -30 * math.pi / 180,
+      300 * math.pi / 180,
       false,
     );
     wheelPath.close();
@@ -68,14 +68,13 @@ class LogoPainter extends CustomPainter {
     canvas.drawPath(wheelPath, strokePaint);
 
     // 2. Irisan Terlepas: M53 44.8 L53 8.8 A36 36 0 0 1 84.2 26.8 Z
-    // Digeser sejauh (+3, -5.2)
     final slicePath = Path();
     slicePath.moveTo(53, 44.8);
-    slicePath.lineTo(53, 8.8); // dari atas (50+3, 14-5.2)
+    slicePath.lineTo(53, 8.8);
     slicePath.arcTo(
       Rect.fromCircle(center: const Offset(53, 44.8), radius: 36),
-      -90 * math.pi / 180, // dari 12 jam (-90 deg)
-      60 * math.pi / 180,  // menyapu 60 derajat searah jarum jam ke -30 deg
+      -90 * math.pi / 180,
+      60 * math.pi / 180,
       false,
     );
     slicePath.close();
@@ -99,46 +98,119 @@ class LogoPainter extends CustomPainter {
         oldDelegate.sliceColor != sliceColor ||
         oldDelegate.inkColor != inkColor ||
         oldDelegate.hubColor != hubColor ||
-        oldDelegate.coinColor != coinColor;
+        oldDelegate.coinColor != coinColor ||
+        oldDelegate.strokeWidthRatio != strokeWidthRatio;
   }
 }
 
-/// Widget Logo Putar Jajan yang siap pakai dengan ukuran fleksibel
+/// Widget Logo Putar Jajan yang membaca token tema aktif bila warna tidak di-override,
+/// serta melakukan morphing halus ketika tema berganti.
 class LogoWidget extends StatelessWidget {
   final double size;
-  final Color wheelColor;
-  final Color sliceColor;
-  final Color inkColor;
-  final Color hubColor;
-  final Color coinColor;
+  final Color? wheelColor;
+  final Color? sliceColor;
+  final Color? inkColor;
+  final Color? hubColor;
+  final Color? coinColor;
   final double strokeWidthRatio;
+  final Color? furColor;
+  final Color? earPinkColor;
+  final bool animate;
 
   const LogoWidget({
     super.key,
     this.size = 36.0,
-    this.wheelColor = AppColors.tomat,
-    this.sliceColor = AppColors.matahari,
-    this.inkColor = AppColors.ink,
-    this.hubColor = AppColors.surface,
-    this.coinColor = AppColors.ink,
+    this.wheelColor,
+    this.sliceColor,
+    this.inkColor,
+    this.hubColor,
+    this.coinColor,
     this.strokeWidthRatio = 3.5,
+    this.furColor,
+    this.earPinkColor,
+    this.animate = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Logo Putar Jajan',
-      child: CustomPaint(
-        size: Size(size, size),
-        painter: LogoPainter(
-          wheelColor: wheelColor,
-          sliceColor: sliceColor,
-          inkColor: inkColor,
-          hubColor: hubColor,
-          coinColor: coinColor,
-          strokeWidthRatio: strokeWidthRatio,
+    final t = context.putarTheme;
+    final disableAnimations =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final morphDuration =
+        disableAnimations ? Duration.zero : const Duration(milliseconds: 480);
+
+    final Widget content;
+    if (t.logoStyle == PutarIconStyle.kucing) {
+      final hasCustomColors = furColor != null || earPinkColor != null;
+      final Widget kucingChild = (hasCustomColors || !animate)
+          ? Semantics(
+              label: 'Mochi',
+              child: CustomPaint(
+                size: Size(size, size),
+                painter: MochiPainter(
+                  expression: MochiExpression.normal,
+                  furColor: furColor ?? t.mascotFur,
+                  earPinkColor: earPinkColor ?? t.mascotEarPink,
+                  blushColor: t.mascotBlush,
+                  noseColor: t.mascotNose,
+                  bellColor: t.mascotBell,
+                  muzzleColor: t.mascotMuzzle,
+                  inkColor: inkColor ?? t.ink,
+                  highlightColor: t.surface,
+                  tearColor: t.accentBlue,
+                ),
+              ),
+            )
+          : MochiWidget(size: size, animate: animate);
+      content = KeyedSubtree(
+        key: ValueKey(
+          'logo_kucing_${furColor?.toARGB32()}_${earPinkColor?.toARGB32()}_$animate',
         ),
-      ),
+        child: kucingChild,
+      );
+    } else {
+      content = Semantics(
+        key: const ValueKey('logo_pasar_malam'),
+        label: 'Logo Putar Jajan',
+        child: CustomPaint(
+          size: Size(size, size),
+          painter: LogoPainter(
+            wheelColor: wheelColor ?? t.primary,
+            sliceColor: sliceColor ?? t.secondary,
+            inkColor: inkColor ?? t.ink,
+            hubColor: hubColor ?? t.surface,
+            coinColor: coinColor ?? t.ink,
+            strokeWidthRatio: strokeWidthRatio,
+          ),
+        ),
+      );
+    }
+
+    return AnimatedSwitcher(
+      duration: morphDuration,
+      switchInCurve: Curves.linear,
+      switchOutCurve: Curves.linear,
+      transitionBuilder: (child, animation) {
+        final fade = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeInOut,
+        );
+        final scale = Tween<double>(begin: 0.72, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOutBack))
+            .animate(animation);
+        final turns = Tween<double>(begin: -0.05, end: 0.0).animate(fade);
+        return FadeTransition(
+          opacity: fade,
+          child: RotationTransition(
+            turns: turns,
+            child: ScaleTransition(
+              scale: scale,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: content,
     );
   }
 }

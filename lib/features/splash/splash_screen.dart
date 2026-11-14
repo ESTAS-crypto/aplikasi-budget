@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/painters/confetti_painter.dart';
+import '../../core/painters/mochi_painter.dart';
+import '../../core/painters/paw_painter.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/group/services/group_auth_service.dart';
 import '../../data/database_provider.dart';
@@ -31,6 +33,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late AnimationController _mainController;
 
   bool _isNavigating = false;
+  bool _didTriggerKucingMeow = false;
 
   @override
   void initState() {
@@ -49,29 +52,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _startSplashSequence();
   }
 
-  Future<void> _startSplashSequence() async {
-    // 1. Mulai putar jingle splash
-    try {
-      SoundService.instance.play(Sfx.splashJingle, volume: 1.0, haptic: false);
-    } catch (_) {}
-
-    // 2. Timer cadangan keras: PASTI pindah layar setelah 3.8 detik bahkan jika ada kendala
+  void _startSplashSequence() {
+    // 1. Timer cadangan keras: PASTI pindah layar setelah 3.8 detik bahkan jika ada kendala
     Future.delayed(const Duration(milliseconds: 3800), () {
+      if (mounted) _checkAndNavigate();
+    });
+
+    // 2. Mulai jingle splash yang sudah di-prepare & animasi timeline 3600ms secara serentak
+    SoundService.instance.playPreparedSplashJingle(volume: 1.0);
+    _mainController.forward().then((_) {
       if (mounted) _checkAndNavigate();
     });
 
     // 3. Jalankan background initialization secara paralel
     _initializeApp();
-
-    // 4. Jalankan animasi timeline 3600ms lalu navigasi setelah selesai
-    _mainController.forward().then((_) {
-      if (mounted) _checkAndNavigate();
-    });
   }
 
   Future<void> _initializeApp() async {
     try {
-      // Inisialisasi audio sound service (pre-decode)
+      // Beri ruang 250ms agar MediaPlayer splash mulai mulus sebelum pra-decode 23 SoundPool SFX
+      await Future.delayed(const Duration(milliseconds: 250));
       await SoundService.instance.initialize();
 
       if (!mounted) return;
@@ -131,8 +131,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       Future.delayed(const Duration(milliseconds: 600), _checkAndNavigate);
     }
 
+    final theme = context.putarTheme;
+
+    if (theme.splashStyle == PutarSplashStyle.kucing) {
+      return _buildKucingSplash(context, theme);
+    }
+
     return Scaffold(
-      backgroundColor: AppColors.matahari, // #FFD23F
+      backgroundColor: theme.secondary, // #FFD23F
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -149,7 +155,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               child: RepaintBoundary(
                 child: CustomPaint(
                   size: const Size(1200, 1200),
-                  painter: const _RaysPainter(),
+                  painter: _RaysPainter(
+                    primaryColor: theme.splashRayPrimary,
+                    secondaryColor: theme.splashRaySecondary,
+                  ),
                 ),
               ),
             ),
@@ -166,26 +175,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   // 10 Lingkaran Meletup (54% - 76%)
                   Positioned.fill(
                     child: CustomPaint(
-                      painter: _BurstingCirclesPainter(progress: t),
+                      painter: _BurstingCirclesPainter(progress: t, theme: theme),
                     ),
                   ),
 
                   // Area Roda Tengah (300x300)
                   Align(
                     alignment: const Alignment(0, -0.32),
-                    child: _buildWheelSection(t),
+                    child: _buildWheelSection(t, theme),
                   ),
 
                   // Wordmark "putar jajan" & Pill Tagline "Putar. Terima. Jajan."
                   Align(
                     alignment: const Alignment(0, 0.38),
-                    child: _buildWordmarkAndTagline(t),
+                    child: _buildWordmarkAndTagline(t, theme),
                   ),
 
                   // Loading Bar di bagian bawah
                   Align(
                     alignment: const Alignment(0, 0.82),
-                    child: _buildLoadingBar(t),
+                    child: _buildLoadingBar(t, theme),
                   ),
                 ],
               );
@@ -196,7 +205,277 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
   }
 
-  Widget _buildWheelSection(double t) {
+  Widget _buildKucingSplash(BuildContext context, PutarTheme theme) {
+    final raySecondary =
+        Color.lerp(theme.accentPink, theme.surface, 0.35) ?? theme.splashRayPrimary;
+
+    return Scaffold(
+      backgroundColor: theme.accentPink,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Center(
+            child: AnimatedBuilder(
+              animation: _raysController,
+              builder: (context, child) {
+                return Transform.rotate(
+                  angle: _raysController.value * 2 * math.pi,
+                  child: child,
+                );
+              },
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  size: const Size(1200, 1200),
+                  painter: _RaysPainter(
+                    primaryColor: theme.accentPink,
+                    secondaryColor: raySecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _mainController,
+            builder: (context, _) {
+              final t = _mainController.value;
+              if (t >= 0.56 && !_didTriggerKucingMeow) {
+                _didTriggerKucingMeow = true;
+                SoundService.instance.playMeow(haptic: false);
+              }
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _SplashHeartsPainter(
+                          progress: t,
+                          theme: theme,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SafeArea(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final badgeSize = math.min(
+                          244.0,
+                          math.min(
+                            constraints.maxWidth * 0.64,
+                            constraints.maxHeight * 0.36,
+                          ),
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildKucingBadgeSection(t, theme, badgeSize),
+                              _buildKucingWordmarkAndTagline(t, theme),
+                              _buildKucingPawStrip(t, theme),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKucingBadgeSection(
+    double t,
+    PutarTheme theme,
+    double badgeSize,
+  ) {
+    final popProg = (t / 0.24).clamp(0.0, 1.0);
+    final popCurve = const Cubic(0.2, 1.3, 0.3, 1.0).transform(popProg);
+    final badgeScale = 0.45 + 0.55 * popCurve;
+    final badgeOpacity = (t / 0.14).clamp(0.0, 1.0);
+
+    // Kedipan singkat pada awal & akhir splash
+    double blinkScaleY = 1.0;
+    if (t > 0.28 && t < 0.34) {
+      blinkScaleY = 0.12;
+    } else if (t > 0.78 && t < 0.84) {
+      blinkScaleY = 0.12;
+    }
+
+    final bellSwing = math.sin(t * math.pi * 6) * 0.26;
+    final expr =
+        t >= 0.56 ? MochiExpression.happy : MochiExpression.normal;
+
+    return Transform.scale(
+      scale: badgeScale,
+      child: Opacity(
+        opacity: badgeOpacity,
+        child: GestureDetector(
+          onTap: () => SoundService.instance.playMeow(),
+          child: Semantics(
+            label: 'Mochi',
+            child: Container(
+              width: badgeSize,
+              height: badgeSize,
+              decoration: BoxDecoration(
+                color: theme.bg,
+                shape: BoxShape.circle,
+                border: Border.all(color: theme.ink, width: 4.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.ink,
+                    offset: const Offset(0, 8),
+                    blurRadius: 0,
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: CustomPaint(
+                size: Size(badgeSize * 0.84, badgeSize * 0.84),
+                painter: MochiPainter.fromTheme(
+                  theme,
+                  expression: expr,
+                  blinkScaleY: blinkScaleY,
+                  bellSwingRadians: bellSwing,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKucingWordmarkAndTagline(double t, PutarTheme theme) {
+    double textProg = 0.0;
+    if (t >= 0.56) {
+      textProg = const Cubic(0.2, 1.2, 0.3, 1.0)
+          .transform(((t - 0.56) / 0.14).clamp(0.0, 1.0));
+    }
+
+    double tagProg = 0.0;
+    if (t >= 0.58) {
+      tagProg = const Cubic(0.2, 1.2, 0.3, 1.0)
+          .transform(((t - 0.58) / 0.14).clamp(0.0, 1.0));
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Transform.translate(
+          offset: Offset(0, 26.0 * (1.0 - textProg)),
+          child: Opacity(
+            opacity: textProg.clamp(0.0, 1.0),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'putar jajan',
+                style: theme.displayLarge.copyWith(
+                  fontSize: 52,
+                  color: theme.ink,
+                  letterSpacing: -1.0,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Transform.translate(
+          offset: Offset(0, 20.0 * (1.0 - tagProg)),
+          child: Opacity(
+            opacity: tagProg.clamp(0.0, 1.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+              decoration: BoxDecoration(
+                color: theme.surface,
+                borderRadius: BorderRadius.circular(theme.chipRadius),
+                border: Border.all(color: theme.ink, width: 3.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.ink,
+                    offset: theme.smallShadowOffset,
+                    blurRadius: 0,
+                  ),
+                ],
+              ),
+              child: Text(
+                theme.text(PutarCopyKeys.splashTagline),
+                textAlign: TextAlign.center,
+                style: theme.bodyLargeBold.copyWith(
+                  color: theme.ink,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKucingPawStrip(double t, PutarTheme theme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 44,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(5, (i) {
+              final threshold = 0.14 + (i * 0.13);
+              final pawProg = ((t - threshold) / 0.12).clamp(0.0, 1.0);
+              final topOffset = i.isEven ? 12.0 : 0.0;
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: i == 0 ? 0 : 12,
+                  top: topOffset,
+                ),
+                child: Opacity(
+                  opacity: pawProg,
+                  child: Transform.scale(
+                    scale: 0.5 + 0.5 * pawProg,
+                    child: Transform.rotate(
+                      angle: math.pi / 2,
+                      child: SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CustomPaint(
+                          painter: PawPainter(
+                            fillColor: theme.primary,
+                            strokeColor: theme.ink,
+                            strokeWidth: 2.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Mochi lagi siap-siap...',
+          textAlign: TextAlign.center,
+          style: theme.bodyLargeBold.copyWith(
+            color: theme.ink,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWheelSection(double t, PutarTheme theme) {
     // Animasi scale & fade roda wrapper: 0 - 16% (cubic-bezier(.2, 1.2, .3, 1))
     double wheelScale = 1.0;
     double wheelOpacity = 1.0;
@@ -215,7 +494,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           height: 300,
           child: RepaintBoundary(
             child: CustomPaint(
-              painter: _SplashWheelPainter(progress: t),
+              painter: _SplashWheelPainter(progress: t, theme: theme),
             ),
           ),
         ),
@@ -223,7 +502,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
   }
 
-  Widget _buildWordmarkAndTagline(double t) {
+  Widget _buildWordmarkAndTagline(double t, PutarTheme theme) {
     // Animasi naik 26px & fade (56% - 70%)
     double textProg = 0.0;
     if (t >= 0.56) {
@@ -248,14 +527,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             opacity: textProg.clamp(0.0, 1.0),
             child: Text(
               'putar jajan',
-              style: AppTypography.displayLarge.copyWith(
+              style: theme.displayLarge.copyWith(
                 fontSize: 54,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
-                shadows: const [
+                fontWeight: theme.weightExtraBold,
+                color: theme.ink,
+                shadows: [
                   Shadow(
-                    offset: Offset(3, 3),
-                    color: AppColors.cream,
+                    offset: theme.smallShadowOffset,
+                    color: theme.bg,
                   ),
                 ],
               ),
@@ -272,23 +551,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: AppColors.ink, width: 3),
-                boxShadow: const [
+                color: theme.surface,
+                borderRadius: BorderRadius.circular(theme.chipRadius),
+                border: Border.all(color: theme.ink, width: theme.borderWidth),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: theme.shadowColor,
+                    offset: theme.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
               ),
               child: Text(
-                'Putar. Terima. Jajan.',
-                style: AppTypography.titleMedium.copyWith(
+                theme.text(PutarCopyKeys.splashTagline),
+                style: theme.titleMedium.copyWith(
                   fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: theme.weightExtraBold,
+                  color: theme.ink,
                 ),
               ),
             ),
@@ -298,7 +577,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
   }
 
-  Widget _buildLoadingBar(double t) {
+  Widget _buildLoadingBar(double t, PutarTheme theme) {
     // Progress loading bar terisi 0% sampai 85%+ pada 0 sampai 85% timeline
     final barFill = (t / 0.85).clamp(0.0, 1.0);
 
@@ -307,10 +586,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       children: [
         Text(
           'Menyiapkan roda...',
-          style: AppTypography.bodySmall.copyWith(
+          style: theme.bodySmall.copyWith(
             fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.ink,
+            fontWeight: theme.weightBold,
+            color: theme.ink,
           ),
         ),
         const SizedBox(height: 8),
@@ -318,18 +597,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           width: 200,
           height: 16,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: theme.surface,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.ink, width: 3),
+            border: Border.all(color: theme.ink, width: theme.borderWidth),
           ),
           alignment: Alignment.centerLeft,
           child: FractionallySizedBox(
             widthFactor: barFill,
             child: Container(
-              decoration: const BoxDecoration(
-                color: AppColors.mint,
+              decoration: BoxDecoration(
+                color: theme.success,
                 border: Border(
-                  right: BorderSide(color: AppColors.ink, width: 3),
+                  right: BorderSide(color: theme.ink, width: theme.borderWidth),
                 ),
               ),
             ),
@@ -340,9 +619,79 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 }
 
-/// Painter untuk Sinar Bergantian #FFD23F dan #FFDE66 tiap 7.5 derajat
+/// Painter 6 hati pastel mengapung naik di latar belakang KSplash.
+class _SplashHeartsPainter extends CustomPainter {
+  final double progress;
+  final PutarTheme theme;
+
+  const _SplashHeartsPainter({
+    required this.progress,
+    required this.theme,
+  });
+
+  static const List<Offset> _baseAnchors = [
+    Offset(0.11, 0.82),
+    Offset(0.24, 0.34),
+    Offset(0.76, 0.24),
+    Offset(0.88, 0.68),
+    Offset(0.18, 0.58),
+    Offset(0.82, 0.44),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final colors = [
+      theme.secondary,
+      theme.surface,
+      theme.accentPurple,
+      theme.primary,
+      theme.secondary,
+      theme.accentMint,
+    ];
+    final strokePaint = Paint()
+      ..color = theme.ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeJoin = StrokeJoin.round;
+
+    for (int i = 0; i < _baseAnchors.length; i++) {
+      final anchor = _baseAnchors[i];
+      final rise = progress * 0.22;
+      final cx = anchor.dx * size.width +
+          math.sin(progress * math.pi * 2 + i) * 8.0;
+      final cy = (anchor.dy - rise) * size.height;
+      final rot = math.sin(progress * math.pi * 2 + i * 0.8) * 0.25;
+
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.rotate(rot);
+      canvas.scale(1.15, 1.15);
+
+      canvas.drawPath(
+        HeartConfettiPainter.unitHeartPath,
+        Paint()
+          ..color = colors[i % colors.length]
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawPath(HeartConfettiPainter.unitHeartPath, strokePaint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SplashHeartsPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.theme.id != theme.id;
+}
+
+/// Painter untuk Sinar Bergantian primaryColor dan secondaryColor tiap 7.5 derajat
 class _RaysPainter extends CustomPainter {
-  const _RaysPainter();
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  const _RaysPainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -351,11 +700,11 @@ class _RaysPainter extends CustomPainter {
     const rayAngle = 7.5 * math.pi / 180;
 
     final paint1 = Paint()
-      ..color = const Color(0xFFFFD23F)
+      ..color = primaryColor
       ..style = PaintingStyle.fill;
 
     final paint2 = Paint()
-      ..color = const Color(0xFFFFDE66)
+      ..color = secondaryColor
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < 48; i++) {
@@ -375,14 +724,20 @@ class _RaysPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _RaysPainter oldDelegate) =>
+      oldDelegate.primaryColor != primaryColor ||
+      oldDelegate.secondaryColor != secondaryColor;
 }
 
 /// Painter untuk 10 Lingkaran Meletup (viewBox burst keluar 190 unit)
 class _BurstingCirclesPainter extends CustomPainter {
   final double progress;
+  final PutarTheme theme;
 
-  _BurstingCirclesPainter({required this.progress});
+  _BurstingCirclesPainter({
+    required this.progress,
+    required this.theme,
+  });
 
   // Koordinat offset (bx, by) dan warna dari Splash.dc.html
   static const List<Offset> _offsets = [
@@ -396,19 +751,6 @@ class _BurstingCirclesPainter extends CustomPainter {
     Offset(-26, -188),
     Offset(89, -168),
     Offset(171, -83),
-  ];
-
-  static const List<Color> _colors = [
-    Color(0xFFFF6B5A), // Tomat
-    Color(0xFFFF9F1C), // Jeruk
-    Color(0xFFFFD23F), // Matahari
-    Color(0xFF3DDBB0), // Mint
-    Color(0xFF6FB1FF), // Langit
-    Color(0xFFB8A4FF), // Lavender
-    Color(0xFFFF8FC0), // Permen
-    Color(0xFFB8E986), // Lemon
-    Color(0xFFFF6B5A), // Tomat
-    Color(0xFFFF9F1C), // Jeruk
   ];
 
   @override
@@ -426,7 +768,7 @@ class _BurstingCirclesPainter extends CustomPainter {
 
     final center = Offset(size.width / 2, size.height * 0.34);
     final strokePaint = Paint()
-      ..color = AppColors.ink.withValues(alpha: opacity)
+      ..color = theme.ink.withValues(alpha: opacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
@@ -438,7 +780,7 @@ class _BurstingCirclesPainter extends CustomPainter {
       );
 
       final fillPaint = Paint()
-        ..color = _colors[i].withValues(alpha: opacity)
+        ..color = theme.getWheelColor(i).withValues(alpha: opacity)
         ..style = PaintingStyle.fill;
 
       const r = 12.0; // diameter 24
@@ -449,30 +791,22 @@ class _BurstingCirclesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BurstingCirclesPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress || oldDelegate.theme.id != theme.id;
 }
 
 /// Painter utama roda splash: bingkai, 16 lampu berkedip, 8 irisan, mint pop-out, hub, pointer
 class _SplashWheelPainter extends CustomPainter {
   final double progress;
+  final PutarTheme theme;
 
-  _SplashWheelPainter({required this.progress});
+  _SplashWheelPainter({
+    required this.progress,
+    required this.theme,
+  });
 
   static const double wheelCenter = 150.0;
   static const double rimRadius = 130.0;
   static const double sliceRadius = 98.0;
-
-  // 8 Warna irisan
-  static const List<Color> sliceColors = [
-    Color(0xFFFF6B5A), // 0: Tomat
-    Color(0xFFFF9F1C), // 1: Jeruk
-    Color(0xFFFFD23F), // 2: Matahari
-    Color(0xFF3DDBB0), // 3: Mint
-    Color(0xFF6FB1FF), // 4: Langit
-    Color(0xFFB8A4FF), // 5: Lavender
-    Color(0xFFFF8FC0), // 6: Permen
-    Color(0xFFB8E986), // 7: Lemon
-  ];
 
   // Offset masuk tiap irisan (dx, dy) dari Splash.dc.html
   static const List<Offset> sliceEntryOffsets = [
@@ -489,18 +823,18 @@ class _SplashWheelPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final strokePaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round;
 
     final shadowPaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.shadowColor
       ..style = PaintingStyle.fill;
 
     final rimPaint = Paint()
-      ..color = AppColors.cream
+      ..color = theme.bg
       ..style = PaintingStyle.fill;
 
     // 1. Bingkai Roda: hard shadow (7,7) lalu krim lingkaran r130
@@ -534,10 +868,10 @@ class _SplashWheelPainter extends CustomPainter {
 
     // 5. Hub tengah: lingkaran r19 putih border 4 ink, lingkaran koin tengah r5 ink
     final hubFill = Paint()
-      ..color = AppColors.surface
+      ..color = theme.surface
       ..style = PaintingStyle.fill;
     final hubInnerFill = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(const Offset(150, 150), 19, hubFill);
@@ -561,11 +895,11 @@ class _SplashWheelPainter extends CustomPainter {
     final blinkPhase = (elapsedMs % 360) / 360;
 
     final bulbPaintTomat = Paint()
-      ..color = AppColors.tomat.withValues(alpha: bulbOpacity)
+      ..color = theme.danger.withValues(alpha: bulbOpacity)
       ..style = PaintingStyle.fill;
 
     final bulbPaintCream = Paint()
-      ..color = AppColors.cream.withValues(alpha: bulbOpacity)
+      ..color = theme.bg.withValues(alpha: bulbOpacity)
       ..style = PaintingStyle.fill;
 
     const bulbRadius = 114.0;
@@ -631,7 +965,7 @@ class _SplashWheelPainter extends CustomPainter {
       }
 
       final sliceFill = Paint()
-        ..color = sliceColors[i].withValues(alpha: currentOpacity)
+        ..color = theme.getWheelColor(i).withValues(alpha: currentOpacity)
         ..style = PaintingStyle.fill;
 
       final slicePath = Path()
@@ -650,7 +984,7 @@ class _SplashWheelPainter extends CustomPainter {
       // Koin ink r7 pada irisan Mint
       if (i == 3) {
         final coinFill = Paint()
-          ..color = AppColors.ink.withValues(alpha: currentOpacity)
+          ..color = theme.ink.withValues(alpha: currentOpacity)
           ..style = PaintingStyle.fill;
         canvas.drawCircle(const Offset(173.7, 207.3), 7.0, coinFill);
       }
@@ -680,11 +1014,11 @@ class _SplashWheelPainter extends CustomPainter {
     canvas.translate(0, pointerY);
 
     final pointerFill = Paint()
-      ..color = AppColors.tomat.withValues(alpha: pointerOpacity)
+      ..color = theme.danger.withValues(alpha: pointerOpacity)
       ..style = PaintingStyle.fill;
 
     final pointerStroke = Paint()
-      ..color = AppColors.ink.withValues(alpha: pointerOpacity)
+      ..color = theme.ink.withValues(alpha: pointerOpacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
       ..strokeJoin = StrokeJoin.round
@@ -705,5 +1039,5 @@ class _SplashWheelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SplashWheelPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress || oldDelegate.theme.id != theme.id;
 }

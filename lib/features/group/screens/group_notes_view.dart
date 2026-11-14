@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/widgets/sticker_card.dart';
 import '../../../core/widgets/sticker_button.dart';
 import '../../../core/widgets/sticker_snackbar.dart';
+import '../../../core/widgets/sheet_inline_error_banner.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/group/models/group_model.dart';
@@ -22,7 +22,9 @@ import '../../../core/group/widgets/scope_switcher.dart';
 import '../../../core/group/widgets/member_avatar.dart';
 import '../../../core/group/painters/group_icons_painter.dart';
 import '../../../core/group/widgets/group_important_dialog.dart';
+import '../../../core/group/widgets/group_activity_bell_button.dart';
 import '../../navigation/app_router.dart';
+import 'group_date_result_screen.dart';
 
 /// Layar 19: Catatan Pengeluaran Grup Bersama
 /// Menampilkan sisa budget deterministik append-only, badge sinkron, dan mode offline penuh
@@ -97,6 +99,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final streamedGroup = activeGroupAsync.valueOrNull;
@@ -192,9 +195,9 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
         );
       });
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
-          child: _buildNoGroupState(),
+          child: _buildNoGroupState(t),
         ),
       );
     }
@@ -202,21 +205,21 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     Widget bodyContent;
     if (group != null) {
       _checkAutoOpen(group);
-      bodyContent = _buildGroupContent(group);
+      bodyContent = _buildGroupContent(t, group);
     } else if (activeGroupId != null && activeGroupId.isNotEmpty) {
-      bodyContent = const Center(
+      bodyContent = Center(
         child: SizedBox(
           width: 32,
           height: 32,
-          child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 3),
+          child: CircularProgressIndicator(color: t.ink, strokeWidth: t.borderWidth),
         ),
       );
     } else {
-      bodyContent = _buildNoGroupState();
+      bodyContent = _buildNoGroupState(t);
     }
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -250,13 +253,13 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.ink, width: 2),
-                          boxShadow: const [
+                          border: Border.all(color: t.borderColor, width: 2),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(2, 2),
+                              color: t.shadowColor,
+                              offset: t.miniShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
@@ -264,16 +267,16 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const CustomPaint(
-                              size: Size(13, 13),
-                              painter: CustomSharePainter(color: AppColors.ink),
+                            CustomPaint(
+                              size: const Size(13, 13),
+                              painter: CustomSharePainter(color: t.ink),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               group.code,
-                              style: AppTypography.buttonSmall.copyWith(
+                              style: t.buttonSmall.copyWith(
                                 fontSize: 12,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: t.weightExtraBold,
                               ),
                             ),
                           ],
@@ -281,6 +284,8 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                       ),
                     ),
                   ],
+                  const SizedBox(width: 8),
+                  const GroupActivityBellButton(),
                 ],
               ),
             ),
@@ -295,7 +300,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     );
   }
 
-  Widget _buildNoGroupState() {
+  Widget _buildNoGroupState(PutarTheme t) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
@@ -305,34 +310,34 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppColors.matahari,
+              color: t.secondary,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.ink, width: 3),
-              boxShadow: const [
+              border: Border.all(color: t.borderColor, width: t.borderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(3, 3),
+                  color: t.shadowColor,
+                  offset: t.smallShadowOffset,
                   blurRadius: 0,
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: const CustomPaint(
-              size: Size(36, 36),
-              painter: CustomCrownPainter(color: AppColors.ink, strokeWidth: 2.8),
+            child: CustomPaint(
+              size: const Size(36, 36),
+              painter: CustomCrownPainter(color: t.ink, strokeWidth: 2.8),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             'Belum Bergabung Grup',
-            style: AppTypography.titleMedium.copyWith(fontSize: 22),
+            style: t.titleMedium.copyWith(fontSize: 22),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'Buat grup baru bersama teman atau masukkan kode undangan untuk mencatat budget bersama.',
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodyMedium.copyWith(
+              color: t.textSecondary,
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -340,7 +345,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
           const SizedBox(height: 24),
           StickerButton.large(
             text: 'BUAT ATAU GABUNG GRUP',
-            backgroundColor: AppColors.matahari,
+            backgroundColor: t.secondary,
             onPressed: () => context.push('/group/join-or-create'),
           ),
         ],
@@ -348,10 +353,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     );
   }
 
-  Widget _buildGroupContent(GroupModel group) {
+  Widget _buildGroupContent(PutarTheme t, GroupModel group) {
     final activeSession = group.activeSession;
     if (activeSession == null) {
-      return _buildNoActiveSessionState(group);
+      return _buildNoActiveSessionState(t, group);
     }
 
     final notesAsync = ref.watch(activeGroupNotesStreamProvider);
@@ -394,62 +399,146 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                 // Header Nama Grup & Sesi
                 Text(
                   group.name,
-                  style: AppTypography.displayMedium.copyWith(fontSize: 26),
+                  style: t.displayMedium.copyWith(fontSize: 26),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Sesi dimulai oleh ${activeSession.startedByName}',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                  style: t.bodySmall.copyWith(
+                    color: t.textSecondary,
+                    fontWeight: t.weightSemiBold,
                   ),
                 ),
                 const SizedBox(height: 14),
 
                 // Hero Card: Sisa Budget Grup Bersama
                 _buildHeroBudgetCard(
+                  t: t,
                   session: activeSession,
                   totalSpent: totalSpent,
                   remainingBudget: remainingBudget,
                 ),
                 const SizedBox(height: 16),
 
-                // Tombol Catat Pengeluaran
-                StickerButton(
-                  text: '+ CATAT PENGELUARAN',
-                  backgroundColor: AppColors.tomat,
-                  height: 50,
-                  borderRadius: 16,
-                  onPressed: () => _openAddExpenseSheet(
-                    group.id,
-                    activeSession.sessionId,
-                    activeSession.budget,
-                  ),
-                ),
-                if (group.isOwner(ref.watch(groupAuthServiceProvider).currentUid ?? '')) ...[
-                  const SizedBox(height: 10),
-                  StickerButton(
-                    text: 'AKHIRI DATE GRUP',
-                    backgroundColor: AppColors.matahari,
-                    height: 46,
-                    borderRadius: 16,
-                    onPressed: () async {
-                      final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
-                        context,
-                        groupName: group.name,
-                        budget: activeSession.budget,
+                // Baris Tombol Aksi (Layar 67 - Hgrup3.dc.html):
+                // Pemilik: Catat jajan [1.2] + Selesaikan date [1.0] (Mint) + helper caption
+                // Anggota: Catat jajan (full width)
+                Builder(
+                  builder: (context) {
+                    final myUid =
+                        ref.watch(groupAuthServiceProvider).currentUid ?? '';
+                    final isOwner = group.isOwner(myUid);
+
+                    if (!isOwner) {
+                      return StickerButton(
+                        text: 'Catat jajan',
+                        backgroundColor: t.primary,
+                        height: 48,
+                        borderRadius: 24,
+                        onPressed: () => _openAddExpenseSheet(
+                          group.id,
+                          activeSession.sessionId,
+                          activeSession.budget,
+                        ),
                       );
-                      if (confirm == true) {
-                        await ref.read(groupGameServiceProvider).endSession(gid: group.id);
-                        if (mounted) {
-                          showStickerSnackbar(context, message: 'Date grup telah diakhiri. Permainan grup kini terbuka!');
-                        }
-                      }
-                    },
-                  ),
-                ],
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 12,
+                              child: StickerButton(
+                                text: 'Catat jajan',
+                                backgroundColor: t.primary,
+                                height: 48,
+                                borderRadius: 24,
+                                onPressed: () => _openAddExpenseSheet(
+                                  group.id,
+                                  activeSession.sessionId,
+                                  activeSession.budget,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 10,
+                              child: StickerButton(
+                                text: 'Selesaikan date',
+                                backgroundColor: t.success,
+                                textColor: t.ink,
+                                height: 48,
+                                borderRadius: 24,
+                                onPressed: () async {
+                                  final itemCount = activeNotes.length;
+                                  final confirm = await GroupImportantDialog
+                                      .showConfirmEndGroupSession(
+                                    context,
+                                    groupName: group.name,
+                                    budget: activeSession.budget,
+                                    totalSpent: totalSpent,
+                                    itemCount: itemCount,
+                                  );
+                                  if (confirm == true) {
+                                    final groupSvc =
+                                        ref.read(groupServiceProvider);
+                                    await groupSvc.markResultAsShown(
+                                      group.id,
+                                      activeSession.sessionId,
+                                    );
+                                    final frozen = await ref
+                                        .read(groupGameServiceProvider)
+                                        .endSession(gid: group.id);
+                                    if (context.mounted) {
+                                      final budget = frozen?.budget ??
+                                          activeSession.budget;
+                                      final spent =
+                                          frozen?.totalSpent ?? totalSpent;
+                                      final uri = buildGroupDateResultUri(
+                                        groupName: group.name,
+                                        budget: budget,
+                                        totalSpent: spent,
+                                        itemCount: itemCount,
+                                        groupId: group.id,
+                                        sessionId: frozen?.sessionId ??
+                                            activeSession.sessionId,
+                                        budgetByName: frozen?.budgetByName ??
+                                            activeSession.budgetByName,
+                                        budgetGame:
+                                            frozen?.game ?? activeSession.game,
+                                        endedByName: frozen?.endedByName,
+                                        endedByUid: frozen?.endedByUid,
+                                        sessionDate: frozen?.startedAt ??
+                                            activeSession.startedAt,
+                                        endedAt: frozen?.endedAt,
+                                      );
+                                      GoRouter.maybeOf(context)
+                                          ?.push(uri.toString());
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tombol Selesaikan date hanya tampil untuk pemilik grup',
+                          textAlign: TextAlign.center,
+                          style: t.bodySmall.copyWith(
+                            fontSize: 11,
+                            fontWeight: t.weightSemiBold,
+                            color: t.ink.withValues(alpha: 0.65),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: 20),
 
                 // Subtitle Daftar Catatan
@@ -459,7 +548,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                     Flexible(
                       child: Text(
                         'Catatan Belanja (${activeNotes.length})',
-                        style: AppTypography.titleMedium.copyWith(fontSize: 16),
+                        style: t.titleMedium.copyWith(fontSize: 16),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -473,9 +562,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
 
                 // List Catatan Pengeluaran
                 if (activeNotes.isEmpty)
-                  _buildEmptyNotesCard()
+                  _buildEmptyNotesCard(t)
                 else
                   ...activeNotes.map((note) => _buildNoteTile(
+                        t: t,
                         gid: group.id,
                         note: note,
                         group: group,
@@ -489,7 +579,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     );
   }
 
-  Widget _buildNoActiveSessionState(GroupModel group) {
+  Widget _buildNoActiveSessionState(PutarTheme t, GroupModel group) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
@@ -499,34 +589,34 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppColors.mint,
+              color: t.success,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.ink, width: 3),
-              boxShadow: const [
+              border: Border.all(color: t.borderColor, width: t.borderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(3, 3),
+                  color: t.shadowColor,
+                  offset: t.smallShadowOffset,
                   blurRadius: 0,
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: const CustomPaint(
-              size: Size(36, 36),
-              painter: CustomCheckPainter(color: AppColors.ink, strokeWidth: 3.0),
+            child: CustomPaint(
+              size: const Size(36, 36),
+              painter: CustomCheckPainter(color: t.ink, strokeWidth: t.borderWidth),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             'Grup "${group.name}"',
-            style: AppTypography.titleMedium.copyWith(fontSize: 22),
+            style: t.titleMedium.copyWith(fontSize: 22),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'Belum ada sesi roda yang diputar. Putar roda bersama untuk menentukan batas budget sesi ini!',
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodyMedium.copyWith(
+              color: t.textSecondary,
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -534,7 +624,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
           const SizedBox(height: 24),
           StickerButton.large(
             text: 'PUTAR RODA SEKARANG',
-            backgroundColor: AppColors.tomat,
+            backgroundColor: t.primary,
             onPressed: () {
               ref.read(appScopeProvider.notifier).state = AppScope.grup;
               context.go('/roda');
@@ -546,6 +636,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
   }
 
   Widget _buildHeroBudgetCard({
+    required PutarTheme t,
     required GroupSessionModel session,
     required int totalSpent,
     required int remainingBudget,
@@ -553,11 +644,11 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     final progress = session.budget > 0
         ? (totalSpent / session.budget).clamp(0.0, 1.0)
         : 1.0;
-    final statusColor = AppColors.getBudgetStatusColor(progress);
+    final statusColor = t.getBudgetStatusColor(progress);
 
     return StickerCard.hero(
       backgroundColor: statusColor,
-      borderColor: AppColors.ink,
+      borderColor: t.borderColor,
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -568,10 +659,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
               Expanded(
                 child: Text(
                   'SISA BUDGET GRUP',
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 12,
                     letterSpacing: 0.5,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -580,13 +671,13 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: t.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.ink, width: 1.8),
+                  border: Border.all(color: t.borderColor, width: 1.8),
                 ),
                 child: Text(
                   remainingBudget >= 0 ? 'AMAN' : 'OVERBUDGET',
-                  style: AppTypography.buttonSmall.copyWith(fontSize: 10),
+                  style: t.buttonSmall.copyWith(fontSize: 10),
                 ),
               ),
             ],
@@ -599,10 +690,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
             alignment: Alignment.centerLeft,
             child: Text(
               RupiahFormatter.format(remainingBudget),
-              style: AppTypography.displayLarge.copyWith(
+              style: t.displayLarge.copyWith(
                 fontSize: 34,
-                color: AppColors.ink,
-                fontWeight: FontWeight.w800,
+                color: t.ink,
+                fontWeight: t.weightExtraBold,
               ),
             ),
           ),
@@ -612,16 +703,16 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
           Container(
             height: 14,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: t.surface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.ink, width: 2),
+              border: Border.all(color: t.borderColor, width: 2),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
               widthFactor: progress,
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.ink,
+                  color: t.ink,
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),
@@ -636,9 +727,9 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
               Expanded(
                 child: Text(
                   'Terpakai: ${RupiahFormatter.format(totalSpent)}',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightBold,
+                    color: t.ink,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -647,9 +738,9 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
               Expanded(
                 child: Text(
                   'Budget: ${RupiahFormatter.format(session.budget)}',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                  style: t.bodySmall.copyWith(
+                    fontWeight: t.weightBold,
+                    color: t.ink,
                   ),
                   textAlign: TextAlign.end,
                   overflow: TextOverflow.ellipsis,
@@ -662,37 +753,37 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
     );
   }
 
-  Widget _buildEmptyNotesCard() {
+  Widget _buildEmptyNotesCard(PutarTheme t) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.ink, width: 2.2),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: 2.2),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(2, 2),
+            color: t.shadowColor,
+            offset: t.miniShadowOffset,
             blurRadius: 0,
           ),
         ],
       ),
       child: Column(
         children: [
-          const CustomPaint(
-            size: Size(36, 40),
-            painter: CustomReceiptPainter(color: AppColors.disabled, strokeWidth: 2.2),
+          CustomPaint(
+            size: const Size(36, 40),
+            painter: CustomReceiptPainter(color: t.textDisabled, strokeWidth: 2.2),
           ),
           const SizedBox(height: 10),
           Text(
             'Belum Ada Pengeluaran',
-            style: AppTypography.titleMedium.copyWith(fontSize: 16),
+            style: t.titleMedium.copyWith(fontSize: 16),
           ),
           const SizedBox(height: 4),
           Text(
             'Setiap pengeluaran yang dicatat anggota akan otomatis mengurangi sisa budget bersama secara realtime.',
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodySmall.copyWith(
+              color: t.textSecondary,
               fontSize: 12,
             ),
             textAlign: TextAlign.center,
@@ -703,25 +794,26 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
   }
 
   Widget _buildNoteTile({
+    required PutarTheme t,
     required String gid,
     required GroupNoteModel note,
     required GroupModel group,
   }) {
     final authService = ref.watch(groupAuthServiceProvider);
-    final myUid = authService.currentUid;
-    final isAuthorOrOwner = note.authorUid == myUid || group.ownerUid == myUid;
+    final isAuthorOrOwner = authService.isCurrentUser(note.authorUid) ||
+        authService.isCurrentUser(group.ownerUid);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.ink, width: 2.2),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: 2.2),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(2, 2),
+            color: t.shadowColor,
+            offset: t.miniShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -744,7 +836,7 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                     Expanded(
                       child: Text(
                         note.title,
-                        style: AppTypography.bodyLargeBold.copyWith(fontSize: 15),
+                        style: t.bodyLargeBold.copyWith(fontSize: 15),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -759,9 +851,9 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                 const SizedBox(height: 2),
                 Text(
                   'Oleh ${note.authorName}',
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: t.textSecondary,
                   ),
                 ),
               ],
@@ -778,9 +870,9 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                   fit: BoxFit.scaleDown,
                   child: Text(
                     RupiahFormatter.format(note.amount),
-                    style: AppTypography.bodyLargeBold.copyWith(
+                    style: t.bodyLargeBold.copyWith(
                       fontSize: 15,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -798,10 +890,10 @@ class _GroupNotesViewState extends ConsumerState<GroupNotesView> {
                       padding: const EdgeInsets.only(top: 4.0),
                       child: Text(
                         'Hapus',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 11,
-                          color: AppColors.tomat,
-                          fontWeight: FontWeight.w700,
+                          color: t.danger,
+                          fontWeight: t.weightBold,
                         ),
                       ),
                     ),
@@ -834,16 +926,28 @@ class _AddGroupExpenseBottomSheet extends ConsumerStatefulWidget {
 class _AddGroupExpenseBottomSheetState extends ConsumerState<_AddGroupExpenseBottomSheet> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
+  final FocusNode _titleFocusNode = FocusNode();
+  final FocusNode _amountFocusNode = FocusNode();
   bool _isSaving = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
+    _titleFocusNode.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
   }
 
+  void _clearError() {
+    if (_errorMessage != null) {
+      setState(() => _errorMessage = null);
+    }
+  }
+
   void _formatNominal(String val) {
+    _clearError();
     final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
     if (clean.isEmpty) {
       _amountController.value = const TextEditingValue(text: '');
@@ -858,20 +962,29 @@ class _AddGroupExpenseBottomSheetState extends ConsumerState<_AddGroupExpenseBot
   }
 
   Future<void> _handleSave() async {
+    if (_isSaving) return;
+
     final title = _titleController.text.trim();
     final rawAmount = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
     final amount = int.tryParse(rawAmount) ?? 0;
 
     if (title.isEmpty) {
-      showStickerSnackbar(context, message: 'Masukkan nama pengeluaran');
+      SoundService.instance.play(Sfx.uiTap);
+      setState(() => _errorMessage = 'Masukkan nama pengeluaran terlebih dahulu');
+      _titleFocusNode.requestFocus();
       return;
     }
     if (amount <= 0) {
-      showStickerSnackbar(context, message: 'Masukkan nominal belanja yang valid');
+      SoundService.instance.play(Sfx.uiTap);
+      setState(() => _errorMessage = 'Masukkan nominal belanja yang valid');
+      _amountFocusNode.requestFocus();
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
 
     try {
       final groupService = ref.read(groupServiceProvider);
@@ -890,9 +1003,13 @@ class _AddGroupExpenseBottomSheetState extends ConsumerState<_AddGroupExpenseBot
       if (mounted) {
         Navigator.pop(context);
       }
-    } catch (e) {
+    } on StateError catch (e) {
       if (mounted) {
-        showStickerSnackbar(context, message: 'Gagal menyimpan catatan');
+        setState(() => _errorMessage = e.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Gagal menyimpan catatan. Coba lagi.');
       }
     } finally {
       if (mounted) {
@@ -903,113 +1020,130 @@ class _AddGroupExpenseBottomSheetState extends ConsumerState<_AddGroupExpenseBot
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: AppColors.ink, width: 3),
+          border: Border.all(color: t.borderColor, width: t.borderWidth),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Catat Pengeluaran Grup',
-                  style: AppTypography.titleMedium.copyWith(fontSize: 18),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    SoundService.instance.play(Sfx.uiTap);
-                    Navigator.pop(context);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.cream,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.ink, width: 2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Catat Pengeluaran Grup',
+                      style: t.titleMedium.copyWith(fontSize: 18),
                     ),
-                    child: const CustomPaint(
-                      size: Size(16, 16),
-                      painter: CustomCrossPainter(color: AppColors.ink, strokeWidth: 2.2),
+                    GestureDetector(
+                      onTap: () {
+                        SoundService.instance.play(Sfx.uiTap);
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: t.bg,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: t.borderColor, width: 2),
+                        ),
+                        child: CustomPaint(
+                          size: const Size(16, 16),
+                          painter: CustomCrossPainter(color: t.ink, strokeWidth: 2.2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Nama Barang
+                TextField(
+                  key: const ValueKey('add_group_note_title_field'),
+                  controller: _titleController,
+                  focusNode: _titleFocusNode,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => _clearError(),
+                  onSubmitted: (_) => _amountFocusNode.requestFocus(),
+                  decoration: InputDecoration(
+                    hintText: 'Nama barang / jajanan',
+                    filled: true,
+                    fillColor: t.bg,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.borderColor, width: 2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.borderColor, width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.borderColor, width: t.subtleBorderWidth),
                     ),
                   ),
+                  style: t.bodyLargeBold.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 12),
+
+                // Nominal Rupiah
+                TextField(
+                  key: const ValueKey('add_group_note_amount_field'),
+                  controller: _amountController,
+                  focusNode: _amountFocusNode,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onChanged: _formatNominal,
+                  onSubmitted: (_) => _handleSave(),
+                  decoration: InputDecoration(
+                    hintText: 'Rp 0',
+                    filled: true,
+                    fillColor: t.bg,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.borderColor, width: 2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.borderColor, width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.borderColor, width: t.subtleBorderWidth),
+                    ),
+                  ),
+                  style: t.displayMedium.copyWith(
+                    fontSize: 24,
+                    color: t.ink,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                SheetInlineErrorBanner(message: _errorMessage),
+
+                StickerButton(
+                  key: const ValueKey('save_group_note_button'),
+                  text: _isSaving ? 'Menyimpan...' : 'Simpan Pengeluaran',
+                  backgroundColor: t.secondary,
+                  height: 50,
+                  onPressed: _isSaving ? null : _handleSave,
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // Nama Barang
-            TextField(
-              controller: _titleController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Nama barang / jajanan',
-                filled: true,
-                fillColor: AppColors.cream,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2.5),
-                ),
-              ),
-              style: AppTypography.bodyLargeBold.copyWith(fontSize: 15),
-            ),
-            const SizedBox(height: 12),
-
-            // Nominal Rupiah
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              onChanged: _formatNominal,
-              decoration: InputDecoration(
-                hintText: 'Rp 0',
-                filled: true,
-                fillColor: AppColors.cream,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2.5),
-                ),
-              ),
-              style: AppTypography.displayMedium.copyWith(
-                fontSize: 24,
-                color: AppColors.ink,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            StickerButton(
-              text: _isSaving ? 'Menyimpan...' : 'Simpan Pengeluaran',
-              backgroundColor: AppColors.matahari,
-              height: 50,
-              onPressed: _isSaving ? null : _handleSave,
-            ),
-          ],
+          ),
         ),
       ),
     );

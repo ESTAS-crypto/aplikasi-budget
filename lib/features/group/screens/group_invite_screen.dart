@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
+import '../../../core/painters/sticker_icons.dart';
 import '../../../core/widgets/sticker_button.dart';
 import '../../../core/widgets/sticker_card.dart';
 import '../../../core/widgets/sticker_snackbar.dart';
@@ -157,6 +157,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final groupService = ref.watch(groupServiceProvider);
     final authService = ref.watch(groupAuthServiceProvider);
     final myUid = authService.currentUid;
@@ -196,15 +197,15 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
         }
 
         return Scaffold(
-          backgroundColor: AppColors.cream,
+          backgroundColor: t.bg,
           appBar: AppBar(
-            backgroundColor: AppColors.cream,
+            backgroundColor: t.bg,
             elevation: 0,
             centerTitle: true,
             leading: IconButton(
-              icon: const CustomPaint(
-                size: Size(22, 22),
-                painter: CustomBackArrowPainter(color: AppColors.ink),
+              icon: CustomPaint(
+                size: const Size(22, 22),
+                painter: CustomBackArrowPainter(color: t.ink),
               ),
               onPressed: () {
                 final isCurrentMember = isOwner || (ref.read(activeGroupIdProvider) == widget.groupId);
@@ -231,15 +232,15 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
             ),
             title: Text(
               groupName,
-              style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
+              style: t.titleMedium.copyWith(color: t.ink),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             actions: [
               IconButton(
-                icon: const CustomPaint(
-                  size: Size(20, 20),
-                  painter: CustomExitPainter(color: AppColors.ink),
+                icon: CustomPaint(
+                  size: const Size(20, 20),
+                  painter: CustomExitPainter(color: t.ink),
                 ),
                 tooltip: 'Keluar Grup',
                 onPressed: _handleLeaveGroup,
@@ -306,6 +307,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                           children: [
                             // Kartu Kode Undangan Besar
                             _buildInviteCodeCard(
+                              t: t,
                               group: group,
                               groupName: groupName,
                               code: groupCode,
@@ -323,7 +325,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                       Flexible(
                                         child: Text(
                                           'Anggota Grup',
-                                          style: AppTypography.titleMedium.copyWith(fontSize: 18),
+                                          style: t.titleMedium.copyWith(fontSize: 18),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -331,13 +333,13 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: AppColors.matahari,
+                                          color: t.secondary,
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: AppColors.ink, width: 1.8),
+                                          border: Border.all(color: t.ink, width: 1.8),
                                         ),
                                         child: Text(
                                           '$memberCount / 10',
-                                          style: AppTypography.buttonSmall.copyWith(fontSize: 11),
+                                          style: t.buttonSmall.copyWith(fontSize: 11),
                                         ),
                                       ),
                                     ],
@@ -354,20 +356,20 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: AppColors.cream,
+                                        color: t.bg,
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: AppColors.ink, width: 1.8),
+                                        border: Border.all(color: t.ink, width: 1.8),
                                       ),
                                       child: Row(
                                         children: [
-                                          const CustomPaint(
-                                            size: Size(12, 12),
-                                            painter: CustomSyncArrowsPainter(color: AppColors.ink),
+                                          CustomPaint(
+                                            size: const Size(12, 12),
+                                            painter: CustomSyncArrowsPainter(color: t.ink),
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
                                             'Ganti Kode',
-                                            style: AppTypography.buttonSmall.copyWith(fontSize: 11),
+                                            style: t.buttonSmall.copyWith(fontSize: 11),
                                           ),
                                         ],
                                       ),
@@ -379,6 +381,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
 
                             // Daftar Anggota Aktif
                             ...uniqueDisplayMembers.map((member) => _buildMemberTile(
+                                  t: t,
                                   member: member,
                                   isCurrentUser: authService.isCurrentUser(member.uid) ||
                                       (myName != null && myName.isNotEmpty && member.name.toLowerCase().trim() == myName),
@@ -395,6 +398,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                             // Kartu Pilihan Nominal Roda
                             if (group != null)
                               _buildWheelSlotsCard(
+                                t: t,
                                 group: group,
                                 isOwner: isOwner,
                               ),
@@ -407,10 +411,10 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                     // Tombol Bawah: Mulai Pakai Grup / Masuk ke Roda Sesi
                     Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: const BoxDecoration(
-                        color: AppColors.cream,
+                      decoration: BoxDecoration(
+                        color: t.bg,
                         border: Border(
-                          top: BorderSide(color: AppColors.ink, width: 2.5),
+                          top: BorderSide(color: t.ink, width: t.subtleBorderWidth),
                         ),
                       ),
                       child: isOwner
@@ -418,7 +422,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                               text: group?.activeSession != null
                                   ? 'Kembali ke Roda Sesi'
                                   : 'Mulai Pakai Grup',
-                              backgroundColor: AppColors.mint,
+                              backgroundColor: t.success,
                               height: 52,
                               borderRadius: 16,
                               onPressed: () async {
@@ -444,24 +448,24 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                     margin: const EdgeInsets.only(bottom: 10),
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: AppColors.matahari.withValues(alpha: 0.25),
+                                      color: t.secondary.withValues(alpha: 0.25),
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.ink, width: 2),
+                                      border: Border.all(color: t.ink, width: 2),
                                     ),
                                     child: Row(
                                       children: [
-                                        const CustomPaint(
-                                          size: Size(16, 16),
-                                          painter: CustomClockPainter(color: AppColors.ink),
+                                        CustomPaint(
+                                          size: const Size(16, 16),
+                                          painter: CustomClockPainter(color: t.ink),
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
                                             'Menunggu Pemilik Memulai Sesi... Kamu otomatis dialihkan saat sesi dimulai.',
-                                            style: AppTypography.bodySmall.copyWith(
+                                            style: t.bodySmall.copyWith(
                                               fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.ink,
+                                              fontWeight: t.weightBold,
+                                              color: t.ink,
                                             ),
                                           ),
                                         ),
@@ -473,24 +477,24 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                     margin: const EdgeInsets.only(bottom: 10),
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: AppColors.mint.withValues(alpha: 0.2),
+                                      color: t.success.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.ink, width: 2),
+                                      border: Border.all(color: t.ink, width: 2),
                                     ),
                                     child: Row(
                                       children: [
-                                        const CustomPaint(
-                                          size: Size(16, 16),
-                                          painter: CustomFlagPainter(color: AppColors.ink),
+                                        CustomPaint(
+                                          size: const Size(16, 16),
+                                          painter: CustomFlagPainter(color: t.ink),
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
                                             'Sesi jajan grup sedang aktif bersama anggota.',
-                                            style: AppTypography.bodySmall.copyWith(
+                                            style: t.bodySmall.copyWith(
                                               fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.ink,
+                                              fontWeight: t.weightBold,
+                                              color: t.ink,
                                             ),
                                           ),
                                         ),
@@ -501,7 +505,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                   text: group.activeSession != null
                                       ? 'Kembali ke Roda Sesi'
                                       : 'Masuk ke Roda Sesi',
-                                  backgroundColor: AppColors.matahari,
+                                  backgroundColor: t.secondary,
                                   height: 52,
                                   borderRadius: 16,
                                   onPressed: () {
@@ -517,9 +521,9 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                                 const SizedBox(height: 10),
                                 StickerButton(
                                   text: 'Keluar dari Grup',
-                                  backgroundColor: AppColors.surface,
-                                  textColor: AppColors.tomat,
-                                  borderColor: AppColors.tomat,
+                                  backgroundColor: t.surface,
+                                  textColor: t.danger,
+                                  borderColor: t.danger,
                                   height: 48,
                                   borderRadius: 16,
                                   onPressed: _handleLeaveGroup,
@@ -538,6 +542,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
   }
 
   Widget _buildWheelSlotsCard({
+    required PutarTheme t,
     required GroupModel group,
     required bool isOwner,
   }) {
@@ -556,13 +561,13 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: t.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.ink, width: 2.5),
-              boxShadow: const [
+              border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(3, 3),
+                  color: t.shadowColor,
+                  offset: t.smallShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -575,17 +580,17 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                   children: [
                     Row(
                       children: [
-                        const CustomPaint(
-                          size: Size(18, 18),
-                          painter: CustomGearPainter(color: AppColors.ink),
+                        CustomPaint(
+                          size: const Size(18, 18),
+                          painter: CustomGearPainter(color: t.ink),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Budget & Permainan',
-                          style: AppTypography.titleMedium.copyWith(
+                          style: t.titleMedium.copyWith(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ],
@@ -593,16 +598,16 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isFixed ? AppColors.mint : AppColors.matahari,
+                        color: isFixed ? t.success : t.secondary,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.ink, width: 1.8),
+                        border: Border.all(color: t.ink, width: 1.8),
                       ),
                       child: Text(
                         isFixed ? 'Angka Tetap' : 'Dari Permainan',
-                        style: AppTypography.buttonSmall.copyWith(
+                        style: t.buttonSmall.copyWith(
                           fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -613,9 +618,9 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                   isFixed
                       ? 'Budget tetap ${RupiahFormatter.format(group.fixedBudget)} per date (tanpa putar roda).'
                       : 'Budget date diundi dari putaran roda (${group.spinPolicy == 'all' ? 'Semua anggota boleh putar' : 'Hanya pemilik'}).',
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 12,
-                    color: AppColors.ink.withValues(alpha: 0.75),
+                    color: t.ink.withValues(alpha: 0.75),
                   ),
                 ),
                 if (!isFixed) ...[
@@ -624,20 +629,20 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                     spacing: 6,
                     runSpacing: 6,
                     children: List.generate(slots.length, (idx) {
-                      final color = AppColors.getWheelColor(idx);
+                      final color = t.getWheelColor(idx);
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: color,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.ink, width: 1.5),
+                          border: Border.all(color: t.ink, width: 1.5),
                         ),
                         child: Text(
                           RupiahFormatter.formatCompact(slots[idx]),
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       );
@@ -650,10 +655,10 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                   children: [
                     Text(
                       isOwner ? 'Atur Budget & Permainan →' : 'Lihat Pengaturan →',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ],
@@ -673,13 +678,13 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: t.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.ink, width: 2.5),
-              boxShadow: const [
+              border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(3, 3),
+                  color: t.shadowColor,
+                  offset: t.smallShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -690,15 +695,17 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.langit,
+                    color: t.info,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.ink, width: 2),
+                    border: Border.all(color: t.ink, width: 2),
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.notifications_active_outlined,
-                    size: 20,
-                    color: AppColors.ink,
+                  child: CustomPaint(
+                    size: const Size(20, 20),
+                    painter: CustomBellIconPainter(
+                      color: t.ink,
+                      strokeWidth: 2.3,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -708,26 +715,26 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                     children: [
                       Text(
                         'Notifikasi Grup',
-                        style: AppTypography.titleMedium.copyWith(
+                        style: t.titleMedium.copyWith(
                           fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Atur banner & nada notifikasi aktivitas',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 11,
-                          color: AppColors.ink.withValues(alpha: 0.7),
+                          color: t.ink.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const CustomPaint(
-                  size: Size(14, 14),
-                  painter: CustomChevronRightPainter(color: AppColors.ink, strokeWidth: 2.2),
+                CustomPaint(
+                  size: const Size(14, 14),
+                  painter: CustomChevronRightPainter(color: t.ink, strokeWidth: 2.2),
                 ),
               ],
             ),
@@ -738,22 +745,23 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
   }
 
   Widget _buildInviteCodeCard({
+    required PutarTheme t,
     required GroupModel? group,
     required String groupName,
     required String code,
     required bool isOwner,
   }) {
     return StickerCard(
-      backgroundColor: AppColors.surface,
-      borderColor: AppColors.ink,
+      backgroundColor: t.surface,
+      borderColor: t.ink,
       padding: const EdgeInsets.all(18),
       child: Column(
         children: [
           Text(
             'Kode Undangan Grup',
-            style: AppTypography.bodySmall.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
+            style: t.bodySmall.copyWith(
+              fontWeight: t.weightBold,
+              color: t.textSecondary,
             ),
           ),
           const SizedBox(height: 12),
@@ -777,36 +785,36 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                   child: Container(
                     height: 42,
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.ink, width: 2),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: 2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2, 2),
+                          color: t.shadowColor,
+                          offset: t.miniShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             CustomPaint(
-                              size: Size(16, 16),
-                              painter: CustomCopyPainter(color: AppColors.ink),
+                              size: const Size(16, 16),
+                              painter: CustomCopyPainter(color: t.ink),
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
                               'Salin Kode',
                               style: TextStyle(
-                                fontFamily: AppTypography.fontFamily,
+                                fontFamily: t.fontFamily,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                fontWeight: t.weightExtraBold,
+                                color: t.ink,
                               ),
                             ),
                           ],
@@ -826,36 +834,36 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                   child: Container(
                     height: 42,
                     decoration: BoxDecoration(
-                      color: AppColors.langit,
+                      color: t.info,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.ink, width: 2),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: 2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2, 2),
+                          color: t.shadowColor,
+                          offset: t.miniShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             CustomPaint(
-                              size: Size(16, 16),
-                              painter: CustomSharePainter(color: AppColors.ink),
+                              size: const Size(16, 16),
+                              painter: CustomSharePainter(color: t.ink),
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
                               'Bagikan',
                               style: TextStyle(
-                                fontFamily: AppTypography.fontFamily,
+                                fontFamily: t.fontFamily,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                fontWeight: t.weightExtraBold,
+                                color: t.ink,
                               ),
                             ),
                           ],
@@ -873,6 +881,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
   }
 
   Widget _buildMemberTile({
+    required PutarTheme t,
     required GroupMemberModel member,
     required bool isCurrentUser,
     required bool canKick,
@@ -881,13 +890,13 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.ink, width: 2.2),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: 2.2),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(2, 2),
+            color: t.shadowColor,
+            offset: t.miniShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -910,7 +919,7 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                     Flexible(
                       child: Text(
                         member.name,
-                        style: AppTypography.bodyLargeBold.copyWith(fontSize: 14),
+                        style: t.bodyLargeBold.copyWith(fontSize: 14),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -919,10 +928,10 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                       const SizedBox(width: 6),
                       Text(
                         '(Kamu)',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
+                          fontWeight: t.weightBold,
+                          color: t.textSecondary,
                         ),
                       ),
                     ],
@@ -930,10 +939,10 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
                 ),
                 Text(
                   member.isOwner ? 'Pemilik Grup' : 'Anggota',
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
-                    color: member.isOwner ? AppColors.jeruk : AppColors.textSecondary,
-                    fontWeight: member.isOwner ? FontWeight.w800 : FontWeight.w500,
+                    color: member.isOwner ? t.accentOrange : t.textSecondary,
+                    fontWeight: member.isOwner ? t.weightExtraBold : t.weightMedium,
                   ),
                 ),
               ],
@@ -948,15 +957,15 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.tomat.withValues(alpha: 0.15),
+                  color: t.danger.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.tomat, width: 1.5),
+                  border: Border.all(color: t.danger, width: 1.5),
                 ),
                 child: Text(
                   'Keluarkan',
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 10,
-                    color: AppColors.tomat,
+                    color: t.danger,
                   ),
                 ),
               ),
@@ -970,16 +979,16 @@ class _GroupInviteScreenState extends ConsumerState<GroupInviteScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.tomat.withValues(alpha: 0.15),
+                  color: t.danger.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.tomat, width: 1.5),
+                  border: Border.all(color: t.danger, width: 1.5),
                 ),
                 child: Text(
                   'Keluar',
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.tomat,
+                    fontWeight: t.weightExtraBold,
+                    color: t.danger,
                   ),
                 ),
               ),

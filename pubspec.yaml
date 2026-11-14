@@ -40,7 +40,8 @@ flutter:
 
   assets:
     - assets/fonts/
-    - assets/audio/
+    - assets/audio/pasar_malam/
+    - assets/audio/kucing/
 
   fonts:
     - family: BricolageGrotesque
@@ -53,6 +54,16 @@ flutter:
           weight: 700
         - asset: assets/fonts/BricolageGrotesque-ExtraBold.ttf
           weight: 800
+    - family: Fredoka
+      fonts:
+        - asset: assets/fonts/Fredoka-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Fredoka-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Fredoka-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Fredoka-Bold.ttf
+          weight: 700
 
 flutter_native_splash:
   color: "#FFD23F"

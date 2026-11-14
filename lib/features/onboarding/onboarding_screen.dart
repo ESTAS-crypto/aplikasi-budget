@@ -5,8 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/painters/game_icons_painter.dart';
 import '../../core/painters/logo_painter.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/sticker_button.dart';
 
@@ -80,8 +79,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -96,9 +96,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   });
                 },
                 children: [
-                  _buildSlide0(),
-                  _buildSlide1(),
-                  _buildSlide2(),
+                  _buildSlide0(t),
+                  _buildSlide1(t),
+                  _buildSlide2(t),
                 ],
               ),
             ),
@@ -129,10 +129,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           width: isActive ? 24 : 10,
                           height: 10,
                           decoration: BoxDecoration(
-                            color: isActive ? AppColors.tomat : AppColors.surface,
+                            color: isActive ? t.danger : t.surface,
                             borderRadius: BorderRadius.circular(5),
                             border: Border.all(
-                              color: AppColors.ink,
+                              color: t.ink,
                               width: 2.0,
                             ),
                           ),
@@ -145,8 +145,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   // Tombol Aksi Utama
                   StickerButton.large(
                     text: _currentPage < 2 ? 'Lanjut' : 'Mulai putar',
-                    backgroundColor: AppColors.tomat,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.danger,
+                    textColor: t.ink,
                     onPressed: _onNextPressed,
                   ),
                   const SizedBox(height: 12),
@@ -158,8 +158,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Text(
                         'Lewati',
-                        style: AppTypography.bodyLargeBold.copyWith(
-                          color: AppColors.textSecondary,
+                        style: t.bodyLargeBold.copyWith(
+                          color: t.textSecondary,
                         ),
                       ),
                     ),
@@ -174,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   /// Slide 1: Logo Melayang & Putar Terima Jajan
-  Widget _buildSlide0() {
+  Widget _buildSlide0(PutarTheme t) {
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -193,23 +193,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   width: 210,
                   height: 210,
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.ink,
-                      width: 3.5,
+                      color: t.ink,
+                      width: t.heroBorderWidth,
                     ),
-                    boxShadow: const [
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(5, 5),
+                        color: t.shadowColor,
+                        offset: t.dialogShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                 ),
 
-                // Logo di tengah melayang naik-turun 12dp
+                // Logo / Maskot Mochi di tengah melayang naik-turun 12dp
                 AnimatedBuilder(
                   animation: _floatAnimation,
                   builder: (context, child) {
@@ -218,8 +218,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       child: child,
                     );
                   },
-                  child: const LogoWidget(
-                    size: 110,
+                  child: LogoWidget(
+                    size: t.mascot != null ? 150 : 110,
                     strokeWidthRatio: 3.5,
                   ),
                 ),
@@ -232,10 +232,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     const orbitRadius = 118.0;
 
                     final coinColors = [
-                      AppColors.mint,
-                      AppColors.tomat,
-                      AppColors.langit,
-                      AppColors.lavender,
+                      t.success,
+                      t.danger,
+                      t.accentBlue,
+                      t.accentPurple,
                     ];
 
                     return Stack(
@@ -254,8 +254,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               color: coinColors[i],
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: AppColors.ink,
-                                width: 3.0,
+                                color: t.ink,
+                                width: t.borderWidth,
                               ),
                             ),
                           ),
@@ -274,7 +274,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
-              style: AppTypography.displayLarge.copyWith(
+              style: t.displayLarge.copyWith(
                 fontSize: 44,
                 height: 1.1,
                 letterSpacing: -1.2,
@@ -286,15 +286,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.lemon,
+                      color: t.accentGreen,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.ink, width: 3),
+                      border: Border.all(color: t.ink, width: t.borderWidth),
                     ),
                     child: Text(
                       'Jajan.',
-                      style: AppTypography.displayLarge.copyWith(
+                      style: t.displayLarge.copyWith(
                         fontSize: 44,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -307,8 +307,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           // Deskripsi
           Text(
             'Biar nggak bingung bahas budget pas\nngedate. Serahkan ke roda.',
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodyMedium.copyWith(
+              color: t.textSecondary,
               fontSize: 16,
               height: 1.4,
             ),
@@ -320,7 +320,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   /// Slide 2: Catat Cepat & Anti Boncos
-  Widget _buildSlide1() {
+  Widget _buildSlide1(PutarTheme t) {
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -336,13 +336,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 width: 260,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: t.surface,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.ink, width: 3.5),
-                  boxShadow: const [
+                  border: Border.all(color: t.ink, width: t.heroBorderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(6, 6),
+                      color: t.shadowColor,
+                      offset: t.heroShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -357,25 +357,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppColors.mint,
+                            color: t.success,
                             borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: AppColors.ink, width: 2),
+                            border: Border.all(color: t.ink, width: 2),
                           ),
                           child: Text(
                             'Lolos Budget!',
-                            style: AppTypography.chipLabel.copyWith(
+                            style: t.chipLabel.copyWith(
                               fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
                         Flexible(
                           child: Text(
                             'Sisa Saldo',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textSecondary,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.textSecondary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -387,33 +387,33 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       fit: BoxFit.scaleDown,
                       child: Text(
                         'Rp68.000',
-                        style: AppTypography.displayMedium.copyWith(
+                        style: t.displayMedium.copyWith(
                           fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Container(height: 2.5, color: AppColors.ink),
+                    Container(height: 2.5, color: t.ink),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'Sate Taichan',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
                           'Rp32.000',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.tomat,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightExtraBold,
+                            color: t.danger,
                           ),
                         ),
                       ],
@@ -424,18 +424,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         Expanded(
                           child: Text(
                             'Es Teh Manis',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
                           'Rp10.000',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.tomat,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightExtraBold,
+                            color: t.danger,
                           ),
                         ),
                       ],
@@ -452,7 +452,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
-              style: AppTypography.displayLarge.copyWith(
+              style: t.displayLarge.copyWith(
                 fontSize: 38,
                 height: 1.1,
                 letterSpacing: -1.0,
@@ -464,15 +464,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.mint,
+                      color: t.success,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.ink, width: 3),
+                      border: Border.all(color: t.ink, width: t.borderWidth),
                     ),
                     child: Text(
                       'Anti Boncos.',
-                      style: AppTypography.displayLarge.copyWith(
+                      style: t.displayLarge.copyWith(
                         fontSize: 38,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -485,8 +485,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           // Deskripsi
           Text(
             'Catat setiap pengeluaran jajan secara realtime.\nSisa saldo terpantau aman tanpa pusing.',
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodyMedium.copyWith(
+              color: t.textSecondary,
               fontSize: 16,
               height: 1.4,
             ),
@@ -498,7 +498,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   /// Slide 3: 4 Pilihan Permainan Seru
-  Widget _buildSlide2() {
+  Widget _buildSlide2(PutarTheme t) {
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -519,11 +519,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       child: Row(
                         children: [
                           Expanded(
-                            child: _buildMiniGameBadge('Roda Putar', AppColors.matahari, 'wheel'),
+                            child: _buildMiniGameBadge(t, 'Roda Putar', t.secondary, 'wheel'),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: _buildMiniGameBadge('Kocok Dadu', AppColors.langit, 'dice'),
+                            child: _buildMiniGameBadge(t, 'Kocok Dadu', t.accentBlue, 'dice'),
                           ),
                         ],
                       ),
@@ -533,11 +533,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       child: Row(
                         children: [
                           Expanded(
-                            child: _buildMiniGameBadge('Gacha Kapsul', AppColors.permen, 'capsule'),
+                            child: _buildMiniGameBadge(t, 'Gacha Kapsul', t.accentPink, 'capsule'),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: _buildMiniGameBadge('Pilih Amplop', AppColors.mint, 'envelope'),
+                            child: _buildMiniGameBadge(t, 'Pilih Amplop', t.success, 'envelope'),
                           ),
                         ],
                       ),
@@ -554,7 +554,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
-              style: AppTypography.displayLarge.copyWith(
+              style: t.displayLarge.copyWith(
                 fontSize: 38,
                 height: 1.1,
                 letterSpacing: -1.0,
@@ -566,15 +566,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.permen,
+                      color: t.accentPink,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.ink, width: 3),
+                      border: Border.all(color: t.ink, width: t.borderWidth),
                     ),
                     child: Text(
                       'Mainkan!',
-                      style: AppTypography.displayLarge.copyWith(
+                      style: t.displayLarge.copyWith(
                         fontSize: 38,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -587,8 +587,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           // Deskripsi
           Text(
             'Bosan sama roda? Ada kocok dadu, gacha kapsul,\ndan pilih amplop rahasia yang siap dimainkan!',
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodyMedium.copyWith(
+              color: t.textSecondary,
               fontSize: 16,
               height: 1.4,
             ),
@@ -599,16 +599,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildMiniGameBadge(String title, Color color, String gameType) {
+  Widget _buildMiniGameBadge(PutarTheme t, String title, Color color, String gameType) {
     return Container(
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -628,10 +628,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           const SizedBox(height: 6),
           Text(
             title,
-            style: AppTypography.chipLabel.copyWith(
+            style: t.chipLabel.copyWith(
               fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
             ),
             textAlign: TextAlign.center,
           ),

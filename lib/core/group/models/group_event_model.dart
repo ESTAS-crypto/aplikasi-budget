@@ -116,6 +116,9 @@ class GroupEventModel {
         return '$actorName memutar roda: $formatted';
       case GroupEventType.expense:
         final t = payload['title'] ?? 'pengeluaran';
+        if (payload['edited'] == true) {
+          return '$actorName mengubah catatan "$t"';
+        }
         return '$actorName mencatat "$t"';
       case GroupEventType.expenseDeleted:
         final t = payload['title'] ?? 'pengeluaran';
@@ -131,11 +134,11 @@ class GroupEventModel {
         final statusLabel = status == 'lewat' ? 'Lewat' : 'Lolos';
         return '$actorName menyelesaikan date: $statusLabel';
       case GroupEventType.budgetChanged:
-        return summary ?? '$actorName mengubah pengaturan budget grup.';
+        return '$actorName mengubah pengaturan budget grup.';
       case GroupEventType.codeChanged:
-        return summary ?? '$actorName memperbarui kode undangan grup.';
+        return '$actorName memperbarui kode undangan grup.';
       case GroupEventType.custom:
-        return summary ?? '$actorName memperbarui pengaturan grup.';
+        return '$actorName memperbarui pengaturan grup.';
     }
   }
 
@@ -173,16 +176,42 @@ class GroupEventModel {
       'actorName': actorName,
       'actor_name': actorName,
       if (summary != null) 'summary': summary,
+      if (sessionId.isNotEmpty) 'session_id': sessionId,
       'payload': payload,
       'createdAt': createdAt.millisecondsSinceEpoch,
-      'created_at': createdAt.toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
     };
+  }
+
+  static final RegExp _evtEpochPattern = RegExp(r'^evt_(\d{13,})(?:_|$)');
+
+  /// Menormalkan timestamp `created_at` yang corrupt akibat pergeseran zona waktu
+  /// (mis. +7 jam ke masa depan) jika `eventId` memuat epoch ms masa lalu yang valid.
+  /// Tetap bekerja meskipun jam dinding perangkat sudah mendekati/melewati `raw`.
+  static DateTime normalizeSkewedTimestamp(
+    String eventId,
+    DateTime raw, {
+    DateTime? referenceNow,
+  }) {
+    final now = referenceNow ?? DateTime.now();
+    final match = _evtEpochPattern.firstMatch(eventId);
+    if (match != null) {
+      final epochMs = int.tryParse(match.group(1)!);
+      if (epochMs != null) {
+        final fromId = DateTime.fromMillisecondsSinceEpoch(epochMs);
+        if (!fromId.isAfter(now.add(const Duration(minutes: 5))) &&
+            raw.difference(fromId).inMinutes > 15) {
+          return fromId;
+        }
+      }
+    }
+    return raw;
   }
 
   factory GroupEventModel.fromMap(String eventId, Map<String, dynamic> map) {
     DateTime parseDate(dynamic val) {
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is String) return DateTime.tryParse(val)?.toLocal() ?? DateTime.now();
       return DateTime.now();
     }
 
@@ -203,14 +232,31 @@ class GroupEventModel {
       } catch (_) {}
     }
 
+    final topSessionId = (map['session_id'] ?? map['sessionId'])?.toString().trim();
+    if (topSessionId != null &&
+        topSessionId.isNotEmpty &&
+        (parsedPayload['sessionId']?.toString().trim().isEmpty ?? true) &&
+        (parsedPayload['session_id']?.toString().trim().isEmpty ?? true) &&
+        (parsedPayload['endedSessionId']?.toString().trim().isEmpty ?? true)) {
+      parsedPayload['sessionId'] = topSessionId;
+    }
+
+    final rawType = map['type'] as String?;
+    final effectiveTypeStr =
+        (rawType == null || rawType == 'broadcast') && map['event_type'] != null
+            ? map['event_type'].toString()
+            : (rawType ?? 'custom');
+
+    final rawCreatedAt = parseDate(map['createdAt'] ?? map['created_at'] ?? map['timestamp']);
+
     return GroupEventModel(
       eventId: parsedId,
-      type: GroupEventType.fromString(map['type'] as String? ?? 'custom'),
+      type: GroupEventType.fromString(effectiveTypeStr),
       actorUid: (map['actorUid'] ?? map['actor_uid']) as String? ?? '',
       actorName: ((map['actorName'] ?? map['actor_name']) as String?)?.trim() ?? 'Anggota',
       summary: map['summary'] as String?,
       payload: parsedPayload,
-      createdAt: parseDate(map['createdAt'] ?? map['created_at'] ?? map['timestamp']),
+      createdAt: normalizeSkewedTimestamp(parsedId, rawCreatedAt),
     );
   }
 }

@@ -10,8 +10,11 @@ class RupiahFormatter {
     decimalDigits: 0,
   );
 
-  /// Format angka ke format resmi: "Rp100.000"
+  /// Format angka ke format resmi: "Rp100.000" atau "-Rp25.000"
   static String format(int amount) {
+    if (amount < 0) {
+      return '-${_formatter.format(amount.abs()).replaceAll(' ', '')}';
+    }
     return _formatter.format(amount).replaceAll(' ', '');
   }
 

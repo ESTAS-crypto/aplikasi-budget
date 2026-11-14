@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 
 /// Painter Garis Putus-putus Neo-Brutalist
 class DashedRRectPainter extends CustomPainter {
@@ -64,13 +63,14 @@ class DashedMemberSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       width: double.infinity,
       height: 52,
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: CustomPaint(
-        painter: const DashedRRectPainter(
-          color: AppColors.ink,
+        painter: DashedRRectPainter(
+          color: t.ink,
           strokeWidth: 2.0,
           radius: 12.0,
         ),
@@ -83,18 +83,18 @@ class DashedMemberSlot extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: AppColors.cream,
+                  color: t.bg,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppColors.ink.withValues(alpha: 0.4),
+                    color: t.ink.withValues(alpha: 0.4),
                     width: 1.5,
                   ),
                 ),
                 child: Center(
                   child: Text(
                     '+',
-                    style: AppTypography.buttonSmall.copyWith(
-                      color: AppColors.ink.withValues(alpha: 0.5),
+                    style: t.buttonSmall.copyWith(
+                      color: t.ink.withValues(alpha: 0.5),
                       fontSize: 18,
                     ),
                   ),
@@ -106,9 +106,9 @@ class DashedMemberSlot extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w600,
+                  style: t.bodySmall.copyWith(
+                    color: t.textSecondary.withValues(alpha: 0.8),
+                    fontWeight: t.weightSemiBold,
                     fontStyle: FontStyle.italic,
                   ),
                 ),

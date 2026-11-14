@@ -139,9 +139,9 @@ class GroupSessionModel {
       'startedByName': startedByName,
       'started_by_name': startedByName,
       'startedAt': startedAt.millisecondsSinceEpoch,
-      'started_at': startedAt.toIso8601String(),
+      'started_at': startedAt.toUtc().toIso8601String(),
       if (endedAt != null) 'endedAt': endedAt!.millisecondsSinceEpoch,
-      if (endedAt != null) 'ended_at': endedAt!.toIso8601String(),
+      if (endedAt != null) 'ended_at': endedAt!.toUtc().toIso8601String(),
       if (endedByUid != null) 'endedByUid': endedByUid,
       if (endedByUid != null) 'ended_by_uid': endedByUid,
       if (endedByName != null) 'endedByName': endedByName,
@@ -162,21 +162,21 @@ class GroupSessionModel {
       if (turnLockedAt != null)
         'turnLockedAt': turnLockedAt!.millisecondsSinceEpoch,
       if (turnLockedAt != null)
-        'turn_locked_at': turnLockedAt!.toIso8601String(),
+        'turn_locked_at': turnLockedAt!.toUtc().toIso8601String(),
     };
   }
 
   factory GroupSessionModel.fromMap(Map<String, dynamic> map) {
     DateTime parseDate(dynamic val) {
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is String) return DateTime.tryParse(val)?.toLocal() ?? DateTime.now();
       return DateTime.now();
     }
 
     DateTime? parseNullableDate(dynamic val) {
       if (val == null) return null;
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val);
+      if (val is String) return DateTime.tryParse(val)?.toLocal();
       return null;
     }
 
@@ -375,7 +375,7 @@ class GroupModel {
       'owner_uid': ownerUid,
       'code': code,
       'createdAt': createdAt.millisecondsSinceEpoch,
-      'created_at': createdAt.toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
       'memberCount': memberCount,
       'member_count': memberCount,
       if (activeSession != null) 'activeSession': activeSession!.toMap(),
@@ -420,7 +420,7 @@ class GroupModel {
   factory GroupModel.fromMap(String id, Map<String, dynamic> map) {
     DateTime parseDate(dynamic val) {
       if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
-      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is String) return DateTime.tryParse(val)?.toLocal() ?? DateTime.now();
       return DateTime.now();
     }
 

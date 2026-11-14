@@ -23,9 +23,21 @@ class GroupService {
   static String generateEventId() => 'evt_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
 
   final dynamic firestore;
-  final SupabaseClient? supabase;
+  final SupabaseClient? _supabaseOverride;
+  final bool resolveLiveSupabase;
   final GroupAuthService authService;
   final SharedPreferences prefs;
+
+  /// Mengembalikan instance Supabase aktif (atau override pengujian jika disetel).
+  SupabaseClient? get supabase {
+    if (_supabaseOverride != null) return _supabaseOverride;
+    if (!resolveLiveSupabase) return null;
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
 
   ValueChanged<String?>? onActiveGroupIdChanged;
 
@@ -33,13 +45,23 @@ class GroupService {
   String? _subscribedChannelGid;
   Completer<void>? _channelSubscribeCompleter;
   bool _isChannelSubscribed = false;
+  bool _channelNeedsReconnect = false;
+  Timer? _channelReconnectTimer;
+  int _channelReconnectAttempt = 0;
+  bool _disposed = false;
+  final Map<String, Future<void>> _eventWriteChains = {};
+
+  int _lastReadRevision = 0;
+  final StreamController<int> _lastReadRevisionController =
+      StreamController<int>.broadcast();
 
   GroupService({
     this.firestore,
-    this.supabase,
+    SupabaseClient? supabase,
+    this.resolveLiveSupabase = false,
     required this.authService,
     required this.prefs,
-  });
+  }) : _supabaseOverride = supabase;
 
   final List<void Function(Map<String, dynamic>)> _onBroadcastCallbacks = [];
 
@@ -48,6 +70,8 @@ class GroupService {
   final Map<String, List<StreamController<List<GroupNoteModel>>>> _notesControllers = {};
   final Map<String, List<StreamController<List<GroupSessionModel>>>> _sessionsControllers = {};
   final Map<String, List<StreamController<GroupModel?>>> _groupControllers = {};
+  final Map<String, GroupModel> _latestGroups = {};
+  final Map<String, Future<GroupSessionModel?>> _inFlightEndSessions = {};
   final Map<String, List<StreamController<Map<String, dynamic>>>> _liveSpinControllers = {};
   final Map<String, List<StreamController<LivePlayModel?>>> _livePlayControllers = {};
 
@@ -106,6 +130,11 @@ class GroupService {
   }
 
   void _notifyGroupChanged(String gid, GroupModel? group) {
+    if (group != null) {
+      _latestGroups[gid] = group;
+    } else {
+      _latestGroups.remove(gid);
+    }
     final controllers = _groupControllers[gid];
     if (controllers != null) {
       for (final c in List.of(controllers)) {
@@ -177,26 +206,128 @@ class GroupService {
     _ensureChannel(gid);
   }
 
+  /// Memaksa penyambungan ulang channel realtime & tarik ulang event setelah aplikasi resume
+  void reconnectAndRefresh(String gid) {
+    if (_disposed || supabase == null || gid.isEmpty) return;
+    _channelNeedsReconnect = true;
+    _ensureChannel(gid);
+    unawaited(refreshEvents(gid));
+  }
+
+  /// Melepaskan resource channel realtime & timer saat service dibuang
+  void dispose() {
+    _disposed = true;
+    _channelReconnectTimer?.cancel();
+    _channelReconnectTimer = null;
+    _isChannelSubscribed = false;
+    _channelNeedsReconnect = false;
+    try {
+      _realtimeChannel?.unsubscribe();
+    } catch (_) {}
+    _realtimeChannel = null;
+    _subscribedChannelGid = null;
+    _onBroadcastCallbacks.clear();
+  }
+
+  bool _hasActiveListenersFor(String gid) {
+    bool hasOpen<T>(Map<String, List<StreamController<T>>> map) =>
+        map[gid]?.any((c) => !c.isClosed) ?? false;
+    return hasOpen(_eventsControllers) ||
+        hasOpen(_membersControllers) ||
+        hasOpen(_notesControllers) ||
+        hasOpen(_sessionsControllers) ||
+        hasOpen(_groupControllers) ||
+        hasOpen(_liveSpinControllers) ||
+        hasOpen(_livePlayControllers);
+  }
+
+  void _scheduleChannelReconnect(String gid) {
+    if (_disposed || supabase == null) return;
+    if (_subscribedChannelGid != gid || !_hasActiveListenersFor(gid)) return;
+    if (_channelReconnectTimer?.isActive ?? false) return;
+
+    const backoffSeconds = [1, 2, 4, 8, 15];
+    final delaySec = backoffSeconds[_channelReconnectAttempt.clamp(0, backoffSeconds.length - 1)];
+    _channelReconnectAttempt = (_channelReconnectAttempt + 1).clamp(0, backoffSeconds.length);
+
+    _channelReconnectTimer = Timer(Duration(seconds: delaySec), () {
+      _channelReconnectTimer = null;
+      if (_disposed || _subscribedChannelGid != gid || !_hasActiveListenersFor(gid)) return;
+      _channelNeedsReconnect = true;
+      _ensureChannel(gid);
+    });
+  }
+
+  Future<void> _enqueueEventWrite(String gid, Future<void> Function() action) {
+    final prev = _eventWriteChains[gid];
+    Future<void> next;
+    if (prev == null) {
+      next = Future<void>.sync(action);
+    } else {
+      next = prev.then((_) => action(), onError: (_) => action());
+    }
+    late final Future<void> tracked;
+    tracked = next.whenComplete(() {
+      if (identical(_eventWriteChains[gid], tracked)) {
+        _eventWriteChains.remove(gid);
+      }
+    });
+    _eventWriteChains[gid] = tracked;
+    return tracked;
+  }
+
+  /// Membuka bungkus payload broadcast Supabase Realtime tanpa kehilangan
+  /// tipe asli event (`type`) maupun saat payload dibungkus di `event_record`/`payload`.
+  static Map<String, dynamic> unwrapBroadcastEventPayload(Map<String, dynamic> rawPayload) {
+    Map<String, dynamic> current = Map<String, dynamic>.from(rawPayload);
+    for (var depth = 0; depth < 3; depth++) {
+      if (current['event_record'] is Map) {
+        current = Map<String, dynamic>.from(current['event_record'] as Map);
+        continue;
+      }
+      if (current['payload'] is Map) {
+        final inner = Map<String, dynamic>.from(current['payload'] as Map);
+        if (inner.containsKey('event_record') ||
+            inner.containsKey('id') ||
+            inner.containsKey('eventId') ||
+            inner.containsKey('type') ||
+            inner.containsKey('actor_uid') ||
+            inner.containsKey('actorUid')) {
+          current = inner;
+          continue;
+        }
+      }
+      break;
+    }
+    if (current['type'] == 'broadcast' && current['event_type'] != null) {
+      current['type'] = current['event_type'];
+    }
+    return current;
+  }
+
   RealtimeChannel? _ensureChannel(String gid, {void Function(Map<String, dynamic>)? onBroadcastEvent}) {
-    if (supabase == null) return null;
+    if (supabase == null || _disposed) return null;
     if (onBroadcastEvent != null && !_onBroadcastCallbacks.contains(onBroadcastEvent)) {
       _onBroadcastCallbacks.add(onBroadcastEvent);
     }
-    if (_realtimeChannel != null && _subscribedChannelGid == gid) {
+    if (_realtimeChannel != null && _subscribedChannelGid == gid && !_channelNeedsReconnect) {
       return _realtimeChannel;
     }
+    _channelReconnectTimer?.cancel();
+    _channelReconnectTimer = null;
     try {
       _realtimeChannel?.unsubscribe();
     } catch (_) {}
     _subscribedChannelGid = gid;
     _isChannelSubscribed = false;
+    _channelNeedsReconnect = false;
     _channelSubscribeCompleter = Completer<void>();
 
     final ch = supabase!.channel('realtime_group_$gid');
     ch.onBroadcast(
       event: 'group_event',
       callback: (payload) {
-        final data = Map<String, dynamic>.from(payload);
+        final data = unwrapBroadcastEventPayload(Map<String, dynamic>.from(payload));
         _handleIncomingRealtimeBroadcast(gid, data);
         for (final cb in List.of(_onBroadcastCallbacks)) {
           cb(data);
@@ -223,15 +354,66 @@ class GroupService {
         _handlePresencePulse(gid, Map<String, dynamic>.from(payload));
       },
     );
+    ch.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'group_events',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'gid',
+        value: gid,
+      ),
+      callback: (pgPayload) {
+        if (pgPayload.newRecord.isNotEmpty) {
+          _handleIncomingRealtimeBroadcast(
+            gid,
+            Map<String, dynamic>.from(pgPayload.newRecord),
+          );
+        }
+      },
+    );
+    ch.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'group_events',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'gid',
+        value: gid,
+      ),
+      callback: (pgPayload) {
+        if (pgPayload.newRecord.isNotEmpty) {
+          _handleIncomingRealtimeBroadcast(
+            gid,
+            Map<String, dynamic>.from(pgPayload.newRecord),
+          );
+        }
+      },
+    );
 
     ch.subscribe((status, error) {
+      if (_disposed || _realtimeChannel != ch) return;
       if (status == RealtimeSubscribeStatus.subscribed) {
         _isChannelSubscribed = true;
+        _channelNeedsReconnect = false;
+        _channelReconnectAttempt = 0;
+        _channelReconnectTimer?.cancel();
+        _channelReconnectTimer = null;
         if (!(_channelSubscribeCompleter?.isCompleted ?? true)) {
           _channelSubscribeCompleter?.complete();
         }
-      } else if (status == RealtimeSubscribeStatus.channelError || status == RealtimeSubscribeStatus.timedOut) {
+        if (_hasActiveListenersFor(gid)) {
+          unawaited(refreshEvents(gid));
+        }
+      } else if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut ||
+          status == RealtimeSubscribeStatus.closed) {
         _isChannelSubscribed = false;
+        _channelNeedsReconnect = true;
+        if (!(_channelSubscribeCompleter?.isCompleted ?? true)) {
+          _channelSubscribeCompleter?.complete();
+        }
+        _scheduleChannelReconnect(gid);
       }
     });
 
@@ -411,7 +593,7 @@ class GroupService {
         final ch = await ensureChannelSubscribed(gid);
         await ch?.sendBroadcastMessage(
           event: 'wheel_spin_live',
-          payload: payload,
+          payload: Map<String, dynamic>.from(payload),
         );
       } catch (e) {
         debugPrint('[GroupService] Broadcast live spin error: $e');
@@ -432,9 +614,10 @@ class GroupService {
     if (supabase == null) return;
     try {
       final ch = await ensureChannelSubscribed(gid);
+      final snapshot = Map<String, dynamic>.from(eventMap);
       await ch?.sendBroadcastMessage(
         event: 'group_event',
-        payload: eventMap,
+        payload: <String, dynamic>{'event_record': snapshot},
       );
     } catch (e) {
       debugPrint('[GroupService] Broadcast error: $e');
@@ -450,12 +633,107 @@ class GroupService {
   String _keyStoredGroupSlots(String gid) => 'group_wheel_slots_$gid';
   String _keyLastEndedSessionId(String gid) => 'group_last_ended_sid_$gid';
   String _keyLastEndedAt(String gid) => 'group_last_ended_at_$gid';
+  String _keyShownResultSessionIds(String gid) => 'group_shown_result_sids_$gid';
+
+  /// Mengecek apakah Layar Hasil (68/69) sudah pernah ditampilkan pada perangkat ini untuk sessionId tertentu.
+  bool hasShownResultForSession(String gid, String sessionId) {
+    if (gid.isEmpty || sessionId.isEmpty) return false;
+    try {
+      final shown = prefs.getStringList(_keyShownResultSessionIds(gid));
+      return shown != null && shown.contains(sessionId);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Menyimpan secara lokal bahwa Layar Hasil (68/69) sudah ditampilkan untuk sessionId ini
+  /// agar tidak muncul berulang kali saat restart aplikasi.
+  Future<void> markResultAsShown(String gid, String sessionId) async {
+    if (gid.isEmpty || sessionId.isEmpty) return;
+    try {
+      final key = _keyShownResultSessionIds(gid);
+      final current = List<String>.from(prefs.getStringList(key) ?? const []);
+      if (current.contains(sessionId)) return;
+      current.insert(0, sessionId);
+      if (current.length > 100) {
+        current.removeRange(100, current.length);
+      }
+      await prefs.setStringList(key, current);
+    } catch (_) {}
+  }
+
+  /// Ringkasan sesi aktif saat ini (budget, total terpakai, jumlah catatan aktif).
+  ({
+    int budget,
+    int totalSpent,
+    int itemCount,
+    String sessionId,
+    GroupSessionModel? session,
+  }) getActiveSessionSummary(String gid) {
+    final activeSess = getEffectiveActiveSession(gid);
+    if (activeSess == null) {
+      return (
+        budget: 0,
+        totalSpent: 0,
+        itemCount: 0,
+        sessionId: '',
+        session: null,
+      );
+    }
+    final activeNotes = GroupHistoryCalculator.sortActiveNotesChronologically(
+      _getLocalNotes(gid)
+          .where((n) => n.sessionId == activeSess.sessionId || n.sessionId.isEmpty)
+          .toList(),
+    );
+    final totalSpent = GroupHistoryCalculator.computeTotalSpent(activeNotes);
+    return (
+      budget: activeSess.budget,
+      totalSpent: totalSpent,
+      itemCount: activeNotes.length,
+      sessionId: activeSess.sessionId,
+      session: activeSess,
+    );
+  }
+
+  GroupSessionModel? _findLocalSessionById(String gid, String sessionId) {
+    if (sessionId.isEmpty) return null;
+    final sessions = _getLocalSessions(gid);
+    final idx = sessions.indexWhere((s) => s.sessionId == sessionId);
+    if (idx != -1) return sessions[idx];
+    final localGroup = _getLocalGroup(gid);
+    if (localGroup?.activeSession?.sessionId == sessionId) {
+      return localGroup!.activeSession;
+    }
+    return null;
+  }
+
+  Future<void> clearEndedSessionMarker(String gid) =>
+      _clearEndedSessionMarker(gid);
 
   Future<void> _clearEndedSessionMarker(String gid) async {
     try {
       await prefs.remove(_keyLastEndedSessionId(gid));
       await prefs.remove(_keyLastEndedAt(gid));
     } catch (_) {}
+  }
+
+  /// Mendapatkan sesi aktif yang valid saat ini untuk grup
+  GroupSessionModel? getEffectiveActiveSession(
+    String gid, [
+    GroupModel? group,
+  ]) {
+    final local = _getLocalGroup(gid);
+    return resolveEffectiveSession(
+      gid,
+      group?.activeSession,
+      local?.activeSession,
+    );
+  }
+
+  /// Mengecek apakah grup saat ini memiliki sesi aktif dengan budget > 0
+  bool hasActiveBudgetSession(String gid, [GroupModel? group]) {
+    final eff = getEffectiveActiveSession(gid, group);
+    return eff != null && eff.budget > 0;
   }
 
   Future<void> _markSessionEnded(String gid, String endedSessionId, DateTime endedAt) async {
@@ -555,6 +833,7 @@ class GroupService {
 
   Future<void> _saveLocalGroup(GroupModel group) async {
     try {
+      _latestGroups[group.id] = group;
       final currentStr = prefs.getString(_keyLocalGroup(group.id));
       final newStr = jsonEncode(group.toMap());
       if (currentStr == newStr) return;
@@ -564,11 +843,15 @@ class GroupService {
   }
 
   GroupModel? _getLocalGroup(String gid) {
+    final cached = _latestGroups[gid];
+    if (cached != null) return cached;
     final str = prefs.getString(_keyLocalGroup(gid));
     if (str == null) return null;
     try {
       final map = jsonDecode(str) as Map<String, dynamic>;
-      return GroupModel.fromMap(gid, map);
+      final parsed = GroupModel.fromMap(gid, map);
+      _latestGroups[gid] = parsed;
+      return parsed;
     } catch (_) {
       return null;
     }
@@ -641,12 +924,25 @@ class GroupService {
 
   Future<void> _saveLocalEvents(String gid, List<GroupEventModel> events) async {
     try {
+      final seenIds = <String>{};
+      final deduped = <GroupEventModel>[];
+      for (final evt in events) {
+        if (evt.eventId.isNotEmpty) {
+          if (!seenIds.add(evt.eventId)) continue;
+        }
+        deduped.add(evt);
+      }
+      deduped.sort((a, b) {
+        final cmp = b.createdAt.compareTo(a.createdAt);
+        if (cmp != 0) return cmp;
+        return b.eventId.compareTo(a.eventId);
+      });
       final currentStr = prefs.getString(_keyLocalEvents(gid));
-      final list = events.map((e) => e.toMap()).toList();
+      final list = deduped.map((e) => e.toMap()).toList();
       final newStr = jsonEncode(list);
       if (currentStr == newStr) return;
       await prefs.setString(_keyLocalEvents(gid), newStr);
-      _notifyEventsChanged(gid, events);
+      _notifyEventsChanged(gid, deduped);
     } catch (_) {}
   }
 
@@ -743,21 +1039,80 @@ class GroupService {
   /// Mengambil log aktivitas grup lokal secara sinkron
   List<GroupEventModel> getLocalEvents(String gid) => _getLocalEvents(gid);
 
+  /// Mengambil daftar anggota grup lokal secara sinkron
+  List<GroupMemberModel> getLocalMembers(String gid) => _getLocalMembers(gid);
+
+  static const String _keyLocalLastReadPrefix = 'group_last_read_at_';
+
+  /// Mengambil timestamp terakhir kali user membuka halaman notifikasi/aktivitas grup (lokal)
+  DateTime? getLocalLastReadAt(String gid) {
+    final ms = prefs.getInt('$_keyLocalLastReadPrefix$gid');
+    if (ms == null || ms <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  Stream<int> watchLastReadRevision() async* {
+    yield _lastReadRevision;
+    yield* _lastReadRevisionController.stream;
+  }
+
+  Future<void> _setLocalLastReadAt(String gid, DateTime timestamp) async {
+    try {
+      await prefs.setInt(
+        '$_keyLocalLastReadPrefix$gid',
+        timestamp.millisecondsSinceEpoch,
+      );
+    } catch (_) {}
+    _lastReadRevision++;
+    if (!_disposed && !_lastReadRevisionController.isClosed) {
+      _lastReadRevisionController.add(_lastReadRevision);
+      // Beri 1 microtask agar StreamProvider penerima segera memicu rebuild sebelum method kembali.
+      await Future<void>.value();
+    }
+  }
+
+  /// Menentukan apakah [event] dihitung sebagai notifikasi belum dibaca di badge & seksi BARU.
+  bool isUnreadEligibleEvent(GroupEventModel event, DateTime threshold) {
+    // Aksi milik diri sendiri cukup diinformasikan di dalam aplikasi & langsung dianggap terbaca.
+    if (authService.isCurrentUser(event.actorUid)) {
+      return false;
+    }
+    // Hasil permainan tidak berlaku (saat budget sesi sudah terkunci) tidak memicu badge belum dibaca.
+    if (event.type == GroupEventType.gameResult &&
+        event.payload['valid'] == false) {
+      return false;
+    }
+    return event.createdAt.isAfter(threshold);
+  }
+
   /// Mengirim notifikasi event bahwa sesi grup telah dimulai oleh pemilik
   Future<void> notifySessionStarted(String gid) async {
     final uid = await authService.ensureSignedIn();
     final actorName = authService.displayName ?? 'Pemilik Grup';
     final now = DateTime.now();
+    final evtId = generateEventId();
+
+    final localEvt = GroupEventModel(
+      eventId: evtId,
+      type: GroupEventType.sessionStart,
+      actorUid: uid,
+      actorName: actorName,
+      summary: '$actorName memulai sesi grup',
+      payload: const {},
+      createdAt: now,
+    );
+    final evts = _getLocalEvents(gid)..insert(0, localEvt);
+    await _saveLocalEvents(gid, evts);
 
     final eventMap = {
-      'id': 'evt_${now.millisecondsSinceEpoch}_${Random().nextInt(999)}',
+      'id': evtId,
       'gid': gid,
       'actor_uid': uid,
       'actor_name': actorName,
       'type': GroupEventType.sessionStart.value,
       'summary': '$actorName memulai sesi grup',
       'payload': {},
-      'created_at': now.toIso8601String(),
+      'created_at': now.toUtc().toIso8601String(),
     };
 
     if (supabase != null) {
@@ -834,6 +1189,7 @@ class GroupService {
     // 1. Simpan ke local persistence SharedPreferences segera
     await _saveLocalGroup(localGroup);
     await _saveLocalMembers(gid, [localMember]);
+    await _setLocalLastReadAt(gid, now);
     await _saveLocalEvents(gid, [localEvt]);
     await setActiveGroupId(gid);
 
@@ -845,7 +1201,7 @@ class GroupService {
           'name': cleanName,
           'owner_uid': uid,
           'code': code,
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
           'member_count': 1,
           'active_session': null,
         });
@@ -856,8 +1212,8 @@ class GroupService {
           'name': creatorName.trim(),
           'color_index': colorIndex,
           'role': 'owner',
-          'joined_at': now.toIso8601String(),
-          'last_read_at': now.toIso8601String(),
+          'joined_at': now.toUtc().toIso8601String(),
+          'last_read_at': now.toUtc().toIso8601String(),
         });
 
         await supabase!.from('invite_codes').insert({
@@ -866,14 +1222,14 @@ class GroupService {
         });
 
         final eventMap = {
-          'id': generateEventId(),
+          'id': localEvt.eventId,
           'gid': gid,
           'actor_uid': uid,
           'actor_name': creatorName.trim(),
           'type': GroupEventType.memberJoin.value,
           'summary': '${creatorName.trim()} membuat grup "$cleanName"',
           'payload': {},
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
 
         await supabase!.from('group_events').insert(eventMap);
@@ -911,7 +1267,7 @@ class GroupService {
           'createdAt': now.millisecondsSinceEpoch,
         });
 
-        final eventRef = groupRef.collection('events').doc(generateEventId());
+        final eventRef = groupRef.collection('events').doc(localEvt.eventId);
         batch.set(eventRef, {
           'actorUid': uid,
           'actorName': creatorName.trim(),
@@ -1040,9 +1396,10 @@ class GroupService {
           'name': memberName.trim(),
           'color_index': colorIndex,
           'role': 'member',
-          'joined_at': now.toIso8601String(),
-          'last_read_at': now.toIso8601String(),
+          'joined_at': now.toUtc().toIso8601String(),
+          'last_read_at': now.toUtc().toIso8601String(),
         }).timeout(const Duration(seconds: 10));
+        await _setLocalLastReadAt(gid, now);
 
         // Hitung jumlah unik anggota
         try {
@@ -1074,7 +1431,7 @@ class GroupService {
             'color_index': colorIndex,
             'role': 'member',
           },
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
 
         try {
@@ -1096,13 +1453,13 @@ class GroupService {
               'uid': uid,
               'name': memberName.trim(),
               'color_index': colorIndex,
-              'last_seen_at': now.toIso8601String(),
+              'last_seen_at': now.toUtc().toIso8601String(),
             }).eq('id', targetId).timeout(const Duration(seconds: 10));
           } else {
             await client.from('group_members').update({
               'name': memberName.trim(),
               'color_index': colorIndex,
-              'last_seen_at': now.toIso8601String(),
+              'last_seen_at': now.toUtc().toIso8601String(),
             }).eq('gid', gid).eq('uid', uid).timeout(const Duration(seconds: 10));
           }
         } catch (_) {}
@@ -1120,7 +1477,7 @@ class GroupService {
             'color_index': colorIndex,
             'role': 'member',
           },
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
         try {
           await client.from('group_events').insert(rejoinEvtMap).timeout(const Duration(seconds: 10));
@@ -1236,6 +1593,7 @@ class GroupService {
                 );
                 final updatedMembers = [...localMembers, newMember];
                 await _saveLocalMembers(gid, updatedMembers);
+                await _setLocalLastReadAt(gid, now);
                 _notifyMembersChanged(gid, updatedMembers);
               }
 
@@ -1271,6 +1629,7 @@ class GroupService {
       lastReadAt: now,
     );
     await _saveLocalMembers(mockGid, [mockMember]);
+    await _setLocalLastReadAt(mockGid, now);
     _notifyMembersChanged(mockGid, [mockMember]);
 
     final mockJoinEvt = GroupEventModel(
@@ -1294,84 +1653,11 @@ class GroupService {
     var local = _getLocalGroup(gid);
     if (local != null) {
       yield local;
+    } else if (supabase == null && firestore == null) {
+      yield null;
     }
 
-    if (supabase != null) {
-      _ensureChannel(gid);
-      final controller = StreamController<GroupModel?>.broadcast();
-      _groupControllers.putIfAbsent(gid, () => []).add(controller);
-
-      try {
-        final row = await supabase!.from('groups').select('*').eq('id', gid).maybeSingle();
-        if (row != null) {
-          final group = GroupModel.fromMap(gid, row);
-          final currentLocal = _getLocalGroup(gid);
-          final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-          final effSession = resolveEffectiveSession(gid, group.activeSession, currentLocal?.activeSession);
-          local = group.copyWith(
-            wheelSlots: slots,
-            activeSession: effSession,
-            clearActiveSession: effSession == null,
-          );
-          await _saveLocalGroup(local);
-          _notifyGroupChanged(gid, local);
-          yield local;
-        }
-      } catch (_) {}
-
-      final timer = Timer.periodic(const Duration(seconds: 4), (_) async {
-        try {
-          final row = await supabase!.from('groups').select('*').eq('id', gid).maybeSingle();
-          if (row != null) {
-            final group = GroupModel.fromMap(gid, row);
-            final currentLocal = _getLocalGroup(gid);
-            final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-            final effSession = resolveEffectiveSession(gid, group.activeSession, currentLocal?.activeSession);
-            final merged = group.copyWith(
-              wheelSlots: slots,
-              activeSession: effSession,
-              clearActiveSession: effSession == null,
-            );
-            await _saveLocalGroup(merged);
-            _notifyGroupChanged(gid, merged);
-          }
-        } catch (_) {}
-      });
-
-      StreamSubscription? sub;
-      try {
-        sub = supabase!
-            .from('groups')
-            .stream(primaryKey: ['id'])
-            .eq('id', gid)
-            .listen((rows) {
-              if (rows.isNotEmpty) {
-                final group = GroupModel.fromMap(gid, rows.first);
-                final currentLocal = _getLocalGroup(gid);
-                final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
-                final effSession = resolveEffectiveSession(gid, group.activeSession, currentLocal?.activeSession);
-                final merged = group.copyWith(
-                  wheelSlots: slots,
-                  activeSession: effSession,
-                  clearActiveSession: effSession == null,
-                );
-                _saveLocalGroup(merged);
-                _notifyGroupChanged(gid, merged);
-              }
-            }, onError: (_) {});
-      } catch (_) {}
-
-      controller.onCancel = () {
-        _groupControllers[gid]?.remove(controller);
-        timer.cancel();
-        sub?.cancel();
-      };
-
-      yield* controller.stream;
-      return;
-    }
-
-    if (firestore != null) {
+    if (supabase == null && firestore != null) {
       try {
         await for (final doc in firestore!.collection('groups').doc(gid).snapshots()) {
           if (doc.exists && doc.data() != null) {
@@ -1396,11 +1682,85 @@ class GroupService {
       }
     }
 
-    if (local != null) {
-      yield local;
-    } else {
-      yield null;
+    final controller = StreamController<GroupModel?>.broadcast();
+    _groupControllers.putIfAbsent(gid, () => []).add(controller);
+
+    Timer? timer;
+    StreamSubscription? sub;
+
+    if (supabase != null) {
+      _ensureChannel(gid);
+
+      // Jalankan initial fetch secara non-blocking agar yield* controller.stream langsung terpasang
+      // dan tidak ada event _notifyGroupChanged yang terlewat saat menunggu jaringan.
+      unawaited(() async {
+        try {
+          final row = await supabase!.from('groups').select('*').eq('id', gid).maybeSingle();
+          if (row != null) {
+            final group = GroupModel.fromMap(gid, row);
+            final currentLocal = _getLocalGroup(gid);
+            final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
+            final effSession = resolveEffectiveSession(gid, group.activeSession, currentLocal?.activeSession);
+            local = group.copyWith(
+              wheelSlots: slots,
+              activeSession: effSession,
+              clearActiveSession: effSession == null,
+            );
+            await _saveLocalGroup(local!);
+            _notifyGroupChanged(gid, local);
+          }
+        } catch (_) {}
+      }());
+
+      timer = Timer.periodic(const Duration(seconds: 4), (_) async {
+        try {
+          final row = await supabase!.from('groups').select('*').eq('id', gid).maybeSingle();
+          if (row != null) {
+            final group = GroupModel.fromMap(gid, row);
+            final currentLocal = _getLocalGroup(gid);
+            final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
+            final effSession = resolveEffectiveSession(gid, group.activeSession, currentLocal?.activeSession);
+            final merged = group.copyWith(
+              wheelSlots: slots,
+              activeSession: effSession,
+              clearActiveSession: effSession == null,
+            );
+            await _saveLocalGroup(merged);
+            _notifyGroupChanged(gid, merged);
+          }
+        } catch (_) {}
+      });
+
+      try {
+        sub = supabase!
+            .from('groups')
+            .stream(primaryKey: ['id'])
+            .eq('id', gid)
+            .listen((rows) {
+              if (rows.isNotEmpty) {
+                final group = GroupModel.fromMap(gid, rows.first);
+                final currentLocal = _getLocalGroup(gid);
+                final slots = group.wheelSlots ?? currentLocal?.wheelSlots ?? _getStoredGroupSlots(gid);
+                final effSession = resolveEffectiveSession(gid, group.activeSession, currentLocal?.activeSession);
+                final merged = group.copyWith(
+                  wheelSlots: slots,
+                  activeSession: effSession,
+                  clearActiveSession: effSession == null,
+                );
+                _saveLocalGroup(merged);
+                _notifyGroupChanged(gid, merged);
+              }
+            }, onError: (_) {});
+      } catch (_) {}
     }
+
+    controller.onCancel = () {
+      _groupControllers[gid]?.remove(controller);
+      timer?.cancel();
+      sub?.cancel();
+    };
+
+    yield* controller.stream;
   }
 
   List<GroupMemberModel> _cleanAndDeduplicate(String gid, List<GroupMemberModel> list) {
@@ -1430,7 +1790,7 @@ class GroupService {
             colorIndex: authService.colorIndex,
             role: 'owner',
             joinedAt: group.createdAt,
-            lastReadAt: DateTime.now(),
+            lastReadAt: getLocalLastReadAt(gid) ?? group.createdAt,
           ),
         );
         return [ownerMember, ...uniqueList];
@@ -1443,76 +1803,11 @@ class GroupService {
   Stream<List<GroupMemberModel>> watchMembers(String gid) async* {
     var local = _getLocalMembers(gid);
     local = _cleanAndDeduplicate(gid, local);
-    if (local.isNotEmpty) {
+    if (local.isNotEmpty || (supabase == null && firestore == null)) {
       yield local;
     }
 
-    if (supabase != null) {
-      final controller = StreamController<List<GroupMemberModel>>.broadcast();
-      _membersControllers.putIfAbsent(gid, () => []).add(controller);
-
-      // 1. Dengarkan WebSocket Broadcast Realtime (< 50ms)
-      void broadcastCb(Map<String, dynamic> payload) {
-        final type = payload['type']?.toString();
-        if (type == GroupEventType.memberJoin.value ||
-            type == GroupEventType.memberLeave.value) {
-          final cur = _getLocalMembers(gid);
-          final clean = _cleanAndDeduplicate(gid, cur);
-          if (!controller.isClosed) controller.add(clean);
-          _notifyMembersChanged(gid, clean);
-        }
-      }
-      _ensureChannel(gid, onBroadcastEvent: broadcastCb);
-
-      // 2. Initial query from Supabase
-      try {
-        final rows = await supabase!.from('group_members').select('*').eq('gid', gid).order('joined_at', ascending: true);
-        final members = (rows as List).map((r) => GroupMemberModel.fromMap((r['uid'] ?? '').toString(), r)).toList();
-        final clean = _cleanAndDeduplicate(gid, members);
-        await _saveLocalMembers(gid, clean);
-        _notifyMembersChanged(gid, clean);
-        yield clean;
-      } catch (_) {}
-
-      // 3. Fallback Periodic Polling (setiap 3 detik untuk latensi rendah)
-      final timer = Timer.periodic(const Duration(seconds: 3), (_) async {
-        try {
-          final rows = await supabase!.from('group_members').select('*').eq('gid', gid).order('joined_at', ascending: true);
-          final members = (rows as List).map((r) => GroupMemberModel.fromMap((r['uid'] ?? '').toString(), r)).toList();
-          final clean = _cleanAndDeduplicate(gid, members);
-          await _saveLocalMembers(gid, clean);
-          _notifyMembersChanged(gid, clean);
-        } catch (_) {}
-      });
-
-      // 4. Postgres stream
-      StreamSubscription? sub;
-      try {
-        sub = supabase!
-            .from('group_members')
-            .stream(primaryKey: ['id'])
-            .eq('gid', gid)
-            .order('joined_at', ascending: true)
-            .listen((rows) {
-              final members = rows.map((r) => GroupMemberModel.fromMap(r['uid']?.toString() ?? '', r)).toList();
-              final clean = _cleanAndDeduplicate(gid, members);
-              _saveLocalMembers(gid, clean);
-              _notifyMembersChanged(gid, clean);
-            }, onError: (_) {});
-      } catch (_) {}
-
-      controller.onCancel = () {
-        _membersControllers[gid]?.remove(controller);
-        _onBroadcastCallbacks.remove(broadcastCb);
-        timer.cancel();
-        sub?.cancel();
-      };
-
-      yield* controller.stream;
-      return;
-    }
-
-    if (firestore != null) {
+    if (supabase == null && firestore != null) {
       try {
         await for (final snapshot in firestore!
             .collection('groups')
@@ -1533,7 +1828,75 @@ class GroupService {
       }
     }
 
-    yield local;
+    final controller = StreamController<List<GroupMemberModel>>.broadcast();
+    _membersControllers.putIfAbsent(gid, () => []).add(controller);
+
+    void Function(Map<String, dynamic>)? broadcastCb;
+    Timer? timer;
+    StreamSubscription? sub;
+
+    if (supabase != null) {
+      // 1. Dengarkan WebSocket Broadcast Realtime (< 50ms)
+      broadcastCb = (payload) {
+        final type = unwrapBroadcastEventPayload(payload)['type']?.toString();
+        if (type == GroupEventType.memberJoin.value ||
+            type == GroupEventType.memberLeave.value) {
+          final cur = _getLocalMembers(gid);
+          final clean = _cleanAndDeduplicate(gid, cur);
+          if (!controller.isClosed) controller.add(clean);
+          _notifyMembersChanged(gid, clean);
+        }
+      };
+      _ensureChannel(gid, onBroadcastEvent: broadcastCb);
+
+      // 2. Initial query from Supabase (non-blocking agar controller.stream langsung terpasang)
+      unawaited(() async {
+        try {
+          final rows = await supabase!.from('group_members').select('*').eq('gid', gid).order('joined_at', ascending: true);
+          final members = (rows as List).map((r) => GroupMemberModel.fromMap((r['uid'] ?? '').toString(), r)).toList();
+          final clean = _cleanAndDeduplicate(gid, members);
+          await _saveLocalMembers(gid, clean);
+          _notifyMembersChanged(gid, clean);
+        } catch (_) {}
+      }());
+
+      // 3. Fallback Periodic Polling (setiap 3 detik untuk latensi rendah)
+      timer = Timer.periodic(const Duration(seconds: 3), (_) async {
+        try {
+          final rows = await supabase!.from('group_members').select('*').eq('gid', gid).order('joined_at', ascending: true);
+          final members = (rows as List).map((r) => GroupMemberModel.fromMap((r['uid'] ?? '').toString(), r)).toList();
+          final clean = _cleanAndDeduplicate(gid, members);
+          await _saveLocalMembers(gid, clean);
+          _notifyMembersChanged(gid, clean);
+        } catch (_) {}
+      });
+
+      // 4. Postgres stream
+      try {
+        sub = supabase!
+            .from('group_members')
+            .stream(primaryKey: ['id'])
+            .eq('gid', gid)
+            .order('joined_at', ascending: true)
+            .listen((rows) {
+              final members = rows.map((r) => GroupMemberModel.fromMap(r['uid']?.toString() ?? '', r)).toList();
+              final clean = _cleanAndDeduplicate(gid, members);
+              _saveLocalMembers(gid, clean);
+              _notifyMembersChanged(gid, clean);
+            }, onError: (_) {});
+      } catch (_) {}
+    }
+
+    controller.onCancel = () {
+      _membersControllers[gid]?.remove(controller);
+      if (broadcastCb != null) {
+        _onBroadcastCallbacks.remove(broadcastCb);
+      }
+      timer?.cancel();
+      sub?.cancel();
+    };
+
+    yield* controller.stream;
   }
 
   /// Memperbarui daftar pilihan nominal roda grup (Khusus Pemilik Grup)
@@ -1582,7 +1945,7 @@ class GroupService {
           'action': 'update_slots',
           'wheelSlots': slots,
         },
-        'created_at': now.toIso8601String(),
+        'created_at': now.toUtc().toIso8601String(),
       };
 
       // 1. Broadcast langsung via WebSocket (< 5ms) ke semua spectator / anggota online
@@ -1700,7 +2063,7 @@ class GroupService {
           'spinPolicy': spinPolicy,
           'wheelSlots': ?wheelSlots,
         },
-        'created_at': now.toIso8601String(),
+        'created_at': now.toUtc().toIso8601String(),
       };
 
       // 1. Broadcast langsung via WebSocket (< 5ms) ke semua anggota
@@ -1830,6 +2193,7 @@ class GroupService {
       'actor_name': actorName,
       'type': GroupEventType.sessionStart.value,
       'summary': summaryText,
+      if (sessionId.isNotEmpty) 'session_id': sessionId,
       'payload': {
         'sessionId': sessionId,
         'budget': fixedBudget,
@@ -1837,7 +2201,7 @@ class GroupService {
         'startedByName': actorName,
         'type': 'fixed',
       },
-      'created_at': now.toIso8601String(),
+      'created_at': now.toUtc().toIso8601String(),
     };
 
     _broadcastGroupEvent(gid, eventMap);
@@ -1949,6 +2313,7 @@ class GroupService {
     _notifyEventsChanged(gid, evts);
 
     if (supabase != null) {
+      final sid = event.sessionId.isNotEmpty ? event.sessionId : enrichedSession.sessionId;
       final eventMap = {
         'id': event.eventId,
         'gid': gid,
@@ -1956,8 +2321,9 @@ class GroupService {
         'actor_name': event.actorName,
         'type': event.type.value,
         'summary': event.summary,
+        if (sid.isNotEmpty) 'session_id': sid,
         'payload': event.payload,
-        'created_at': event.createdAt.toIso8601String(),
+        'created_at': event.createdAt.toUtc().toIso8601String(),
       };
       _broadcastGroupEvent(gid, eventMap);
 
@@ -1972,7 +2338,7 @@ class GroupService {
           await supabase!.from('group_sessions').upsert({
             'id': enrichedSession.sessionId,
             'gid': gid,
-            'started_at': enrichedSession.startedAt.toIso8601String(),
+            'started_at': enrichedSession.startedAt.toUtc().toIso8601String(),
             'started_by_uid': enrichedSession.startedByUid,
             'started_by_name': enrichedSession.startedByName,
             'budget': enrichedSession.budget,
@@ -2043,8 +2409,24 @@ class GroupService {
     }
   }
 
-  /// Mengakhiri / menutup sesi grup aktif (membekukan sesi ke riwayat & membuka kunci date grup)
-  Future<void> endSession({required String gid}) async {
+  /// Mengakhiri / menutup sesi grup aktif secara idempoten
+  /// (membekukan sesi ke riwayat & membuka kunci date grup tanpa duplikasi event).
+  Future<GroupSessionModel?> endSession({required String gid}) {
+    final existingFuture = _inFlightEndSessions[gid];
+    if (existingFuture != null) {
+      return existingFuture;
+    }
+
+    final future = _endSessionInternal(gid: gid);
+    _inFlightEndSessions[gid] = future;
+    return future.whenComplete(() {
+      if (_inFlightEndSessions[gid] == future) {
+        _inFlightEndSessions.remove(gid);
+      }
+    });
+  }
+
+  Future<GroupSessionModel?> _endSessionInternal({required String gid}) async {
     final now = DateTime.now();
     final uid = authService.currentUid ?? '';
     final actorName = authService.displayName ?? 'Pemilik Grup';
@@ -2053,15 +2435,55 @@ class GroupService {
     final activeSess = local?.activeSession;
     final endedSessionId = activeSess?.sessionId ?? '';
 
+    // Idempotency guard 1: tidak ada sesi aktif lagi -> jangan buat event ganda
+    if (activeSess == null || endedSessionId.isEmpty) {
+      return null;
+    }
+
+    // Idempotency guard 2: sesi ini sudah berakhir di riwayat lokal / penanda ended
+    final alreadyFrozen = _findLocalSessionById(gid, endedSessionId);
+    if (alreadyFrozen != null &&
+        alreadyFrozen.isEnded &&
+        alreadyFrozen.endedAt != null) {
+      await _markSessionEnded(gid, endedSessionId, alreadyFrozen.endedAt!);
+      if (local != null) {
+        final updatedGroup = local.copyWith(clearActiveSession: true);
+        await _saveLocalGroup(updatedGroup);
+        _notifyGroupChanged(gid, updatedGroup);
+      }
+      return alreadyFrozen;
+    }
+    if (isSessionEnded(gid, activeSess)) {
+      if (local != null) {
+        final updatedGroup = local.copyWith(clearActiveSession: true);
+        await _saveLocalGroup(updatedGroup);
+        _notifyGroupChanged(gid, updatedGroup);
+      }
+      return alreadyFrozen;
+    }
+
     // 1. Tandai sesi telah diakhiri agar tidak dihidupkan kembali oleh polling / failsafe
     await _markSessionEnded(gid, endedSessionId, now);
 
     // 1b. Bekukan dokumen sesi (TIDAK dihapus; hitung hasil & totalSpent saat selesai)
     GroupSessionModel? frozenSession;
     int noteCount = 0;
-    if (activeSess != null && endedSessionId.isNotEmpty) {
-      final sessionNotes = _getLocalNotes(gid)
-          .where((n) => n.sessionId == endedSessionId || n.sessionId.isEmpty)
+    {
+      final allLocalNotes = _getLocalNotes(gid);
+      bool migratedAny = false;
+      final updatedAllNotes = allLocalNotes.map((n) {
+        if (n.sessionId.isEmpty) {
+          migratedAny = true;
+          return n.copyWith(sessionId: endedSessionId);
+        }
+        return n;
+      }).toList();
+      if (migratedAny) {
+        await _saveLocalNotes(gid, updatedAllNotes);
+      }
+
+      final sessionNotes = updatedAllNotes
+          .where((n) => n.sessionId == endedSessionId)
           .toList();
       final sortedNotes =
           GroupHistoryCalculator.sortActiveNotesChronologically(sessionNotes);
@@ -2081,9 +2503,8 @@ class GroupService {
       await upsertLocalSession(gid, frozenSession);
     }
 
-    final statusLabel =
-        (frozenSession?.isLolos ?? true) ? 'Lolos' : 'Lewat';
-    final hematVal = frozenSession?.hemat ?? 0;
+    final statusLabel = frozenSession.isLolos ? 'Lolos' : 'Lewat';
+    final hematVal = frozenSession.hemat;
 
     // 2. Catat event session_end ke log lokal terlebih dahulu (0ms Local-First)
     final endEvt = GroupEventModel(
@@ -2097,9 +2518,16 @@ class GroupService {
         'sessionId': endedSessionId,
         'endedSessionId': endedSessionId,
         'endedAt': now.millisecondsSinceEpoch,
-        if (frozenSession != null) 'budget': frozenSession.budget,
-        if (frozenSession != null) 'totalSpent': frozenSession.totalSpent,
-        if (frozenSession != null) 'status': frozenSession.status,
+        'startedAt': frozenSession.startedAt.millisecondsSinceEpoch,
+        'budget': frozenSession.budget,
+        'totalSpent': frozenSession.totalSpent,
+        'status': frozenSession.status,
+        'game': frozenSession.game,
+        'budgetByName': frozenSession.budgetByName.isNotEmpty
+            ? frozenSession.budgetByName
+            : frozenSession.startedByName,
+        'endedByName': actorName,
+        'endedByUid': uid,
         'hemat': hematVal,
         'noteCount': noteCount,
       },
@@ -2118,6 +2546,7 @@ class GroupService {
 
     // 4. Siarkan ke seluruh anggota via WebSocket & update database di latar belakang
     if (supabase != null) {
+      final endSid = endEvt.sessionId;
       final eventMap = {
         'id': endEvt.eventId,
         'gid': gid,
@@ -2125,37 +2554,53 @@ class GroupService {
         'actor_name': actorName,
         'type': GroupEventType.sessionEnd.value,
         'summary': endEvt.summary,
+        if (endSid.isNotEmpty) 'session_id': endSid,
         'payload': endEvt.payload,
-        'created_at': now.toIso8601String(),
+        'created_at': now.toUtc().toIso8601String(),
       };
       _broadcastGroupEvent(gid, eventMap);
-      unawaited(Future.wait([
-        supabase!.from('groups').update({
-          'active_session': null,
-        }).eq('id', gid),
-        supabase!.from('group_events').insert(eventMap),
-        if (frozenSession != null)
-          supabase!.from('group_sessions').upsert({
-            'id': frozenSession.sessionId,
-            'gid': gid,
-            'started_at': frozenSession.startedAt.toIso8601String(),
-            'started_by_uid': frozenSession.startedByUid,
-            'started_by_name': frozenSession.startedByName,
-            'ended_at': now.toIso8601String(),
-            'ended_by_uid': uid,
-            'ended_by_name': actorName,
-            'budget': frozenSession.budget,
-            'game': frozenSession.game,
-            'budget_by_uid': frozenSession.budgetByUid,
-            'budget_by_name': frozenSession.budgetByName,
-            'detail': frozenSession.detail,
-            'status': frozenSession.status,
-            'total_spent': frozenSession.totalSpent,
-          }),
-      ]).catchError((Object e) {
-        debugPrint('[GroupService] endSession Supabase error: $e');
-        return <dynamic>[];
-      }));
+      final fs = frozenSession;
+      unawaited(() async {
+        try {
+          final existingRemote = await supabase!
+              .from('group_sessions')
+              .select('id, status')
+              .eq('id', fs.sessionId)
+              .maybeSingle();
+          final remoteAlreadyEnded = existingRemote != null &&
+              existingRemote['status'] != null &&
+              existingRemote['status'].toString() != 'running';
+
+          await supabase!.from('groups').update({
+            'active_session': null,
+          }).eq('id', gid);
+
+          if (!remoteAlreadyEnded) {
+            await Future.wait([
+              supabase!.from('group_events').insert(eventMap),
+              supabase!.from('group_sessions').upsert({
+                'id': fs.sessionId,
+                'gid': gid,
+                'started_at': fs.startedAt.toUtc().toIso8601String(),
+                'started_by_uid': fs.startedByUid,
+                'started_by_name': fs.startedByName,
+                'ended_at': now.toUtc().toIso8601String(),
+                'ended_by_uid': uid,
+                'ended_by_name': actorName,
+                'budget': fs.budget,
+                'game': fs.game,
+                'budget_by_uid': fs.budgetByUid,
+                'budget_by_name': fs.budgetByName,
+                'detail': fs.detail,
+                'status': fs.status,
+                'total_spent': fs.totalSpent,
+              }),
+            ]);
+          }
+        } catch (e) {
+          debugPrint('[GroupService] endSession Supabase error: $e');
+        }
+      }());
     }
 
     if (firestore != null) {
@@ -2163,12 +2608,10 @@ class GroupService {
         final groupRef = firestore!.collection('groups').doc(gid);
         final batch = firestore!.batch();
         batch.update(groupRef, {'activeSession': null});
-        if (frozenSession != null) {
-          batch.set(
-            groupRef.collection('sessions').doc(frozenSession.sessionId),
-            frozenSession.toMap(),
-          );
-        }
+        batch.set(
+          groupRef.collection('sessions').doc(frozenSession.sessionId),
+          frozenSession.toMap(),
+        );
         batch.set(
           groupRef.collection('events').doc(endEvt.eventId),
           endEvt.toMap(),
@@ -2178,6 +2621,8 @@ class GroupService {
         debugPrint('[GroupService] endSession Firestore error: $e');
       }
     }
+
+    return frozenSession;
   }
 
   /// Mencatat event tanpa mengubah activeSession (misal event race condition invalid)
@@ -2188,6 +2633,7 @@ class GroupService {
     _notifyEventsChanged(gid, evts);
 
     if (supabase != null) {
+      final sid = event.sessionId;
       final eventMap = {
         'id': event.eventId,
         'gid': gid,
@@ -2195,8 +2641,9 @@ class GroupService {
         'actor_name': event.actorName,
         'type': event.type.value,
         'summary': event.summary,
+        if (sid.isNotEmpty) 'session_id': sid,
         'payload': event.payload,
-        'created_at': event.createdAt.toIso8601String(),
+        'created_at': event.createdAt.toUtc().toIso8601String(),
       };
       _broadcastGroupEvent(gid, eventMap);
       try {
@@ -2235,8 +2682,22 @@ class GroupService {
       _notifyGroupChanged(gid, updated);
     }
 
+    final codeEvtId = generateEventId();
+    final localEvt = GroupEventModel(
+      eventId: codeEvtId,
+      type: GroupEventType.codeChanged,
+      actorUid: uid,
+      actorName: actorName,
+      summary: '$actorName memperbarui kode undangan grup',
+      payload: {'code': newCode},
+      createdAt: now,
+    );
+    final evts = _getLocalEvents(gid)..insert(0, localEvt);
+    await _saveLocalEvents(gid, evts);
+    _notifyEventsChanged(gid, evts);
+
     final codeEvtMap = {
-      'id': generateEventId(),
+      'id': codeEvtId,
       'gid': gid,
       'actor_uid': uid,
       'actor_name': actorName,
@@ -2245,7 +2706,7 @@ class GroupService {
       'payload': {
         'code': newCode,
       },
-      'created_at': now.toIso8601String(),
+      'created_at': now.toUtc().toIso8601String(),
     };
     _broadcastGroupEvent(gid, codeEvtMap);
 
@@ -2339,7 +2800,7 @@ class GroupService {
         await supabase!.from('groups').update({'member_count': count > 1 ? count - 1 : 1}).eq('id', gid);
 
         final removeEvtMap = {
-          'id': generateEventId(),
+          'id': localEvt.eventId,
           'gid': gid,
           'actor_uid': authService.currentUid ?? '',
           'actor_name': authService.displayName ?? 'Pemilik',
@@ -2350,7 +2811,7 @@ class GroupService {
             'kickedUid': memberUid,
             'kickedName': memberName,
           },
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
         await supabase!.from('group_events').insert(removeEvtMap);
         await _broadcastGroupEvent(gid, removeEvtMap);
@@ -2363,7 +2824,7 @@ class GroupService {
         batch.delete(groupRef.collection('members').doc(memberUid));
         batch.update(groupRef, {'memberCount': 0});
 
-        final eventRef = groupRef.collection('events').doc(generateEventId());
+        final eventRef = groupRef.collection('events').doc(localEvt.eventId);
         batch.set(eventRef, {
           'actorUid': authService.currentUid ?? '',
           'actorName': authService.displayName ?? 'Pemilik',
@@ -2481,7 +2942,7 @@ class GroupService {
             'leaverUid': myUid,
             'leaverName': myName,
           },
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
         await supabase!.from('group_events').insert(leaveEvtMap);
         await _broadcastGroupEvent(gid, leaveEvtMap);
@@ -2517,13 +2978,123 @@ class GroupService {
     }
   }
 
-  /// Menambah catatan pengeluaran grup (Append-only)
+  /// Menambah catatan pengeluaran grup (Append-only).
+  /// Mendukung aturan sinkronisasi catatan offline hingga 24 jam setelah sesi berakhir:
+  /// - Jika [clientCreatedAt] <= `endedAt` dan disinkronkan <= 24 jam pasca `endedAt`,
+  ///   catatan tetap diterima, sesi dihitung ulang, dan event `"Hasil date diperbarui"` ditulis.
+  /// - Jika > 24 jam pasca `endedAt` atau dibuat setelah `endedAt`, permintaan ditolak.
+  Future<void> _setNotePendingFlag(
+    String gid,
+    String noteId, {
+    required bool pending,
+  }) async {
+    final notes = _getLocalNotes(gid);
+    final idx = notes.indexWhere((n) => n.noteId == noteId);
+    if (idx == -1 || notes[idx].hasPendingWrites == pending) return;
+    notes[idx] = notes[idx].copyWith(hasPendingWrites: pending);
+    await _saveLocalNotes(gid, notes);
+    _notifyNotesChanged(gid, notes);
+  }
+
+  Future<void> _syncAddedNoteToRemote({
+    required String gid,
+    required String noteId,
+    required String sessionId,
+    required String uid,
+    required String authorName,
+    required String cleanTitle,
+    required int amount,
+    required DateTime noteTime,
+    required bool isLateOfflineSync,
+    required GroupSessionModel? recalculatedSession,
+    required Map<String, dynamic> evtMap,
+  }) async {
+    if (supabase == null || _disposed) return;
+    const reqTimeout = Duration(seconds: 8);
+    try {
+      await supabase!.from('group_notes').insert({
+        'id': noteId,
+        'gid': gid,
+        'session_id': sessionId,
+        'author_uid': uid,
+        'author_name': authorName,
+        'title': cleanTitle,
+        'amount': amount,
+        'created_at': noteTime.toUtc().toIso8601String(),
+        'deleted': false,
+      }).timeout(reqTimeout);
+
+      await _setNotePendingFlag(gid, noteId, pending: false);
+
+      if (isLateOfflineSync && recalculatedSession != null) {
+        try {
+          await supabase!
+              .from('group_sessions')
+              .update({
+                'total_spent': recalculatedSession.totalSpent,
+                'status': recalculatedSession.status,
+              })
+              .eq('id', recalculatedSession.sessionId)
+              .timeout(reqTimeout);
+        } catch (_) {}
+      }
+
+      await supabase!.from('group_events').insert(evtMap).timeout(reqTimeout);
+      _broadcastGroupEvent(gid, evtMap);
+    } catch (e) {
+      debugPrint('[GroupService] Supabase addNote background sync error: $e');
+    }
+  }
+
+  Future<void> _syncUpdatedNoteToRemote({
+    required String gid,
+    required String noteId,
+    required String cleanTitle,
+    required int newAmount,
+    required GroupSessionModel? recalculatedSession,
+    required Map<String, dynamic> evtMap,
+  }) async {
+    if (supabase == null || _disposed) return;
+    const reqTimeout = Duration(seconds: 8);
+    try {
+      await supabase!
+          .from('group_notes')
+          .update({
+            'title': cleanTitle,
+            'amount': newAmount,
+          })
+          .eq('id', noteId)
+          .timeout(reqTimeout);
+
+      await _setNotePendingFlag(gid, noteId, pending: false);
+
+      if (recalculatedSession != null) {
+        try {
+          await supabase!
+              .from('group_sessions')
+              .update({
+                'total_spent': recalculatedSession.totalSpent,
+                'status': recalculatedSession.status,
+              })
+              .eq('id', recalculatedSession.sessionId)
+              .timeout(reqTimeout);
+        } catch (_) {}
+      }
+
+      await supabase!.from('group_events').insert(evtMap).timeout(reqTimeout);
+      _broadcastGroupEvent(gid, evtMap);
+    } catch (e) {
+      debugPrint('[GroupService] Supabase updateNote background sync error: $e');
+    }
+  }
+
   Future<String> addNote({
     required String gid,
     required String sessionId,
     required String title,
     required int amount,
     int? sessionBudget,
+    DateTime? clientCreatedAt,
   }) async {
     final cleanTitle = title.trim();
     if (cleanTitle.isEmpty) {
@@ -2533,10 +3104,42 @@ class GroupService {
       throw ArgumentError('Nominal harus lebih dari 0.');
     }
 
-    final uid = await authService.ensureSignedIn();
+    final syncTime = DateTime.now();
+    final uid = authService.currentUid ??
+        await authService.ensureSignedIn().timeout(
+              const Duration(seconds: 4),
+              onTimeout: () =>
+                  authService.fallbackUid ??
+                  'anon_local_${syncTime.millisecondsSinceEpoch}',
+            );
     final authorName = authService.displayName ?? 'Anggota';
-    final noteId = 'note_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}';
-    final now = DateTime.now();
+    final noteTime = clientCreatedAt ?? syncTime;
+    final noteId = 'note_${syncTime.millisecondsSinceEpoch}_${Random().nextInt(9999)}';
+
+    final groupBeforeSave = _getLocalGroup(gid);
+    final activeSess = groupBeforeSave?.activeSession;
+    final isActiveCurrentSession = activeSess != null &&
+        activeSess.sessionId == sessionId &&
+        activeSess.endedAt == null &&
+        !isSessionEnded(gid, activeSess);
+    final existingSession = _findLocalSessionById(gid, sessionId);
+    bool isLateOfflineSync = false;
+    if (!isActiveCurrentSession &&
+        existingSession != null &&
+        existingSession.endedAt != null) {
+      final endedAt = existingSession.endedAt!;
+      if (noteTime.isAfter(endedAt)) {
+        throw StateError(
+          'Date sudah selesai. Buat date baru untuk mencatat pengeluaran.',
+        );
+      }
+      if (syncTime.difference(endedAt) > const Duration(hours: 24)) {
+        throw StateError(
+          'Catatan offline melewati batas 24 jam setelah date selesai.',
+        );
+      }
+      isLateOfflineSync = true;
+    }
 
     final localNote = GroupNoteModel(
       noteId: noteId,
@@ -2545,45 +3148,63 @@ class GroupService {
       authorName: authorName,
       title: cleanTitle,
       amount: amount,
-      createdAt: now,
+      createdAt: noteTime,
       deleted: false,
+      hasPendingWrites: supabase != null,
     );
 
     final notes = _getLocalNotes(gid)..insert(0, localNote);
     await _saveLocalNotes(gid, notes);
 
-    // Hitung ulang totalSpent pada sesi terkait
+    // Hitung ulang totalSpent & status pada sesi terkait
+    GroupSessionModel? recalculatedSession;
     final sessions = _getLocalSessions(gid);
     final sIdx = sessions.indexWhere((s) => s.sessionId == sessionId);
     if (sIdx != -1) {
-      await upsertLocalSession(gid, sessions[sIdx]);
+      recalculatedSession = await upsertLocalSession(gid, sessions[sIdx]);
+    } else if (existingSession != null) {
+      recalculatedSession = await upsertLocalSession(gid, existingSession);
     }
 
     final group = _getLocalGroup(gid);
+    final matchedSessionBudget = sessions
+        .where((s) => s.sessionId == sessionId && s.budget > 0)
+        .map((s) => s.budget)
+        .firstOrNull;
     final resolvedBudget = (sessionBudget != null && sessionBudget > 0)
         ? sessionBudget
-        : ((group?.activeSession?.budget ?? 0) > 0
+        : ((group?.activeSession?.sessionId == sessionId &&
+                (group?.activeSession?.budget ?? 0) > 0)
             ? group!.activeSession!.budget
-            : (_recoverSessionBudgetFromEvents(gid, sessionId) ?? 0));
+            : (matchedSessionBudget ??
+                ((group?.activeSession?.budget ?? 0) > 0
+                    ? group!.activeSession!.budget
+                    : (_recoverSessionBudgetFromEvents(gid, sessionId) ?? 0))));
     final totalBudget = resolvedBudget;
     final currentNotes = _getLocalNotes(gid).where((n) => n.sessionId == sessionId && !n.deleted).toList();
     final currentSpent = currentNotes.fold<int>(0, (total, n) => total + n.amount);
-    final remaining = totalBudget > 0 ? (totalBudget - currentSpent).clamp(0, totalBudget) : 0;
+    final remaining = totalBudget - currentSpent;
+
+    final evtId = generateEventId();
+    final evtPayload = <String, dynamic>{
+      'noteId': noteId,
+      'title': cleanTitle,
+      'amount': amount,
+      'budget': totalBudget,
+      'spent': currentSpent,
+      'remaining': remaining,
+      'sessionId': sessionId,
+      if (isLateOfflineSync) 'lateOfflineSync': true,
+    };
 
     final localEvt = GroupEventModel(
-      eventId: generateEventId(),
+      eventId: evtId,
       type: GroupEventType.expense,
       actorUid: uid,
       actorName: authorName,
       summary: '$authorName mencatat "$cleanTitle" (${RupiahFormatter.format(amount)})',
-      payload: {
-        'noteId': noteId,
-        'title': cleanTitle,
-        'amount': amount,
-        'remaining': remaining,
-        'sessionId': sessionId,
-      },
-      createdAt: now,
+      payload: evtPayload,
+      createdAt: noteTime,
     );
     final evts = _getLocalEvents(gid)..insert(0, localEvt);
     await _saveLocalEvents(gid, evts);
@@ -2591,43 +3212,43 @@ class GroupService {
     _notifyNotesChanged(gid, notes);
     _notifyEventsChanged(gid, evts);
 
+    if (isLateOfflineSync && recalculatedSession != null) {
+      await _emitEndedSessionRecalculatedEvent(
+        gid: gid,
+        session: recalculatedSession,
+        actorUid: uid,
+        actorName: authorName,
+        lateOfflineSync: true,
+      );
+    }
+
     if (supabase != null) {
-      try {
-        await supabase!.from('group_notes').insert({
-          'id': noteId,
-          'gid': gid,
-          'session_id': sessionId,
-          'author_uid': uid,
-          'author_name': authorName,
-          'title': cleanTitle,
-          'amount': amount,
-          'created_at': now.toIso8601String(),
-          'deleted': false,
-        });
-
-        final evtMap = {
-          'id': generateEventId(),
-          'gid': gid,
-          'actor_uid': uid,
-          'actor_name': authorName,
-          'type': GroupEventType.expense.value,
-          'summary': '$authorName mencatat "$cleanTitle" (${RupiahFormatter.format(amount)})',
-          'payload': {
-            'noteId': noteId,
-            'title': cleanTitle,
-            'amount': amount,
-            'remaining': remaining,
-            'sessionId': sessionId,
-          },
-          'created_at': now.toIso8601String(),
-        };
-
-        await supabase!.from('group_events').insert(evtMap);
-        _broadcastGroupEvent(gid, evtMap);
-      } catch (e) {
-        debugPrint('[GroupService] Supabase addNote error: $e');
-      }
-
+      final evtMap = {
+        'id': evtId,
+        'gid': gid,
+        'actor_uid': uid,
+        'actor_name': authorName,
+        'type': GroupEventType.expense.value,
+        'summary': '$authorName mencatat "$cleanTitle" (${RupiahFormatter.format(amount)})',
+        if (sessionId.isNotEmpty) 'session_id': sessionId,
+        'payload': evtPayload,
+        'created_at': noteTime.toUtc().toIso8601String(),
+      };
+      unawaited(
+        _syncAddedNoteToRemote(
+          gid: gid,
+          noteId: noteId,
+          sessionId: sessionId,
+          uid: uid,
+          authorName: authorName,
+          cleanTitle: cleanTitle,
+          amount: amount,
+          noteTime: noteTime,
+          isLateOfflineSync: isLateOfflineSync,
+          recalculatedSession: recalculatedSession,
+          evtMap: evtMap,
+        ),
+      );
       return noteId;
     }
 
@@ -2647,29 +3268,35 @@ class GroupService {
           'authorName': authorName,
           'title': cleanTitle,
           'amount': amount,
-          'createdAt': now.millisecondsSinceEpoch,
+          'createdAt': noteTime.millisecondsSinceEpoch,
           'deleted': false,
         });
+
+        if (isLateOfflineSync && recalculatedSession != null) {
+          batch.set(
+            firestore!
+                .collection('groups')
+                .doc(gid)
+                .collection('sessions')
+                .doc(recalculatedSession.sessionId),
+            recalculatedSession.toMap(),
+          );
+        }
 
         final eventRef = firestore!
             .collection('groups')
             .doc(gid)
             .collection('events')
-            .doc(generateEventId());
+            .doc(evtId);
 
         batch.set(eventRef, {
-          'id': generateEventId(),
+          'id': evtId,
           'actorUid': uid,
           'actorName': authorName,
           'type': GroupEventType.expense.value,
           'summary': '$authorName mencatat "$cleanTitle" (${RupiahFormatter.format(amount)})',
-          'payload': {
-            'title': cleanTitle,
-            'amount': amount,
-            'remaining': remaining,
-            'sessionId': sessionId,
-          },
-          'timestamp': now.millisecondsSinceEpoch,
+          'payload': evtPayload,
+          'timestamp': noteTime.millisecondsSinceEpoch,
         });
 
         await batch.commit();
@@ -2687,9 +3314,7 @@ class GroupService {
     }
 
     final initialLocal = filterNotes(_getLocalNotes(gid));
-    if (initialLocal.isNotEmpty) {
-      yield initialLocal;
-    }
+    yield initialLocal;
 
     final rawController = StreamController<List<GroupNoteModel>>.broadcast();
     final streamController = StreamController<List<GroupNoteModel>>.broadcast();
@@ -2702,14 +3327,12 @@ class GroupService {
       }
     });
 
-    if (initialLocal.isNotEmpty) {
-      streamController.add(initialLocal);
-    }
-
     Timer? timer;
     StreamSubscription? sub;
 
     if (supabase != null) {
+      _ensureChannel(gid);
+
       Future<void> mergeAndEmit(List<GroupNoteModel> remoteNotes) async {
         final existing = _getLocalNotes(gid);
         final existingMap = {for (final n in existing) n.noteId: n};
@@ -2736,17 +3359,20 @@ class GroupService {
         }
       }
 
-      try {
-        final rows = await supabase!
-            .from('group_notes')
-            .select('*')
-            .eq('gid', gid)
-            .order('created_at', ascending: false);
-        final notes = (rows as List)
-            .map((r) => GroupNoteModel.fromMap(r['id']?.toString() ?? '', r))
-            .toList();
-        await mergeAndEmit(notes);
-      } catch (_) {}
+      // Jalankan initial fetch non-blocking agar streamController langsung terpasang (0ms delay)
+      unawaited(() async {
+        try {
+          final rows = await supabase!
+              .from('group_notes')
+              .select('*')
+              .eq('gid', gid)
+              .order('created_at', ascending: false);
+          final notes = (rows as List)
+              .map((r) => GroupNoteModel.fromMap(r['id']?.toString() ?? '', r))
+              .toList();
+          await mergeAndEmit(notes);
+        } catch (_) {}
+      }());
 
       timer = Timer.periodic(const Duration(seconds: 10), (_) async {
         try {
@@ -2870,6 +3496,69 @@ class GroupService {
     return recalculated;
   }
 
+  Future<void> _emitEndedSessionRecalculatedEvent({
+    required String gid,
+    required GroupSessionModel session,
+    required String actorUid,
+    required String actorName,
+    bool lateOfflineSync = false,
+  }) async {
+    final now = DateTime.now();
+    final statusLabel = session.isLolos ? 'Lolos' : 'Lewat';
+    final summary =
+        'Hasil date diperbarui: $statusLabel (${RupiahFormatter.format(session.totalSpent)})';
+    final evtPayload = <String, dynamic>{
+      'action': 'session_result_updated',
+      'sessionId': session.sessionId,
+      'status': session.status,
+      'totalSpent': session.totalSpent,
+      'budget': session.budget,
+      'subtitle': summary,
+      if (lateOfflineSync) 'lateOfflineSync': true,
+    };
+    final evt = GroupEventModel(
+      eventId: generateEventId(),
+      type: GroupEventType.custom,
+      actorUid: actorUid,
+      actorName: actorName,
+      summary: summary,
+      payload: evtPayload,
+      createdAt: now,
+    );
+    final evts = _getLocalEvents(gid)..insert(0, evt);
+    await _saveLocalEvents(gid, evts);
+    _notifyEventsChanged(gid, evts);
+
+    if (supabase != null) {
+      try {
+        final evtMap = {
+          'id': evt.eventId,
+          'gid': gid,
+          'actor_uid': actorUid,
+          'actor_name': actorName,
+          'type': GroupEventType.custom.value,
+          'summary': summary,
+          if (session.sessionId.isNotEmpty) 'session_id': session.sessionId,
+          'payload': evtPayload,
+          'created_at': now.toUtc().toIso8601String(),
+        };
+        await supabase!.from('group_events').insert(evtMap);
+        _broadcastGroupEvent(gid, evtMap);
+      } catch (_) {}
+    }
+
+    if (firestore != null) {
+      try {
+        await firestore!
+            .collection('groups')
+            .doc(gid)
+            .collection('events')
+            .doc(evt.eventId)
+            .set(evt.toMap());
+      } catch (_) {}
+    }
+  }
+
   Future<GroupSessionModel?> _recalculateSessionForNoteMutation(
     String gid,
     String targetSessionId,
@@ -2938,6 +3627,7 @@ class GroupService {
     final updatedNote = existingNote.copyWith(
       title: cleanTitle,
       amount: newAmount,
+      hasPendingWrites: supabase != null,
     );
     notes[idx] = updatedNote;
     await _saveLocalNotes(gid, notes);
@@ -2965,9 +3655,7 @@ class GroupService {
         .toList();
     final currentSpent =
         remainingNotes.fold<int>(0, (total, n) => total + n.amount);
-    final remaining = totalBudget > 0
-        ? (totalBudget - currentSpent).clamp(0, totalBudget)
-        : 0;
+    final remaining = totalBudget - currentSpent;
 
     final localEvt = GroupEventModel(
       eventId: generateEventId(),
@@ -2980,6 +3668,8 @@ class GroupService {
         'noteId': noteId,
         'title': cleanTitle,
         'amount': newAmount,
+        'budget': totalBudget,
+        'spent': currentSpent,
         'remaining': remaining,
         'sessionId': targetSessionId,
         'edited': true,
@@ -2993,40 +3683,27 @@ class GroupService {
     _notifyEventsChanged(gid, evts);
 
     if (supabase != null) {
-      try {
-        await supabase!
-            .from('group_notes')
-            .update({
-              'title': cleanTitle,
-              'amount': newAmount,
-            })
-            .eq('id', noteId);
-
-        if (recalculatedSession != null) {
-          try {
-            await supabase!
-                .from('group_sessions')
-                .update({
-                  'total_spent': recalculatedSession.totalSpent,
-                  'status': recalculatedSession.status,
-                })
-                .eq('id', recalculatedSession.sessionId);
-          } catch (_) {}
-        }
-
-        final evtMap = {
-          'id': localEvt.eventId,
-          'gid': gid,
-          'actor_uid': myUid,
-          'actor_name': myName,
-          'type': GroupEventType.expense.value,
-          'summary': localEvt.summary,
-          'payload': localEvt.payload,
-          'created_at': now.toIso8601String(),
-        };
-        await supabase!.from('group_events').insert(evtMap);
-        _broadcastGroupEvent(gid, evtMap);
-      } catch (_) {}
+      final evtMap = {
+        'id': localEvt.eventId,
+        'gid': gid,
+        'actor_uid': myUid,
+        'actor_name': myName,
+        'type': GroupEventType.expense.value,
+        'summary': localEvt.summary,
+        if (targetSessionId.isNotEmpty) 'session_id': targetSessionId,
+        'payload': localEvt.payload,
+        'created_at': now.toUtc().toIso8601String(),
+      };
+      unawaited(
+        _syncUpdatedNoteToRemote(
+          gid: gid,
+          noteId: noteId,
+          cleanTitle: cleanTitle,
+          newAmount: newAmount,
+          recalculatedSession: recalculatedSession,
+          evtMap: evtMap,
+        ),
+      );
     }
 
     if (firestore != null) {
@@ -3101,7 +3778,7 @@ class GroupService {
         .where((n) => !n.deleted && (targetSessionId.isEmpty || n.sessionId == targetSessionId))
         .toList();
     final currentSpent = remainingNotes.fold<int>(0, (total, n) => total + n.amount);
-    final remaining = totalBudget > 0 ? (totalBudget - currentSpent).clamp(0, totalBudget) : 0;
+    final remaining = totalBudget - currentSpent;
 
     final localEvt = GroupEventModel(
       eventId: generateEventId(),
@@ -3113,6 +3790,8 @@ class GroupService {
         'noteId': noteId,
         'title': title,
         'amount': amount,
+        'budget': totalBudget,
+        'spent': currentSpent,
         'remaining': remaining,
         'deleted': true,
         'sessionId': targetSessionId,
@@ -3148,15 +3827,18 @@ class GroupService {
           'actor_name': myName,
           'type': GroupEventType.expenseDeleted.value,
           'summary': '$myName menghapus pengeluaran "$title" (${RupiahFormatter.format(amount)})',
+          if (targetSessionId.isNotEmpty) 'session_id': targetSessionId,
           'payload': {
             'noteId': noteId,
             'title': title,
             'amount': amount,
+            'budget': totalBudget,
+            'spent': currentSpent,
             'remaining': remaining,
             'deleted': true,
             'sessionId': targetSessionId,
           },
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
 
         await supabase!.from('group_events').insert(evtMap);
@@ -3261,11 +3943,12 @@ class GroupService {
           'actor_name': actorName,
           'type': GroupEventType.spin.value,
           'summary': '$actorName memutar roda: ${RupiahFormatter.format(budget)}',
+          if (effectiveSessionId.isNotEmpty) 'session_id': effectiveSessionId,
           'payload': {
             'budget': budget,
             'sessionId': effectiveSessionId,
           },
-          'created_at': now.toIso8601String(),
+          'created_at': now.toUtc().toIso8601String(),
         };
 
         // 1. Broadcast langsung via WebSocket channel DULUAN (< 5ms) tanpa menunggu database
@@ -3313,23 +3996,30 @@ class GroupService {
 
   Future<void> _handleIncomingRealtimeBroadcast(String gid, Map<String, dynamic> rawPayload) async {
     try {
-      Map<String, dynamic> evtMap = rawPayload;
-      if (evtMap.containsKey('payload') && evtMap['payload'] is Map) {
-        final inner = Map<String, dynamic>.from(evtMap['payload'] as Map);
-        if (inner.containsKey('id') || inner.containsKey('type') || inner.containsKey('actor_uid')) {
-          evtMap = inner;
-        }
-      }
+      final evtMap = unwrapBroadcastEventPayload(rawPayload);
       final evtId = (evtMap['id'] ?? evtMap['eventId'] ?? '').toString();
+      if (evtId.isEmpty && evtMap['type'] == null) return;
       final newEvt = GroupEventModel.fromMap(evtId, evtMap);
 
-      // 1. Simpan ke riwayat event lokal & siarkan perubahan log aktivitas
-      final currentEvents = _getLocalEvents(gid);
-      if (!currentEvents.any((e) => e.eventId == newEvt.eventId)) {
-        currentEvents.insert(0, newEvt);
-        await _saveLocalEvents(gid, currentEvents);
-        _notifyEventsChanged(gid, currentEvents);
-      }
+      // 1. Simpan ke riwayat event lokal secara serial agar broadcast & postgresChanges tidak balapan
+      await _enqueueEventWrite(gid, () async {
+        final currentEvents = _getLocalEvents(gid);
+        final existingIdx = newEvt.eventId.isNotEmpty
+            ? currentEvents.indexWhere((e) => e.eventId == newEvt.eventId)
+            : -1;
+        if (existingIdx == -1) {
+          currentEvents.insert(0, newEvt);
+          await _saveLocalEvents(gid, currentEvents);
+        } else {
+          final existing = currentEvents[existingIdx];
+          if (existing.summary != newEvt.summary ||
+              existing.type != newEvt.type ||
+              jsonEncode(existing.payload) != jsonEncode(newEvt.payload)) {
+            currentEvents[existingIdx] = newEvt;
+            await _saveLocalEvents(gid, currentEvents);
+          }
+        }
+      });
 
       // 2. Realtime Member Leave / Kick (< 50ms)
       if (newEvt.type == GroupEventType.memberLeave) {
@@ -3527,16 +4217,52 @@ class GroupService {
         final sessions = _getLocalSessions(gid);
         final sIdx = sessions.indexWhere((s) => s.sessionId == endedSid);
         final baseSess = sIdx != -1 ? sessions[sIdx] : activeSess;
+        final payloadBudget = (newEvt.payload['budget'] as num?)?.toInt() ?? 0;
+        final payloadSpent =
+            (newEvt.payload['totalSpent'] as num?)?.toInt() ?? 0;
+        final payloadStatus = newEvt.payload['status']?.toString();
+        final payloadStartedMs = (newEvt.payload['startedAt'] as num?)?.toInt();
+
         if (baseSess != null && baseSess.sessionId.isNotEmpty) {
+          final resolvedSpent = baseSess.totalSpent > 0
+              ? baseSess.totalSpent
+              : payloadSpent;
+          final resolvedStatus = payloadStatus ??
+              (resolvedSpent <= baseSess.budget ? 'lolos' : 'lewat');
           final frozen = baseSess.copyWith(
             gid: gid,
             endedAt: newEvt.createdAt,
             endedByUid: newEvt.actorUid,
             endedByName: newEvt.actorName,
-            status: baseSess.totalSpent <= baseSess.budget ? 'lolos' : 'lewat',
+            totalSpent: resolvedSpent,
+            status: resolvedStatus,
             locked: true,
           );
           await upsertLocalSession(gid, frozen);
+        } else if (endedSid.isNotEmpty && payloadBudget > 0) {
+          final syntheticSession = GroupSessionModel(
+            sessionId: endedSid,
+            gid: gid,
+            budget: payloadBudget,
+            game: newEvt.payload['game']?.toString() ?? 'wheel',
+            startedByUid: newEvt.actorUid,
+            startedByName: newEvt.payload['budgetByName']?.toString() ??
+                newEvt.actorName,
+            startedAt: payloadStartedMs != null
+                ? DateTime.fromMillisecondsSinceEpoch(payloadStartedMs)
+                : newEvt.createdAt,
+            endedAt: newEvt.createdAt,
+            endedByUid: newEvt.actorUid,
+            endedByName: newEvt.actorName,
+            budgetByUid: newEvt.actorUid,
+            budgetByName: newEvt.payload['budgetByName']?.toString() ??
+                newEvt.actorName,
+            status: payloadStatus ??
+                (payloadSpent <= payloadBudget ? 'lolos' : 'lewat'),
+            totalSpent: payloadSpent,
+            locked: true,
+          );
+          await upsertLocalSession(gid, syntheticSession);
         }
         if (cur != null) {
           final updated = cur.copyWith(clearActiveSession: true);
@@ -3638,21 +4364,44 @@ class GroupService {
     }
   }
 
-  void _handleCustomEventPayload(String gid, GroupEventModel evt) {
-    _handleIncomingRealtimeBroadcast(gid, evt.toMap());
+  /// Menggabungkan event remote dengan event lokal optimis yang masih baru
+  /// agar aktivitas offline/optimis tidak hilang terhapus poll atau stream.
+  Future<void> _mergeAndSaveRemoteEvents(
+    String gid,
+    List<GroupEventModel> remoteEvents,
+  ) {
+    return _enqueueEventWrite(gid, () async {
+      final local = _getLocalEvents(gid);
+      final mergedMap = <String, GroupEventModel>{};
+      final withoutId = <GroupEventModel>[];
+      for (final r in remoteEvents) {
+        if (r.eventId.isEmpty) {
+          withoutId.add(r);
+        } else {
+          mergedMap[r.eventId] = r;
+        }
+      }
+      final recentCutoff = DateTime.now().subtract(const Duration(minutes: 15));
+      for (final loc in local) {
+        if (loc.eventId.isEmpty) {
+          withoutId.add(loc);
+        } else if (!mergedMap.containsKey(loc.eventId) &&
+            loc.createdAt.isAfter(recentCutoff)) {
+          mergedMap[loc.eventId] = loc;
+        }
+      }
+      final merged = [...mergedMap.values, ...withoutId]
+        ..sort((a, b) {
+          final cmp = b.createdAt.compareTo(a.createdAt);
+          if (cmp != 0) return cmp;
+          return b.eventId.compareTo(a.eventId);
+        });
+      await _saveLocalEvents(gid, merged);
+    });
   }
 
-  /// Memantau log aktivitas grup realtime (Local-First + Broadcast + Polling)
-  Stream<List<GroupEventModel>> watchEvents(String gid) async* {
-    final local = _getLocalEvents(gid);
-    if (local.isNotEmpty) {
-      yield local;
-    }
-
-    final controller = StreamController<List<GroupEventModel>>.broadcast();
-    _eventsControllers.putIfAbsent(gid, () => []).add(controller);
-
-    // 1. Initial query from Supabase
+  /// Memaksa muat ulang daftar aktivitas/notifikasi grup dari server
+  Future<List<GroupEventModel>> refreshEvents(String gid) async {
     if (supabase != null) {
       try {
         final rows = await supabase!
@@ -3660,85 +4409,101 @@ class GroupService {
             .select('*')
             .eq('gid', gid)
             .order('created_at', ascending: false)
-            .limit(50);
-        if (rows.isNotEmpty) {
-          final events = (rows as List)
-              .map((r) => GroupEventModel.fromMap(r['id']?.toString() ?? '', r))
-              .toList();
-          await _saveLocalEvents(gid, events);
-          yield events;
-        }
-      } catch (_) {}
+            .limit(100);
+        final events = (rows as List)
+            .map((r) => GroupEventModel.fromMap(r['id']?.toString() ?? '', r))
+            .toList();
+        await _mergeAndSaveRemoteEvents(gid, events);
+        return _getLocalEvents(gid);
+      } catch (e) {
+        debugPrint('[GroupService] refreshEvents error: $e');
+      }
     }
+    return _getLocalEvents(gid);
+  }
 
-    // 2. Realtime Broadcast Listener (< 50ms)
-    void Function(Map<String, dynamic>)? broadcastCb;
-    if (supabase != null) {
-      try {
-        broadcastCb = (payload) async {
-          try {
-            Map<String, dynamic> evtMap = Map<String, dynamic>.from(payload);
-            if (evtMap.containsKey('payload') && evtMap['payload'] is Map) {
-              final inner = Map<String, dynamic>.from(evtMap['payload'] as Map);
-              if (inner.containsKey('id') || inner.containsKey('type') || inner.containsKey('actor_uid')) {
-                evtMap = inner;
-              }
-            }
-            final evtId = (evtMap['id'] ?? evtMap['eventId'] ?? '').toString();
-            final newEvt = GroupEventModel.fromMap(evtId, evtMap);
-            _handleCustomEventPayload(gid, newEvt);
-            final current = _getLocalEvents(gid);
-            if (!current.any((e) => e.eventId == newEvt.eventId)) {
-              current.insert(0, newEvt);
-              await _saveLocalEvents(gid, current);
-              _notifyEventsChanged(gid, current);
-            }
-          } catch (e) {
-            debugPrint('[GroupService] Broadcast receive error: $e');
-          }
-        };
-        _ensureChannel(gid, onBroadcastEvent: broadcastCb);
-      } catch (_) {}
-    }
+  /// Memantau log aktivitas grup realtime (Local-First + Broadcast + PostgresChanges + Polling)
+  Stream<List<GroupEventModel>> watchEvents(String gid) async* {
+    final local = _getLocalEvents(gid);
+    yield local;
 
-    // 3. Fallback Periodic Polling (every 15 seconds)
-    Timer? pollTimer;
-    if (supabase != null) {
-      pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-        try {
-          final rows = await supabase!
-              .from('group_events')
-              .select('*')
-              .eq('gid', gid)
-              .order('created_at', ascending: false)
-              .limit(50);
-          if (rows.isNotEmpty) {
-            final events = (rows as List)
-                .map((r) => GroupEventModel.fromMap(r['id']?.toString() ?? '', r))
-                .toList();
-            await _saveLocalEvents(gid, events);
-          }
-        } catch (_) {}
+    final controller = StreamController<List<GroupEventModel>>.broadcast();
+    _eventsControllers.putIfAbsent(gid, () => []).add(controller);
+
+    final afterYield = _getLocalEvents(gid);
+    if (afterYield.length != local.length) {
+      scheduleMicrotask(() {
+        if (!controller.isClosed) controller.add(afterYield);
       });
     }
 
-    // 4. Supabase Postgres table stream
-    StreamSubscription? subSubscription;
+    // 1. Pastikan channel realtime aktif (mendengar broadcast & postgresChanges langsung)
+    //    serta jalankan query awal non-blocking dari Supabase.
     if (supabase != null) {
+      _ensureChannel(gid);
+      unawaited(refreshEvents(gid));
+    }
+
+    // 2. Fallback Periodic Polling (setiap 10 detik) + Auto-recover Supabase table stream
+    Timer? pollTimer;
+    Timer? streamRetryTimer;
+    StreamSubscription? subSubscription;
+    bool cancelled = false;
+
+    void attachEventStream() {
+      if (cancelled || supabase == null || _disposed) return;
+      subSubscription?.cancel();
       try {
         subSubscription = supabase!
             .from('group_events')
             .stream(primaryKey: ['id'])
             .eq('gid', gid)
             .order('created_at', ascending: false)
-            .listen((rows) {
-              final events = rows.map((r) => GroupEventModel.fromMap(r['id']?.toString() ?? '', r)).toList();
-              _saveLocalEvents(gid, events);
-            }, onError: (_) {});
-      } catch (_) {}
+            .limit(100)
+            .listen(
+              (rows) {
+                final events = rows
+                    .map((r) => GroupEventModel.fromMap(r['id']?.toString() ?? '', r))
+                    .toList();
+                unawaited(_mergeAndSaveRemoteEvents(gid, events));
+              },
+              onError: (e) {
+                debugPrint('[GroupService] watchEvents stream error: $e');
+                if (cancelled || controller.isClosed || _disposed) return;
+                _channelNeedsReconnect = true;
+                _ensureChannel(gid);
+                streamRetryTimer?.cancel();
+                streamRetryTimer = Timer(const Duration(seconds: 3), () {
+                  if (!cancelled && !controller.isClosed && !_disposed) {
+                    unawaited(refreshEvents(gid));
+                    attachEventStream();
+                  }
+                });
+              },
+              onDone: () {
+                if (cancelled || controller.isClosed || _disposed) return;
+                streamRetryTimer?.cancel();
+                streamRetryTimer = Timer(const Duration(seconds: 3), () {
+                  if (!cancelled && !controller.isClosed && !_disposed) {
+                    unawaited(refreshEvents(gid));
+                    attachEventStream();
+                  }
+                });
+              },
+            );
+      } catch (e) {
+        debugPrint('[GroupService] watchEvents stream attach error: $e');
+      }
     }
 
-    // 5. Firestore fallback
+    if (supabase != null) {
+      pollTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+        await refreshEvents(gid);
+      });
+      attachEventStream();
+    }
+
+    // 3. Firestore fallback
     StreamSubscription? firestoreSub;
     if (firestore != null) {
       try {
@@ -3757,10 +4522,9 @@ class GroupService {
     }
 
     controller.onCancel = () {
+      cancelled = true;
       _eventsControllers[gid]?.remove(controller);
-      if (broadcastCb != null) {
-        _onBroadcastCallbacks.remove(broadcastCb);
-      }
+      streamRetryTimer?.cancel();
       pollTimer?.cancel();
       subSubscription?.cancel();
       firestoreSub?.cancel();
@@ -3771,17 +4535,59 @@ class GroupService {
 
   /// Menandai bahwa pengguna telah membaca aktivitas terkini di grup
   Future<void> markActivityAsRead(String gid) async {
-    final myUid = authService.currentUid;
+    final myUid = authService.currentUid ?? authService.fallbackUid;
+    var now = DateTime.now();
+    // Jika jam server sedikit lebih maju dari jam perangkat (clock skew <= 2 menit),
+    // pastikan event yang sudah tampil saat membuka notifikasi ikut tertandai terbaca.
+    final maxAllowedSkew = now.add(const Duration(minutes: 2));
+    for (final evt in _getLocalEvents(gid)) {
+      if (evt.createdAt.isAfter(now) && !evt.createdAt.isAfter(maxAllowedSkew)) {
+        now = evt.createdAt;
+      }
+    }
+
+    // 1. Update lokal seketika (0ms badge reset, bekerja offline & multi-UID)
+    await _setLocalLastReadAt(gid, now);
+
+    final localMembers = _getLocalMembers(gid);
+    bool updatedAny = false;
+    final nextMembers = localMembers.map((m) {
+      if (authService.isCurrentUser(m.uid) || (myUid != null && m.uid == myUid)) {
+        updatedAny = true;
+        return m.copyWith(lastReadAt: now);
+      }
+      return m;
+    }).toList();
+    if (updatedAny) {
+      await _saveLocalMembers(gid, nextMembers);
+    } else {
+      _notifyMembersChanged(gid, localMembers);
+    }
+
     if (myUid == null) return;
-    final now = DateTime.now();
 
     if (supabase != null) {
       try {
-        await supabase!
-            .from('group_members')
-            .update({'last_read_at': now.toIso8601String()})
-            .eq('gid', gid)
-            .eq('uid', myUid);
+        final candidates = <String>{
+          if (authService.currentUid != null && authService.currentUid!.isNotEmpty)
+            authService.currentUid!,
+          if (authService.fallbackUid != null && authService.fallbackUid!.isNotEmpty)
+            authService.fallbackUid!,
+          myUid,
+        }.toList();
+        if (candidates.length > 1) {
+          await supabase!
+              .from('group_members')
+              .update({'last_read_at': now.toUtc().toIso8601String()})
+              .eq('gid', gid)
+              .inFilter('uid', candidates);
+        } else {
+          await supabase!
+              .from('group_members')
+              .update({'last_read_at': now.toUtc().toIso8601String()})
+              .eq('gid', gid)
+              .eq('uid', myUid);
+        }
       } catch (_) {}
       return;
     }
@@ -3798,17 +4604,30 @@ class GroupService {
     }
   }
 
-  /// Memperbarui timestamp kehadiran pengguna (lastSeenAt)
+  /// Memperbarui timestamp kehadiran pengguna (lastSeenAt) & memperbaiki last_read_at jika corrupt di masa depan
   Future<void> updatePresence(String gid) async {
     final myUid = authService.currentUid;
     if (myUid == null) return;
     final now = DateTime.now();
 
+    // Self-heal last_read_at yang bergeser ke masa depan akibat bug timezone versi lama
+    final maxFutureLimit = now.add(const Duration(minutes: 2));
+    final localMembers = _getLocalMembers(gid);
+    final idx = localMembers.indexWhere((m) => authService.isCurrentUser(m.uid));
+    final localReadAt = getLocalLastReadAt(gid);
+    final hasCorruptMemberReadAt =
+        idx != -1 && localMembers[idx].lastReadAt.isAfter(maxFutureLimit);
+    final hasCorruptLocalReadAt =
+        localReadAt != null && localReadAt.isAfter(maxFutureLimit);
+    if (hasCorruptMemberReadAt || hasCorruptLocalReadAt) {
+      await markActivityAsRead(gid);
+    }
+
     if (supabase != null) {
       try {
         await supabase!
             .from('group_members')
-            .update({'last_seen_at': now.toIso8601String()})
+            .update({'last_seen_at': now.toUtc().toIso8601String()})
             .eq('gid', gid)
             .eq('uid', myUid);
       } catch (_) {}
@@ -3997,6 +4816,7 @@ final groupServiceProvider = Provider<GroupService>((ref) {
   final service = GroupService(
     firestore: null,
     supabase: supabase,
+    resolveLiveSupabase: true,
     authService: authService,
     prefs: prefs,
   );
@@ -4085,33 +4905,73 @@ final activeGroupEventsStreamProvider = StreamProvider<List<GroupEventModel>>((r
   return groupService.watchEvents(activeGid);
 });
 
+final _groupLastReadRevisionProvider = StreamProvider<int>((ref) {
+  final groupService = ref.watch(groupServiceProvider);
+  return groupService.watchLastReadRevision();
+});
+
 /// Provider menghitung jumlah aktivitas belum dibaca oleh anggota saat ini
 final unreadActivityCountProvider = Provider<int>((ref) {
   final authService = ref.watch(groupAuthServiceProvider);
-  final myUid = authService.currentUid;
+  final groupService = ref.watch(groupServiceProvider);
+  final activeGid = ref.watch(activeGroupIdProvider);
+  ref.watch(_groupLastReadRevisionProvider);
+  final myUid = authService.currentUid ?? authService.fallbackUid;
   if (myUid == null) return 0;
 
   final membersAsync = ref.watch(activeGroupMembersStreamProvider);
   final eventsAsync = ref.watch(activeGroupEventsStreamProvider);
 
-  final members = membersAsync.valueOrNull ?? [];
-  final events = eventsAsync.valueOrNull ?? [];
+  final members = membersAsync.valueOrNull ??
+      ((activeGid != null && activeGid.isNotEmpty)
+          ? groupService.getLocalMembers(activeGid)
+          : const <GroupMemberModel>[]);
+  final events = eventsAsync.valueOrNull ??
+      (activeGid != null && activeGid.isNotEmpty
+          ? groupService.getLocalEvents(activeGid)
+          : const <GroupEventModel>[]);
+  if (events.isEmpty) return 0;
 
-  final myMember = members.firstWhere(
-    (m) => m.uid == myUid,
-    orElse: () => GroupMemberModel(
-      uid: myUid,
-      name: authService.displayName ?? '',
-      colorIndex: 0,
-      role: 'member',
-      joinedAt: DateTime.fromMillisecondsSinceEpoch(0),
-      lastReadAt: DateTime.fromMillisecondsSinceEpoch(0),
-    ),
+  final localReadAt = (activeGid != null && activeGid.isNotEmpty)
+      ? groupService.getLocalLastReadAt(activeGid)
+      : null;
+
+  final matchedIdx = members.indexWhere(
+    (m) => authService.isCurrentUser(m.uid) || m.uid == myUid,
   );
+  final myMember = matchedIdx != -1 ? members[matchedIdx] : null;
 
-  return events.where((e) {
-    return e.actorUid != myUid && e.createdAt.isAfter(myMember.lastReadAt);
-  }).length;
+  final now = DateTime.now();
+  final maxFutureLimit = now.add(const Duration(minutes: 2));
+  DateTime? memberReadAt = myMember?.lastReadAt;
+  // Guard terhadap timestamp kosong (epoch 0) atau corrupt masa depan dari versi lama
+  if (memberReadAt != null &&
+      (memberReadAt.millisecondsSinceEpoch <= 0 ||
+          memberReadAt.isAfter(maxFutureLimit))) {
+    memberReadAt = null;
+  }
+
+  final safeLocalReadAt =
+      (localReadAt != null && !localReadAt.isAfter(maxFutureLimit))
+          ? localReadAt
+          : null;
+
+  DateTime threshold;
+  if (memberReadAt != null && safeLocalReadAt != null) {
+    threshold =
+        memberReadAt.isAfter(safeLocalReadAt) ? memberReadAt : safeLocalReadAt;
+  } else if (memberReadAt != null || safeLocalReadAt != null) {
+    threshold = (memberReadAt ?? safeLocalReadAt)!;
+  } else {
+    final localGroup = (activeGid != null && activeGid.isNotEmpty)
+        ? groupService.getLocalGroup(activeGid)
+        : null;
+    threshold = localGroup?.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  return events
+      .where((e) => groupService.isUnreadEligibleEvent(e, threshold))
+      .length;
 });
 
 

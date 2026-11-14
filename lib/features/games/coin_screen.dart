@@ -6,8 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/games/game_engine.dart';
 import '../../core/painters/sticker_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/pop_reveal.dart';
@@ -150,27 +149,28 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
     final currentActive = await db.getActiveDate();
 
     if (currentActive != null && mounted) {
+      final t = context.putarTheme;
       SoundService.instance.play(Sfx.uiTap);
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: AppColors.ink, width: 3),
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            side: BorderSide(color: t.ink, width: t.borderWidth),
           ),
-          title: const Text(
+          title: Text(
             'Date Masih Aktif!',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
               fontSize: 20,
             ),
           ),
           content: Text(
             'Kamu masih memiliki date yang aktif dengan budget ${RupiahFormatter.format(currentActive.budget)}.\n\nSelesaikan date yang sedang aktif di menu Catatan terlebih dahulu sebelum memulai sesi baru.',
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: t.ink,
               fontSize: 14,
               height: 1.4,
             ),
@@ -178,30 +178,30 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'Tutup',
                 style: TextStyle(
-                  color: AppColors.disabled,
-                  fontWeight: FontWeight.w700,
+                  color: t.textDisabled,
+                  fontWeight: t.weightBold,
                 ),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.matahari,
-                foregroundColor: AppColors.ink,
+                backgroundColor: t.secondary,
+                foregroundColor: t.ink,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.ink, width: 2),
+                  side: BorderSide(color: t.ink, width: 2),
                 ),
               ),
               onPressed: () {
                 Navigator.pop(ctx);
                 context.go('/catatan');
               },
-              child: const Text(
+              child: Text(
                 'Buka Catatan',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: t.weightExtraBold),
               ),
             ),
           ],
@@ -227,6 +227,7 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     final activeDateAsync = ref.watch(activeDateStreamProvider);
     final activeDate = activeDateAsync.value;
 
@@ -234,7 +235,7 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
     final currentStep = _hasStarted ? _precalculatedSteps[lastStepIndex] : null;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: theme.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -257,24 +258,24 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: theme.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        border: Border.all(color: theme.ink, width: theme.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: theme.shadowColor,
+                            offset: theme.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 22,
                         height: 22,
                         child: CustomPaint(
                           painter: CustomBackIconPainter(
-                            color: AppColors.ink,
+                            color: theme.ink,
                             strokeWidth: 3.0,
                           ),
                         ),
@@ -285,10 +286,10 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                   Expanded(
                     child: Text(
                       'Lempar Koin',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: theme.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: theme.weightExtraBold,
+                        color: theme.ink,
                       ),
                     ),
                   ),
@@ -307,25 +308,25 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: theme.secondary,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      border: Border.all(color: theme.ink, width: theme.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: theme.shadowColor,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 16,
                           height: 16,
                           child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: theme.ink,
                               strokeWidth: 2.2,
                             ),
                           ),
@@ -334,9 +335,9 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                         Expanded(
                           child: Text(
                             'Date aktif: ${RupiahFormatter.format(activeDate.budget)} · Buka Catatan',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: theme.bodySmall.copyWith(
+                              fontWeight: theme.weightExtraBold,
+                              color: theme.ink,
                             ),
                           ),
                         ),
@@ -351,22 +352,22 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: theme.secondary,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: theme.ink, width: theme.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: theme.shadowColor,
+                        offset: theme.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     'Gambar x2 · Angka setengah',
-                    style: AppTypography.bodySmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                    style: theme.bodySmall.copyWith(
+                      fontWeight: theme.weightExtraBold,
+                      color: theme.ink,
                       fontSize: 13,
                     ),
                   ),
@@ -379,13 +380,13 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                 height: 280,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFE9A8),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppColors.ink, width: 3),
-                  boxShadow: const [
+                  color: theme.accentWarmSoft,
+                  borderRadius: BorderRadius.circular(theme.cardRadius),
+                  border: Border.all(color: theme.ink, width: theme.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(4, 4),
+                      color: theme.shadowColor,
+                      offset: theme.standardShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -422,7 +423,7 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                               width: 130,
                               height: 16,
                               decoration: BoxDecoration(
-                                color: AppColors.ink.withValues(alpha: opacity),
+                                color: theme.ink.withValues(alpha: opacity),
                                 borderRadius: BorderRadius.circular(50),
                               ),
                             ),
@@ -512,9 +513,9 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                     children: [
                       Text(
                         'Lemparan ${_currentFlipIndex.clamp(1, 3)} dari 3',
-                        style: AppTypography.bodySmall.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                        style: theme.bodySmall.copyWith(
+                          fontWeight: theme.weightExtraBold,
+                          color: theme.ink,
                           fontSize: 13,
                         ),
                       ),
@@ -526,13 +527,13 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                           height: 20,
                           margin: const EdgeInsets.symmetric(horizontal: 3),
                           decoration: BoxDecoration(
-                            color: isUsed ? AppColors.mint : AppColors.surface,
+                            color: isUsed ? theme.success : theme.surface,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.ink, width: 2.5),
-                            boxShadow: const [
+                            border: Border.all(color: theme.ink, width: theme.subtleBorderWidth),
+                            boxShadow: [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(1.5, 1.5),
+                                color: theme.shadowColor,
+                                offset: const Offset(1.5, 1.5),
                                 blurRadius: 0,
                               ),
                             ],
@@ -550,9 +551,9 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                 PopReveal(
                   child: Center(
                     child: StickerCard(
-                      backgroundColor: AppColors.surface,
-                      borderRadius: 22,
-                      borderWidth: 3,
+                      backgroundColor: theme.surface,
+                      borderRadius: theme.cardRadius,
+                      borderWidth: theme.borderWidth,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -561,18 +562,18 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                             currentStep!.side == CoinSide.gambar
                                 ? 'Gambar! ${RupiahFormatter.format(currentStep.beforeAmount)} jadi'
                                 : 'Angka! ${RupiahFormatter.format(currentStep.beforeAmount)} jadi',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textSecondary,
+                            style: theme.bodySmall.copyWith(
+                              fontWeight: theme.weightBold,
+                              color: theme.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             RupiahFormatter.format(_currentAmount),
-                            style: AppTypography.displayLarge.copyWith(
+                            style: theme.displayLarge.copyWith(
                               fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: theme.weightExtraBold,
+                              color: theme.ink,
                             ),
                           ),
                         ],
@@ -587,7 +588,7 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
               if (!_hasStarted) ...[
                 StickerButton.large(
                   text: 'LEMPAR KOIN',
-                  backgroundColor: AppColors.tomat,
+                  backgroundColor: theme.primary,
                   autoPulse: true,
                   onPressed: _flipCoin,
                 ),
@@ -598,9 +599,9 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                       child: StickerButton(
                         height: 56,
                         borderRadius: 28,
-                        backgroundColor: AppColors.tomat,
+                        backgroundColor: theme.primary,
                         text: 'LEMPAR LAGI',
-                        textColor: AppColors.ink,
+                        textColor: theme.ink,
                         onPressed: _isFlipping ? null : _flipCoin,
                       ),
                     ),
@@ -609,9 +610,9 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
                       child: StickerButton(
                         height: 56,
                         borderRadius: 28,
-                        backgroundColor: AppColors.mint,
+                        backgroundColor: theme.success,
                         text: 'AMBIL',
-                        textColor: AppColors.ink,
+                        textColor: theme.ink,
                         onPressed: _isFlipping ? null : _takeBudget,
                       ),
                     ),
@@ -620,16 +621,16 @@ class _CoinScreenState extends ConsumerState<CoinScreen>
               ] else ...[
                 StickerButton.large(
                   text: 'PAKAI BUDGET INI',
-                  backgroundColor: AppColors.mint,
+                  backgroundColor: theme.success,
                   onPressed: () => _startActiveDate(_currentAmount),
                 ),
                 const SizedBox(height: 10),
                 StickerButton(
                   height: 48,
                   borderRadius: 24,
-                  backgroundColor: AppColors.surface,
+                  backgroundColor: theme.surface,
                   text: 'Main Ulang',
-                  textColor: AppColors.ink,
+                  textColor: theme.ink,
                   onPressed: () {
                     SoundService.instance.play(Sfx.uiTap);
                     setState(() {
@@ -657,15 +658,16 @@ class _CoinFaceGambar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.matahari,
+        color: t.secondary,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.ink, width: 4.5),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: 4.5),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -678,17 +680,17 @@ class _CoinFaceGambar extends StatelessWidget {
               width: 66,
               height: 66,
               child: CustomPaint(
-                painter: _CoinLogoPainter(),
+                painter: _CoinLogoPainter(theme: t),
               ),
             ),
             const SizedBox(height: 2),
             Text(
               'GAMBAR',
-              style: AppTypography.chipLabel.copyWith(
+              style: t.chipLabel.copyWith(
                 fontSize: 10,
                 letterSpacing: 1.2,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -704,15 +706,16 @@ class _CoinFaceAngka extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.jeruk,
+        color: t.accentOrange,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.ink, width: 4.5),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: 4.5),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -723,20 +726,20 @@ class _CoinFaceAngka extends StatelessWidget {
           children: [
             Text(
               '½',
-              style: AppTypography.displayLarge.copyWith(
+              style: t.displayLarge.copyWith(
                 fontSize: 58,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
                 height: 1.0,
               ),
             ),
             Text(
               'ANGKA',
-              style: AppTypography.chipLabel.copyWith(
+              style: t.chipLabel.copyWith(
                 fontSize: 10,
                 letterSpacing: 1.2,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -748,22 +751,26 @@ class _CoinFaceAngka extends StatelessWidget {
 
 /// Custom Painter untuk Logo Roda Koin
 class _CoinLogoPainter extends CustomPainter {
+  final PutarTheme theme;
+
+  const _CoinLogoPainter({required this.theme});
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width * 0.44;
 
     final borderPaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
     final tomatPaint = Paint()
-      ..color = AppColors.tomat
+      ..color = theme.primary
       ..style = PaintingStyle.fill;
 
     final mintPaint = Paint()
-      ..color = AppColors.mint
+      ..color = theme.success
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromCircle(center: center, radius: radius);
@@ -778,12 +785,12 @@ class _CoinLogoPainter extends CustomPainter {
 
     // Lingkaran pusat putih
     final centerPaint = Paint()
-      ..color = AppColors.surface
+      ..color = theme.surface
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius * 0.28, centerPaint);
     canvas.drawCircle(center, radius * 0.28, borderPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CoinLogoPainter oldDelegate) => oldDelegate.theme != theme;
 }

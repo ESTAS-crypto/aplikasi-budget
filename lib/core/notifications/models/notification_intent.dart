@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../theme/putar_theme.dart';
 
 /// Sumber pemicu notifikasi
 enum NotificationSource {
@@ -249,19 +250,24 @@ class NotificationIntent {
     required int totalBudget,
     required int totalSpent,
     NotificationSource source = NotificationSource.localBudget,
+    PutarTheme theme = PutarTheme.pasarMalam,
   }) {
+    final formattedOver = _formatRupiah(overAmount);
     return NotificationIntent(
       dedupeKey: 'budOver:$scopeId:$sessionId',
       category: NotificationCategory.budgetOver,
       source: source,
       gid: scopeId == 'local' ? null : scopeId,
       groupName: scopeId == 'local' ? null : groupOrAppName,
-      title: 'Budget lewat Rp${_formatRupiah(overAmount)}',
+      title: theme.text(
+        PutarCopyKeys.budgetOverAmount,
+        params: {'amount': formattedOver},
+      ),
       subtitle:
           'Total Rp${_formatRupiah(totalSpent)} dari Rp${_formatRupiah(totalBudget)}',
       systemTitle: groupOrAppName,
       systemBody:
-          'Budget grup lewat Rp${_formatRupiah(overAmount)}. Total Rp${_formatRupiah(totalSpent)} dari Rp${_formatRupiah(totalBudget)}.',
+          'Budget grup lewat Rp$formattedOver. Total Rp${_formatRupiah(totalSpent)} dari Rp${_formatRupiah(totalBudget)}.',
       amount: overAmount,
       payload: '/catatan',
       isImportantDialog: false,
@@ -272,12 +278,13 @@ class NotificationIntent {
   factory NotificationIntent.weeklyReminder({
     required int year,
     required int weekNumber,
+    PutarTheme theme = PutarTheme.pasarMalam,
   }) {
     return NotificationIntent(
       dedupeKey: 'rem:$year-W$weekNumber',
       category: NotificationCategory.weeklyReminder,
       source: NotificationSource.schedule,
-      title: 'Roda lagi nunggu kamu',
+      title: theme.text(PutarCopyKeys.wheelWaiting),
       subtitle: 'Jumat malam waktunya putar. Siapa tau dapat 150k.',
       systemTitle: 'Putar Jajan',
       systemBody: 'Jumat malam waktunya putar roda budget kencan.',
@@ -290,6 +297,7 @@ class NotificationIntent {
   factory NotificationIntent.streakCelebration({
     required int streakWeeks,
     required DateTime date,
+    PutarTheme theme = PutarTheme.pasarMalam,
   }) {
     final dateStr =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -297,7 +305,10 @@ class NotificationIntent {
       dedupeKey: 'streak:$dateStr',
       category: NotificationCategory.streakCelebration,
       source: NotificationSource.localBudget,
-      title: 'Streak $streakWeeks minggu!',
+      title: theme.text(
+        PutarCopyKeys.streakWeeks,
+        params: {'weeks': '$streakWeeks'},
+      ),
       subtitle: 'Kamu lolos budget lagi minggu ini. Pertahankan.',
       systemTitle: 'Putar Jajan',
       systemBody:
@@ -391,7 +402,8 @@ class NotificationIntent {
   }
 
   static String _formatRupiah(int value) {
-    final s = value.toString();
+    final isNeg = value < 0;
+    final s = value.abs().toString();
     final buffer = StringBuffer();
     int count = 0;
     for (int i = s.length - 1; i >= 0; i--) {
@@ -401,7 +413,8 @@ class NotificationIntent {
         buffer.write('.');
       }
     }
-    return buffer.toString().split('').reversed.join('');
+    final formatted = buffer.toString().split('').reversed.join('');
+    return isNeg ? '-$formatted' : formatted;
   }
 }
 

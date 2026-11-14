@@ -58,6 +58,15 @@ class NotificationCoordinator with WidgetsBindingObserver {
 
   static final NotificationCoordinator instance = NotificationCoordinator._();
 
+  static const Duration _maxAllowedClockSkew = Duration(minutes: 2);
+
+  Future<void> _saveWatermarkIfValid(String? gid, DateTime createdAt) async {
+    if (gid == null || gid.isEmpty) return;
+    if (!createdAt.isAfter(DateTime.now().add(_maxAllowedClockSkew))) {
+      await _claimStore.setLastDeliveredEventAt(gid, createdAt);
+    }
+  }
+
   late NotifiedClaimStore _claimStore;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   final DateTime appLaunchTime = DateTime.now();
@@ -77,6 +86,7 @@ class NotificationCoordinator with WidgetsBindingObserver {
 
   // Delegates untuk konfigurasi & render
   String? Function()? currentUidGetter;
+  bool Function(String actorUid)? isCurrentUserGetter;
   bool Function(String gid)? isGroupMutedGetter;
   bool Function(NotificationCategory category)? isCategoryEnabledGetter;
   Future<bool> Function()? hasSystemNotificationPermissionGetter;
@@ -334,10 +344,12 @@ class NotificationCoordinator with WidgetsBindingObserver {
     // -------------------------------------------------------------------------
     final myUid = currentUidGetter?.call();
 
-    // 2a. Abaikan aksi diri sendiri (actorUid == uid) hanya jika pengguna sedang aktif di dalam aplikasi (resumed).
-    // Jika aplikasi di luar layar (paused/detached/background), tetap izinkan notifikasi sistem di status bar.
-    final isOwnAction = intent.actorUid != null && myUid != null && intent.actorUid == myUid;
-    if (isOwnAction && _lifecycleState == AppLifecycleState.resumed) {
+    // 2a. Abaikan aksi diri sendiri (actorUid == uid) di semua kondisi aplikasi:
+    // pelaku cukup mendapat info di dalam aplikasi dan tidak perlu notif luar HP maupun badge.
+    final isOwnAction = intent.actorUid != null &&
+        ((isCurrentUserGetter != null && isCurrentUserGetter!(intent.actorUid!)) ||
+            (myUid != null && intent.actorUid == myUid));
+    if (isOwnAction) {
       await _claimStore.tryClaim(
         dedupeKey: key,
         surface: NotificationSurface.dropped,
@@ -401,7 +413,16 @@ class NotificationCoordinator with WidgetsBindingObserver {
     // Event yang createdAt-nya lebih tua dari watermark, atau lebih dari 5 menit
     // sebelum aplikasi dibuka, tidak memicu banner atau notifikasi sistem
     if (intent.gid != null) {
-      final watermark = await _claimStore.getLastDeliveredEventAt(intent.gid!);
+      final rawWatermark = await _claimStore.getLastDeliveredEventAt(intent.gid!);
+      // Self-heal jika watermark tersimpan > 2 menit di masa depan akibat bug timezone lama
+      final DateTime? watermark;
+      if (rawWatermark != null &&
+          rawWatermark.isAfter(now.add(_maxAllowedClockSkew))) {
+        await _claimStore.clearLastDeliveredEventAt(intent.gid!);
+        watermark = null;
+      } else {
+        watermark = rawWatermark;
+      }
       final isOlderThanWatermark = watermark != null && intent.createdAt.isBefore(watermark);
       final isOlderThan5MinBeforeLaunch = appLaunchTime.difference(intent.createdAt).inMinutes > 5;
 
@@ -431,9 +452,7 @@ class NotificationCoordinator with WidgetsBindingObserver {
         surface: NotificationSurface.banner,
         reason: NotificationDropReason.none,
       );
-      if (intent.gid != null) {
-        await _claimStore.setLastDeliveredEventAt(intent.gid!, intent.createdAt);
-      }
+      await _saveWatermarkIfValid(intent.gid, intent.createdAt);
       return _recordDecision(
         intent: intent,
         surface: NotificationSurface.banner,
@@ -525,9 +544,7 @@ class NotificationCoordinator with WidgetsBindingObserver {
               if (onRenderBanner != null) {
                 await onRenderBanner!(aggregated);
               }
-              if (intent.gid != null) {
-                await _claimStore.setLastDeliveredEventAt(intent.gid!, intent.createdAt);
-              }
+              await _saveWatermarkIfValid(intent.gid, intent.createdAt);
               return _recordDecision(
                 intent: intent,
                 surface: NotificationSurface.banner,
@@ -575,9 +592,7 @@ class NotificationCoordinator with WidgetsBindingObserver {
               if (onRenderSystem != null) {
                 await onRenderSystem!(aggregated);
               }
-              if (intent.gid != null) {
-                await _claimStore.setLastDeliveredEventAt(intent.gid!, intent.createdAt);
-              }
+              await _saveWatermarkIfValid(intent.gid, intent.createdAt);
               return _recordDecision(
                 intent: intent,
                 surface: NotificationSurface.system,
@@ -605,9 +620,7 @@ class NotificationCoordinator with WidgetsBindingObserver {
       debugPrint('[NotificationCoordinator] Render error on $targetSurface: $e');
     }
 
-    if (intent.gid != null) {
-      await _claimStore.setLastDeliveredEventAt(intent.gid!, intent.createdAt);
-    }
+    await _saveWatermarkIfValid(intent.gid, intent.createdAt);
 
     return _recordDecision(
       intent: intent,

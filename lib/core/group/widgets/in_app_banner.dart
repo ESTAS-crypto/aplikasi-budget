@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../../utils/sound_service.dart';
 import '../painters/group_icons_painter.dart';
 import '../../../features/navigation/app_router.dart';
@@ -77,7 +76,7 @@ class InAppBanner {
     }
 
     // Tutup banner yang sedang aktif bila ada secara langsung
-    dismiss();
+    _removeCurrentEntry();
 
     final count = _pendingEvents.length;
     if (count == 0) return;
@@ -127,12 +126,20 @@ class InAppBanner {
     overlay.insert(entry);
   }
 
-  /// Menutup banner yang sedang tampil
-  static void dismiss() {
+  static void _removeCurrentEntry() {
     try {
       _currentEntry?.remove();
     } catch (_) {}
     _currentEntry = null;
+  }
+
+  /// Menutup banner yang sedang tampil dan membatalkan antrean debounce
+  static void dismiss() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _pendingEvents.clear();
+    _latestOnTap = null;
+    _removeCurrentEntry();
   }
 }
 
@@ -292,53 +299,54 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
     }
   }
 
-  Color _getBadgeColor(InAppBannerCategory category) {
+  Color _getBadgeColor(PutarTheme t, InAppBannerCategory category) {
     switch (category) {
       case InAppBannerCategory.expense:
       case InAppBannerCategory.budgetWarning80:
-        return AppColors.matahari; // #FFD23F
+        return t.secondary;
       case InAppBannerCategory.expenseDeleted:
       case InAppBannerCategory.memberLeave:
-        return AppColors.cream; // #FFF3D6
+        return t.bg;
       case InAppBannerCategory.spin:
-        return AppColors.lavender; // #B8A4FF
+        return t.accentPurple;
       case InAppBannerCategory.budgetOver:
-        return AppColors.tomat; // #FF6B5A
+        return t.danger;
       case InAppBannerCategory.sessionEnd:
       case InAppBannerCategory.memberJoin:
-        return AppColors.mint; // #3DDBB0
+        return t.success;
       case InAppBannerCategory.codeChanged:
-        return const Color(0xFF6FB1FF); // #6FB1FF
+        return t.accentBlue;
     }
   }
 
-  CustomPainter _getBadgePainter(InAppBannerCategory category) {
+  CustomPainter _getBadgePainter(PutarTheme t, InAppBannerCategory category) {
     switch (category) {
       case InAppBannerCategory.expense:
-        return const CustomReceiptPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomReceiptPainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.expenseDeleted:
-        return const CustomTrashPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomTrashPainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.spin:
-        return const CustomWheelPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomWheelPainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.budgetWarning80:
       case InAppBannerCategory.budgetOver:
-        return const CustomWarningTrianglePainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomWarningTrianglePainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.sessionEnd:
-        return const CustomFlagPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomFlagPainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.memberJoin:
-        return const CustomUserPlusPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomUserPlusPainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.memberLeave:
-        return const CustomUserMinusPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomUserMinusPainter(color: t.ink, strokeWidth: 2.6);
       case InAppBannerCategory.codeChanged:
-        return const CustomKeyPainter(color: AppColors.ink, strokeWidth: 2.6);
+        return CustomKeyPainter(color: t.ink, strokeWidth: 2.6);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final topPadding = MediaQuery.of(context).padding.top;
-    final badgeColor = _getBadgeColor(widget.category);
-    final badgePainter = _getBadgePainter(widget.category);
+    final badgeColor = _getBadgeColor(t, widget.category);
+    final badgePainter = _getBadgePainter(t, widget.category);
 
     return AnimatedBuilder(
       animation: Listenable.merge([_entryController, _exitController]),
@@ -377,13 +385,13 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: t.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.ink, width: 3.0),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: t.borderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(3, 3),
+                          color: t.ink,
+                          offset: t.smallShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
@@ -398,7 +406,7 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                             decoration: BoxDecoration(
                               color: badgeColor,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.ink, width: 3.0),
+                              border: Border.all(color: t.ink, width: t.borderWidth),
                             ),
                             alignment: Alignment.center,
                             child: CustomPaint(
@@ -415,10 +423,10 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                             children: [
                               Text(
                                 widget.title,
-                                style: AppTypography.bodySmall.copyWith(
+                                style: t.bodySmall.copyWith(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
+                                  fontWeight: t.weightExtraBold,
+                                  color: t.ink,
                                   height: 1.2,
                                 ),
                                 maxLines: 1,
@@ -428,10 +436,10 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                                 const SizedBox(height: 1),
                                 Text(
                                   widget.subtitle,
-                                  style: AppTypography.bodySmall.copyWith(
+                                  style: t.bodySmall.copyWith(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF5B4B7A),
+                                    fontWeight: t.weightMedium,
+                                    color: t.textSecondary,
                                     height: 1.25,
                                   ),
                                   maxLines: 1,

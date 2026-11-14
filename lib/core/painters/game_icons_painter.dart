@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/putar_theme.dart';
 
 /// Ikon Permainan: Dadu Miring -12° (viewBox 64x64)
 /// Sesuai design/source/Games.dc.html
@@ -11,9 +11,9 @@ class DiceIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const DiceIconPainter({
-    this.diceColor = AppColors.surface,
-    this.dotColor = AppColors.ink,
-    this.strokeColor = AppColors.ink,
+    this.diceColor = PutarTheme.kPasarMalamSurface,
+    this.dotColor = PutarTheme.kPasarMalamInk,
+    this.strokeColor = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -77,9 +77,9 @@ class CapsuleIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CapsuleIconPainter({
-    this.topColor = AppColors.tomat,
-    this.bottomColor = AppColors.surface,
-    this.strokeColor = AppColors.ink,
+    this.topColor = PutarTheme.kPasarMalamTomat,
+    this.bottomColor = PutarTheme.kPasarMalamSurface,
+    this.strokeColor = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -157,9 +157,9 @@ class EnvelopeIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const EnvelopeIconPainter({
-    this.envelopeColor = AppColors.surface,
-    this.coinColor = AppColors.matahari,
-    this.strokeColor = AppColors.ink,
+    this.envelopeColor = PutarTheme.kPasarMalamSurface,
+    this.coinColor = PutarTheme.kPasarMalamMatahari,
+    this.strokeColor = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -222,8 +222,8 @@ class CoinIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CoinIconPainter({
-    this.coinColor = AppColors.matahari,
-    this.strokeColor = AppColors.ink,
+    this.coinColor = PutarTheme.kPasarMalamMatahari,
+    this.strokeColor = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -274,7 +274,7 @@ class ShuffleIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const ShuffleIconPainter({
-    this.color = AppColors.matahari,
+    this.color = PutarTheme.kPasarMalamMatahari,
     this.strokeWidth = 2.6,
   });
 
@@ -350,32 +350,52 @@ class GameIconWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     CustomPainter painter;
     switch (gameType.toLowerCase()) {
       case 'dice':
       case 'dadu':
-        painter = const DiceIconPainter();
+        painter = DiceIconPainter(
+          diceColor: t.surface,
+          dotColor: t.ink,
+          strokeColor: t.ink,
+        );
         break;
       case 'capsule':
       case 'kapsul':
-        painter = const CapsuleIconPainter();
+        painter = CapsuleIconPainter(
+          topColor: t.danger,
+          bottomColor: t.surface,
+          strokeColor: t.ink,
+        );
         break;
       case 'envelope':
       case 'amplop':
-        painter = const EnvelopeIconPainter();
+        painter = EnvelopeIconPainter(
+          envelopeColor: t.surface,
+          coinColor: t.secondary,
+          strokeColor: t.ink,
+        );
         break;
       case 'coin':
       case 'koin':
-        painter = const CoinIconPainter();
+        painter = CoinIconPainter(
+          coinColor: t.secondary,
+          strokeColor: t.ink,
+        );
         break;
       case 'shuffle':
       case 'acak':
         painter = ShuffleIconPainter(
-          color: color ?? AppColors.matahari,
+          color: color ?? t.secondary,
         );
         break;
       default:
-        painter = const DiceIconPainter();
+        painter = DiceIconPainter(
+          diceColor: t.surface,
+          dotColor: t.ink,
+          strokeColor: t.ink,
+        );
     }
 
     return SizedBox(

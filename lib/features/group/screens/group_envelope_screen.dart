@@ -13,8 +13,7 @@ import '../../../core/group/services/group_game_service.dart';
 import '../../../core/group/widgets/member_avatar.dart';
 import '../../../core/group/widgets/group_important_dialog.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/widgets/in_app_toast.dart';
@@ -40,13 +39,6 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
   bool _hasPlayedOpenSound = false;
   int? _wonAmount;
 
-  // 3 warna amplop sesuai GAmplop.dc.html:
-  // [0] #3DDBB0 (mint), [1] #FF8FC0 (permen), [2] #6FB1FF (langit)
-  static const List<Color> _envelopeColors = [
-    AppColors.mint,
-    AppColors.permen,
-    AppColors.langit,
-  ];
 
   // 3 nominal terundi untuk masing-masing amplop
   List<int> _envelopeAmounts = [];
@@ -157,6 +149,28 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
       TextDirection.ltr,
     );
 
+    // Jika catatan grup sebelumnya masih ada (budget > 0), tanyakan persetujuan terlebih dahulu.
+    // Jika catatan grup kosong, langsung pasang hasil amplop ke catatan grup.
+    final groupService = ref.read(groupServiceProvider);
+    final existingSession = groupService.getEffectiveActiveSession(group.id, group);
+    if (existingSession != null && existingSession.budget > 0) {
+      final accepted = await GroupImportantDialog.showConfirmAcceptGameBudget(
+        context,
+        budget: won,
+        currentBudget: existingSession.budget,
+        gameName: 'Pilih Amplop',
+      );
+      if (!mounted) return;
+      if (accepted != true) {
+        InAppToast.show(
+          context,
+          message:
+              'Hasil amplop dibatalkan. Catatan grup tetap ${RupiahFormatter.format(existingSession.budget)}.',
+        );
+        return;
+      }
+    }
+
     // Tulis hasil permainan & klaim sesi grup
     final gameService = ref.read(groupGameServiceProvider);
     final claimResult = await gameService.claimSessionAndWriteResult(
@@ -184,30 +198,44 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
+    final groupService = ref.read(groupServiceProvider);
 
-    final group = activeGroupAsync.valueOrNull ??
-        (activeGroupId != null && activeGroupId.isNotEmpty
-            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
-            : null);
+    final streamedGroup = activeGroupAsync.valueOrNull;
+    final localGroup = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? groupService.getLocalGroup(activeGroupId)
+        : null;
+    final rawGroup = streamedGroup ?? localGroup;
+    final resolvedSession = rawGroup != null
+        ? groupService.resolveEffectiveSession(
+            rawGroup.id,
+            streamedGroup?.activeSession,
+            localGroup?.activeSession,
+          )
+        : null;
+    final group = rawGroup?.copyWith(
+      activeSession: resolvedSession,
+      clearActiveSession: resolvedSession == null,
+    );
 
     if (group == null) {
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBackButton(),
+                _buildBackButton(t),
                 const SizedBox(height: 40),
                 Center(
                   child: Text(
                     'Grup tidak ditemukan',
-                    style: AppTypography.displayMedium.copyWith(fontSize: 20),
+                    style: t.displayMedium.copyWith(fontSize: 20),
                   ),
                 ),
               ],
@@ -246,7 +274,7 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
     final showOpenedState = _hasOpened || (session != null && session.budget > 0);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -256,15 +284,15 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
               // 1. Top Bar: Tombol Kembali & Judul Layar
               Row(
                 children: [
-                  _buildBackButton(),
+                  _buildBackButton(t),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
                       'Pilih Amplop',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -277,23 +305,23 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    color: t.secondary,
+                    borderRadius: BorderRadius.circular(t.pillButtonRadius),
+                    border: Border.all(color: t.borderColor, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     'Satu amplop, isinya rahasia',
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -301,11 +329,11 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
               const SizedBox(height: 10),
 
               // 3. Group Status Strip
-              _buildGroupStatusStrip(group: group, members: members, canPlay: canPlay),
+              _buildGroupStatusStrip(t: t, group: group, members: members, canPlay: canPlay),
               const SizedBox(height: 36),
 
               // 4. Barisan 3 Amplop (Mint, Permen, Langit)
-              _buildEnvelopesShowcase(showOpenedState: showOpenedState),
+              _buildEnvelopesShowcase(t: t, showOpenedState: showOpenedState),
               const SizedBox(height: 22),
 
               // Keterangan pilihan amplop
@@ -316,9 +344,9 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
                       : _selectedIndex == 1
                           ? 'Amplop tengah yang kamu pilih'
                           : 'Amplop kanan yang kamu pilih',
-                  style: AppTypography.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                  style: t.bodyMedium.copyWith(
+                    fontWeight: t.weightSemiBold,
+                    color: t.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -327,17 +355,19 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
 
               // 5. Kartu Hasil Pop Reveal
               _buildResultCard(
+                t: t,
                 session: session,
                 showOpenedState: showOpenedState,
               ),
               const SizedBox(height: 24),
 
               // 6. Bar Budget Grup untuk Date Ini
-              _buildBudgetStatusBar(budget: currentBudget, isLocked: isLocked),
+              _buildBudgetStatusBar(t: t, budget: currentBudget, isLocked: isLocked),
               const SizedBox(height: 12),
 
               // 7. Tombol Aksi BUKA AMPLOP (bg Mint / #3DDBB0)
               _buildActionButton(
+                t: t,
                 group: group,
                 canPlay: canPlay,
                 isLocked: isLocked,
@@ -350,7 +380,7 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
     );
   }
 
-  Widget _buildBackButton() {
+  Widget _buildBackButton(PutarTheme t) {
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
@@ -364,25 +394,25 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ink, width: 3),
-          boxShadow: const [
+          border: Border.all(color: t.borderColor, width: t.borderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.shadowColor,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
         ),
         alignment: Alignment.center,
-        child: const SizedBox(
+        child: SizedBox(
           width: 22,
           height: 22,
           child: CustomPaint(
             painter: CustomBackIconPainter(
-              color: AppColors.ink,
-              strokeWidth: 3.0,
+              color: t.ink,
+              strokeWidth: t.borderWidth,
             ),
           ),
         ),
@@ -391,6 +421,7 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
   }
 
   Widget _buildGroupStatusStrip({
+    required PutarTheme t,
     required GroupModel group,
     required List<GroupMemberModel> members,
     required bool canPlay,
@@ -405,13 +436,13 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -448,10 +479,10 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
                   'Grup · ${group.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                     height: 1.2,
                   ),
                 ),
@@ -459,10 +490,10 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
                   '$onlineCount online · $turnPolicyLabel · hasil dilihat semua',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    fontWeight: t.weightSemiBold,
+                    color: t.textSecondary,
                   ),
                 ),
               ],
@@ -473,7 +504,11 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
     );
   }
 
-  Widget _buildEnvelopesShowcase({required bool showOpenedState}) {
+  Widget _buildEnvelopesShowcase({
+    required PutarTheme t,
+    required bool showOpenedState,
+  }) {
+    final envelopeColors = [t.accentMint, t.accentPink, t.accentBlue];
     return Center(
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -483,7 +518,7 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(3, (index) {
               final isChosen = _selectedIndex == index;
-              final color = _envelopeColors[index % _envelopeColors.length];
+              final color = envelopeColors[index % envelopeColors.length];
               final amount = _envelopeAmounts.length > index ? _envelopeAmounts[index] : 0;
 
               return GestureDetector(
@@ -508,6 +543,7 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
   }
 
   Widget _buildResultCard({
+    required PutarTheme t,
     required GroupSessionModel? session,
     required bool showOpenedState,
   }) {
@@ -522,13 +558,13 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -538,19 +574,19 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
             children: [
               Text(
                 'Pilih amplop dan tekan buka',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Rp0',
-                style: AppTypography.displayMedium.copyWith(
+                style: t.displayMedium.copyWith(
                   fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ],
@@ -564,13 +600,13 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -580,19 +616,19 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
             children: [
               Text(
                 'Isi amplop',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 RupiahFormatter.format(displayedAmount),
-                style: AppTypography.displayLarge.copyWith(
+                style: t.displayLarge.copyWith(
                   fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                   height: 1.1,
                 ),
               ),
@@ -603,7 +639,11 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
     );
   }
 
-  Widget _buildBudgetStatusBar({required int budget, required bool isLocked}) {
+  Widget _buildBudgetStatusBar({
+    required PutarTheme t,
+    required int budget,
+    required bool isLocked,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -612,18 +652,18 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
           children: [
             Text(
               'Budget grup untuk date ini',
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
             Text(
               RupiahFormatter.format(budget),
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -632,18 +672,18 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
         Container(
           height: 14,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.ink, width: 3),
+            border: Border.all(color: t.borderColor, width: t.borderWidth),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
             widthFactor: budget > 0 ? 1.0 : 0.0,
             child: Container(
-              decoration: const BoxDecoration(
-                color: AppColors.mint,
+              decoration: BoxDecoration(
+                color: t.success,
                 border: Border(
-                  right: BorderSide(color: AppColors.ink, width: 3),
+                  right: BorderSide(color: t.borderColor, width: t.borderWidth),
                 ),
               ),
             ),
@@ -652,10 +692,10 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
         const SizedBox(height: 4),
         Text(
           'Permainan lain terkunci sampai date selesai.',
-          style: AppTypography.bodySmall.copyWith(
+          style: t.bodySmall.copyWith(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            fontWeight: t.weightSemiBold,
+            color: t.textSecondary,
           ),
         ),
       ],
@@ -663,20 +703,29 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
   }
 
   Future<void> _confirmEndSession(GroupModel group) async {
+    final groupService = ref.read(groupServiceProvider);
+    final summary = groupService.getActiveSessionSummary(group.id);
     final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
       context,
       groupName: group.name,
-      budget: group.activeSession?.budget,
+      budget: summary.budget > 0 ? summary.budget : group.activeSession?.budget,
+      totalSpent: summary.totalSpent,
+      itemCount: summary.itemCount,
     );
     if (confirm == true) {
       await ref.read(groupGameServiceProvider).endSession(gid: group.id);
       if (mounted) {
+        setState(() {
+          _hasOpened = false;
+          _wonAmount = null;
+        });
         InAppToast.show(context, message: 'Date grup telah diakhiri. Permainan kini terbuka!');
       }
     }
   }
 
   Widget _buildActionButton({
+    required PutarTheme t,
     required GroupModel group,
     required bool canPlay,
     required bool isLocked,
@@ -710,9 +759,9 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
       children: [
         StickerButton.large(
           text: buttonText,
-          backgroundColor: isButtonDisabled ? AppColors.surface : AppColors.mint,
-          textColor: AppColors.ink,
-          borderColor: AppColors.ink,
+          backgroundColor: isButtonDisabled ? t.surface : t.success,
+          textColor: t.ink,
+          borderColor: t.borderColor,
           onPressed: isButtonDisabled
               ? (isSessionLocked && isOwner ? () => _confirmEndSession(group) : null)
               : () => _openEnvelope(group, canPlay, isSessionLocked),
@@ -721,9 +770,9 @@ class _GroupEnvelopeScreenState extends ConsumerState<GroupEnvelopeScreen>
           const SizedBox(height: 10),
           StickerButton.large(
             text: 'AKHIRI DATE GRUP',
-            backgroundColor: AppColors.matahari,
-            textColor: AppColors.ink,
-            borderColor: AppColors.ink,
+            backgroundColor: t.secondary,
+            textColor: t.ink,
+            borderColor: t.borderColor,
             onPressed: () => _confirmEndSession(group),
           ),
         ],
@@ -755,6 +804,7 @@ class _GroupEnvelopeItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -850,16 +900,16 @@ class _GroupEnvelopeItem extends StatelessWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.topCenter,
                   children: [
-                    // Kertas hasil di dalam amplop (.pa: top 40px, height 80px, white)
+                    // Kertas hasil di dalam amplop (.pa: top 40px, height 80px)
                     Positioned(
                       top: 40 + slidePaperY,
                       child: Container(
                         width: 80,
                         height: 72,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: theme.surface,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.ink, width: 3),
+                          border: Border.all(color: theme.borderColor, width: theme.borderWidth),
                         ),
                         alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -867,10 +917,10 @@ class _GroupEnvelopeItem extends StatelessWidget {
                           showRevealedAmount ? amountText : '?',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.buttonSmall.copyWith(
-                            color: AppColors.ink,
+                          style: theme.buttonSmall.copyWith(
+                            color: theme.ink,
                             fontSize: 13,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: theme.weightExtraBold,
                           ),
                         ),
                       ),
@@ -885,11 +935,11 @@ class _GroupEnvelopeItem extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: color,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 3.5),
-                          boxShadow: const [
+                          border: Border.all(color: theme.borderColor, width: 3.5),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: theme.shadowColor,
+                              offset: theme.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
@@ -897,10 +947,10 @@ class _GroupEnvelopeItem extends StatelessWidget {
                         alignment: Alignment.center,
                         child: Text(
                           '?',
-                          style: AppTypography.displayLarge.copyWith(
+                          style: theme.displayLarge.copyWith(
                             fontSize: 38,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: theme.weightExtraBold,
+                            color: theme.ink,
                           ),
                         ),
                       ),
@@ -916,7 +966,10 @@ class _GroupEnvelopeItem extends StatelessWidget {
                           width: 104,
                           height: 52,
                           child: CustomPaint(
-                            painter: _GroupEnvelopeFlapPainter(color: color),
+                            painter: _GroupEnvelopeFlapPainter(
+                              color: color,
+                              strokeColor: theme.ink,
+                            ),
                           ),
                         ),
                       ),
@@ -934,8 +987,12 @@ class _GroupEnvelopeItem extends StatelessWidget {
 
 class _GroupEnvelopeFlapPainter extends CustomPainter {
   final Color color;
+  final Color strokeColor;
 
-  const _GroupEnvelopeFlapPainter({required this.color});
+  const _GroupEnvelopeFlapPainter({
+    required this.color,
+    required this.strokeColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -944,7 +1001,7 @@ class _GroupEnvelopeFlapPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = AppColors.ink
+      ..color = strokeColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5
       ..strokeJoin = StrokeJoin.round;
@@ -962,5 +1019,5 @@ class _GroupEnvelopeFlapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GroupEnvelopeFlapPainter oldDelegate) =>
-      oldDelegate.color != color;
+      oldDelegate.color != color || oldDelegate.strokeColor != strokeColor;
 }

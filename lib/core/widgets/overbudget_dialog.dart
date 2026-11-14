@@ -1,30 +1,31 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../theme/putar_theme.dart';
 import '../painters/sticker_icons.dart';
 import '../utils/rupiah_formatter.dart';
 import '../utils/sound_service.dart';
 import 'sticker_button.dart';
 
 /// Menampilkan dialog peringatan saat jajan melebihi budget (Budget lewat!).
-/// Kartu putih, ikon peringatan di lingkaran Tomat, tombol "Catat tetap" dan "Hapus item".
+/// Kartu putih, ikon peringatan di lingkaran warna danger, tombol "Catat tetap" dan "Hapus item".
 /// Animasi membesar dari skala 0.8 ke 1.04 lalu ke 1.0.
 Future<bool?> showOverbudgetDialog(
   BuildContext context, {
   required int excessAmount,
 }) {
   SoundService.instance.play(Sfx.overBudget);
+  final theme = PutarTheme.of(context);
 
   return showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Budget Lewat',
-    barrierColor: AppColors.ink.withValues(alpha: 0.55),
+    barrierColor: theme.ink.withValues(alpha: 0.55),
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (context, anim1, anim2) {
       return const SizedBox.shrink();
     },
-    transitionBuilder: (context, anim1, anim2, child) {
+    transitionBuilder: (ctx, anim1, anim2, child) {
+      final t = PutarTheme.of(ctx);
       // Keyframe sequence: 0.8 -> 1.04 -> 1.0
       final scaleAnimation = TweenSequence<double>([
         TweenSequenceItem(
@@ -48,16 +49,16 @@ Future<bool?> showOverbudgetDialog(
               width: 320,
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 26),
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(22),
+                color: t.surface,
+                borderRadius: BorderRadius.circular(t.cardRadius),
                 border: Border.all(
-                  color: AppColors.ink,
-                  width: 3.0,
+                  color: t.borderColor,
+                  width: t.borderWidth,
                 ),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(5, 5),
+                    color: t.shadowColor,
+                    offset: t.dialogShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
@@ -65,71 +66,71 @@ Future<bool?> showOverbudgetDialog(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Ikon peringatan di lingkaran Tomat
+                  // Ikon peringatan di lingkaran danger
                   Container(
                     width: 68,
                     height: 68,
                     decoration: BoxDecoration(
-                      color: AppColors.tomat,
+                      color: t.danger,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.ink,
-                        width: 3.0,
+                        color: t.borderColor,
+                        width: t.borderWidth,
                       ),
-                      boxShadow: const [
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2, 2),
+                          color: t.shadowColor,
+                          offset: t.miniShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     padding: const EdgeInsets.all(16),
-                    child: const CustomPaint(
+                    child: CustomPaint(
                       painter: CustomWarningIconPainter(
-                        color: AppColors.ink,
-                        markColor: AppColors.ink,
+                        color: t.ink,
+                        markColor: t.ink,
                         strokeWidth: 3.0,
                       ),
                     ),
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Budget lewat!',
-                    style: AppTypography.displayMedium.copyWith(
+                    t.text(PutarCopyKeys.budgetOverShort),
+                    style: t.displayMedium.copyWith(
                       fontSize: 26,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Jajan ini bikin kamu lewat budget sebesar ${RupiahFormatter.format(excessAmount)}. Mau tetap dicatat?',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
+                    style: t.bodyMedium.copyWith(
+                      color: t.textSecondary,
                       fontSize: 15,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  // Tombol "Catat tetap" (Tomat)
+                  // Tombol "Catat tetap"
                   StickerButton(
                     width: double.infinity,
                     height: 50,
                     text: 'Catat tetap',
-                    backgroundColor: AppColors.tomat,
-                    textColor: AppColors.ink,
-                    onPressed: () => Navigator.of(context).pop(true),
+                    backgroundColor: t.danger,
+                    textColor: t.ink,
+                    onPressed: () => Navigator.of(ctx).pop(true),
                   ),
                   const SizedBox(height: 12),
-                  // Tombol "Hapus item" (Krim/Matahari atau Surface)
+                  // Tombol "Hapus item"
                   StickerButton(
                     width: double.infinity,
                     height: 50,
                     text: 'Hapus item',
-                    backgroundColor: AppColors.cream,
-                    textColor: AppColors.ink,
-                    onPressed: () => Navigator.of(context).pop(false),
+                    backgroundColor: t.bg,
+                    textColor: t.ink,
+                    onPressed: () => Navigator.of(ctx).pop(false),
                   ),
                 ],
               ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../painters/group_icons_painter.dart';
 
 /// Komponen Neo-Brutalist Arti Status Sinkron (Layar 20: Grup5.dc.html)
@@ -14,47 +13,53 @@ class SyncLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           'Arti status sinkron',
-          style: AppTypography.titleMedium.copyWith(
+          style: t.titleMedium.copyWith(
             fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
         const SizedBox(height: 8),
         _buildStatusRow(
-          badgeBg: AppColors.mint, // #3DDBB0
-          badgePainter: const CustomCheckPainter(color: AppColors.ink, strokeWidth: 2.8),
+          t: t,
+          badgeBg: t.success,
+          badgePainter: CustomCheckPainter(color: t.ink, strokeWidth: 2.8),
           label: 'Tersinkron',
           description: 'Semua anggota sudah menerimanya',
         ),
         _buildStatusRow(
-          badgeBg: AppColors.cream, // #FFF3D6
-          badgePainter: const CustomClockPainter(color: AppColors.ink, strokeWidth: 2.8),
+          t: t,
+          badgeBg: t.bg,
+          badgePainter: CustomClockPainter(color: t.ink, strokeWidth: 2.8),
           label: 'Menunggu',
           description: 'Tersimpan di HP, belum terkirim',
         ),
         _buildStatusRow(
-          badgeBg: AppColors.matahari, // #FFD23F
-          badgePainter: const CustomSyncArrowsPainter(color: AppColors.ink, strokeWidth: 2.8),
+          t: t,
+          badgeBg: t.secondary,
+          badgePainter: CustomSyncArrowsPainter(color: t.ink, strokeWidth: 2.8),
           label: 'Menyinkronkan',
           description: 'Sedang dikirim',
         ),
         _buildStatusRow(
-          badgeBg: AppColors.ink, // #22163A
-          badgePainter: const CustomCloudOfflinePainter(color: Colors.white, strokeWidth: 2.8),
+          t: t,
+          badgeBg: t.ink,
+          badgePainter: CustomCloudOfflinePainter(color: t.surface, strokeWidth: 2.8),
           label: 'Offline',
           description: 'Perubahan baru disimpan di HP',
         ),
         _buildStatusRow(
-          badgeBg: AppColors.tomat, // #FF6B5A
-          badgePainter: const CustomWarningTrianglePainter(color: AppColors.ink, strokeWidth: 2.8),
-          label: 'Gagal',
+          t: t,
+          badgeBg: t.danger,
+          badgePainter: CustomWarningTrianglePainter(color: t.ink, strokeWidth: 2.8),
+          label: t.text(PutarCopyKeys.syncFailed),
           description: 'Ketuk untuk coba lagi',
         ),
       ],
@@ -65,13 +70,13 @@ class SyncLegend extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.ink, width: 3.0),
-        boxShadow: const [
+        color: t.surface,
+        borderRadius: BorderRadius.circular(t.cardRadius),
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(4, 4),
+            color: t.ink,
+            offset: t.standardShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -81,6 +86,7 @@ class SyncLegend extends StatelessWidget {
   }
 
   Widget _buildStatusRow({
+    required PutarTheme t,
     required Color badgeBg,
     required CustomPainter badgePainter,
     required String label,
@@ -97,7 +103,7 @@ class SyncLegend extends StatelessWidget {
             decoration: BoxDecoration(
               color: badgeBg,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.ink, width: 2.5),
+              border: Border.all(color: t.ink, width: 2.5),
             ),
             alignment: Alignment.center,
             child: CustomPaint(
@@ -112,17 +118,18 @@ class SyncLegend extends StatelessWidget {
             width: 104,
             padding: const EdgeInsets.symmetric(vertical: 2.0),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: t.surface,
               borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: AppColors.ink, width: 2.0),
+              border: Border.all(color: t.ink, width: 2.0),
             ),
             alignment: Alignment.center,
             child: Text(
               label,
-              style: AppTypography.buttonSmall.copyWith(
+              textAlign: TextAlign.center,
+              style: t.buttonSmall.copyWith(
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ),
@@ -132,10 +139,10 @@ class SyncLegend extends StatelessWidget {
           Expanded(
             child: Text(
               description,
-              style: AppTypography.bodySmall.copyWith(
+              style: t.bodySmall.copyWith(
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.ink,
+                fontWeight: t.weightMedium,
+                color: t.ink,
                 height: 1.2,
               ),
             ),

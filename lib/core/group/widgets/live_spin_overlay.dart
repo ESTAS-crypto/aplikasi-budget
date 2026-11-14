@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
+import '../../painters/sticker_icons.dart';
 import '../../utils/rupiah_formatter.dart';
 import '../../utils/sound_service.dart';
 import '../../utils/wheel_math.dart';
@@ -46,6 +46,7 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
 
   late final List<int> _slots;
   final Map<int, TextPainter> _cachedTextPainters = {};
+  String? _builtThemeId;
 
   @override
   void initState() {
@@ -57,8 +58,6 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
     } else {
       _slots = List<int>.from(GroupModel.defaultSlots);
     }
-
-    _buildTextPainters();
 
     final clockSync = ref.read(clockSyncServiceProvider);
     final nowMs = clockSync.serverNowMs;
@@ -88,16 +87,30 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
     _ticker.start();
   }
 
-  void _buildTextPainters() {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final t = context.putarTheme;
+    if (_builtThemeId != t.id) {
+      _builtThemeId = t.id;
+      _buildTextPainters(t);
+    }
+  }
+
+  void _buildTextPainters(PutarTheme t) {
+    for (final tp in _cachedTextPainters.values) {
+      tp.dispose();
+    }
+    _cachedTextPainters.clear();
     for (final slot in _slots) {
       final tp = TextPainter(
         text: TextSpan(
           text: RupiahFormatter.formatCompact(slot),
-          style: const TextStyle(
-            fontFamily: AppTypography.fontFamily,
+          style: TextStyle(
+            fontFamily: t.fontFamily,
             fontWeight: FontWeight.w900,
             fontSize: 12,
-            color: AppColors.ink,
+            color: t.ink,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -188,6 +201,7 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final actorName = widget.play.startedByName.isNotEmpty
         ? widget.play.startedByName
         : 'Seseorang';
@@ -201,13 +215,13 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.cream,
+              color: t.bg,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.ink, width: 3.5),
-              boxShadow: const [
+              border: Border.all(color: t.ink, width: t.heroBorderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(6, 6),
+                  color: t.ink,
+                  offset: t.heroShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -221,28 +235,34 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.matahari,
+                        color: t.secondary,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.ink, width: 2.5),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(2, 2),
+                            color: t.ink,
+                            offset: t.miniShadowOffset,
                           ),
                         ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.sync, size: 16, color: AppColors.ink),
+                          CustomPaint(
+                            size: const Size(16, 16),
+                            painter: CustomSyncIconPainter(
+                              color: t.ink,
+                              strokeWidth: 2.4,
+                            ),
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'SIARAN LANGSUNG',
-                            style: const TextStyle(
-                              fontFamily: AppTypography.fontFamily,
+                            style: TextStyle(
+                              fontFamily: t.fontFamily,
                               fontWeight: FontWeight.w900,
                               fontSize: 11,
-                              color: AppColors.ink,
+                              color: t.ink,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -257,11 +277,17 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 2),
+                          border: Border.all(color: t.ink, width: 2),
                         ),
-                        child: const Icon(Icons.close, size: 16, color: AppColors.ink),
+                        child: CustomPaint(
+                          size: const Size(16, 16),
+                          painter: CustomCloseIconPainter(
+                            color: t.ink,
+                            strokeWidth: 2.5,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -272,11 +298,11 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                 Text(
                   '$actorName memutar roda!',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: AppTypography.fontFamily,
+                  style: TextStyle(
+                    fontFamily: t.fontFamily,
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -285,11 +311,11 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                       ? '🎯 Roda mendarat pada hasil budget!'
                       : 'Semua anggota melihat putaran bersamaan...',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: AppTypography.fontFamily,
-                    fontWeight: FontWeight.w600,
+                  style: TextStyle(
+                    fontFamily: t.fontFamily,
+                    fontWeight: t.weightSemiBold,
                     fontSize: 12,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -311,6 +337,7 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                             cachedTextPainters: _cachedTextPainters,
                             isMiniPreview: false,
                             pointerFlickAngleDegrees: _pointerFlickAngle,
+                            theme: t,
                           ),
                         ),
                       ),
@@ -319,7 +346,10 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                         top: 2,
                         child: Transform.rotate(
                           angle: _pointerFlickAngle * math.pi / 180,
-                          child: const _LiveWheelPointer(),
+                          child: _LiveWheelPointer(
+                            inkColor: t.ink,
+                            pointerColor: t.danger,
+                          ),
                         ),
                       ),
                       // Pin Tengah
@@ -327,13 +357,13 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: AppColors.matahari,
+                          color: t.secondary,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: t.borderWidth),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(1.5, 1.5),
+                              color: t.ink,
+                              offset: const Offset(1.5, 1.5),
                             ),
                           ],
                         ),
@@ -352,13 +382,13 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           decoration: BoxDecoration(
-                            color: AppColors.mint,
+                            color: t.success,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.ink, width: 3),
-                            boxShadow: const [
+                            border: Border.all(color: t.ink, width: t.borderWidth),
+                            boxShadow: [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(4, 4),
+                                color: t.ink,
+                                offset: t.standardShadowOffset,
                               ),
                             ],
                           ),
@@ -366,32 +396,32 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                             children: [
                               Text(
                                 'BUDGET DITENTUKAN',
-                                style: const TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
+                                style: TextStyle(
+                                  fontFamily: t.fontFamily,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 11,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                   letterSpacing: 0.8,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 amountFormatted,
-                                style: const TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
+                                style: TextStyle(
+                                  fontFamily: t.fontFamily,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 24,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 'Menutup otomatis dalam $_countdownSeconds detik...',
-                                style: const TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
-                                  fontWeight: FontWeight.w700,
+                                style: TextStyle(
+                                  fontFamily: t.fontFamily,
+                                  fontWeight: t.weightBold,
                                   fontSize: 11,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
@@ -401,29 +431,29 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
                           key: const ValueKey('spinning_pill'),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
-                            color: AppColors.surface,
+                            color: t.surface,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.ink, width: 2),
+                            border: Border.all(color: t.ink, width: 2),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               SizedBox(
                                 width: 14,
                                 height: 14,
                                 child: CircularProgressIndicator(
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                   strokeWidth: 2.2,
                                 ),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
                                 'Sinkronisasi putaran...',
                                 style: TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
-                                  fontWeight: FontWeight.w700,
+                                  fontFamily: t.fontFamily,
+                                  fontWeight: t.weightBold,
                                   fontSize: 12,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
@@ -441,18 +471,35 @@ class _LiveSpinOverlayState extends ConsumerState<LiveSpinOverlay>
 
 /// Pointer segitiga neo-brutalist di atas roda
 class _LiveWheelPointer extends StatelessWidget {
-  const _LiveWheelPointer();
+  final Color inkColor;
+  final Color pointerColor;
+
+  const _LiveWheelPointer({
+    required this.inkColor,
+    required this.pointerColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: const Size(26, 30),
-      painter: _PointerPainter(),
+      painter: _PointerPainter(
+        inkColor: inkColor,
+        pointerColor: pointerColor,
+      ),
     );
   }
 }
 
 class _PointerPainter extends CustomPainter {
+  final Color inkColor;
+  final Color pointerColor;
+
+  const _PointerPainter({
+    required this.inkColor,
+    required this.pointerColor,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final path = Path()
@@ -464,14 +511,14 @@ class _PointerPainter extends CustomPainter {
     // Shadow
     canvas.drawPath(
       path.shift(const Offset(2, 2)),
-      Paint()..color = AppColors.ink,
+      Paint()..color = inkColor,
     );
 
     // Body
     canvas.drawPath(
       path,
       Paint()
-        ..color = AppColors.tomat
+        ..color = pointerColor
         ..style = PaintingStyle.fill,
     );
 
@@ -479,12 +526,14 @@ class _PointerPainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = AppColors.ink
+        ..color = inkColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PointerPainter oldDelegate) =>
+      oldDelegate.inkColor != inkColor ||
+      oldDelegate.pointerColor != pointerColor;
 }

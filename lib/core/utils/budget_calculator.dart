@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/putar_theme.dart';
 
 enum BudgetStatus {
   safe,    // < 70% (Mint)
@@ -35,15 +35,17 @@ class BudgetCalculator {
   static Color getStatusColor({
     required int spent,
     required int budget,
+    PutarTheme? theme,
   }) {
+    final t = theme ?? PutarTheme.pasarMalam;
     final status = getStatus(spent: spent, budget: budget);
     switch (status) {
       case BudgetStatus.safe:
-        return AppColors.mint;
+        return t.success;
       case BudgetStatus.warning:
-        return AppColors.matahari;
+        return t.warning;
       case BudgetStatus.danger:
-        return AppColors.tomat;
+        return t.danger;
     }
   }
 

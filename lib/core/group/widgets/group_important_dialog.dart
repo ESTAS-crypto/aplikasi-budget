@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
+import '../../utils/rupiah_formatter.dart';
 import '../../utils/sound_service.dart';
 import '../painters/group_icons_painter.dart';
 
@@ -17,16 +17,23 @@ class GroupImportantDialog {
     BuildContext context, {
     required WidgetBuilder builder,
     bool barrierDismissible = false,
+    Duration duration = const Duration(milliseconds: 360),
+    Color? barrierColor,
   }) {
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     return showGeneralDialog<T>(
       context: context,
       barrierDismissible: barrierDismissible,
       barrierLabel: 'Dialog Penting',
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.45),
       useRootNavigator: true,
-      transitionDuration: const Duration(milliseconds: 360),
+      transitionDuration:
+          disableAnimations ? const Duration(milliseconds: 100) : duration,
       pageBuilder: (ctx, anim, secondaryAnim) => builder(ctx),
       transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        if (disableAnimations) {
+          return FadeTransition(opacity: anim, child: child);
+        }
         final isReverse = anim.status == AnimationStatus.reverse;
         final double scale;
         final double opacity;
@@ -78,19 +85,20 @@ class GroupImportantDialog {
     VoidCallback? onConfirm,
   }) async {
     SoundService.instance.play(Sfx.notifWarning);
+    final t = context.putarTheme;
     await _show<void>(
       context,
       barrierDismissible: false,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.tomat,
-        badgeIcon: const CustomUserMinusPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.danger,
+        badgeIcon: CustomUserMinusPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Kamu dikeluarkan dari grup',
         message:
             'Pemilik mengeluarkanmu dari $groupName. Catatan pribadimu tetap aman di HP ini.',
         actions: [
           _DialogButton(
             label: 'Mengerti',
-            backgroundColor: AppColors.matahari,
+            backgroundColor: t.secondary,
             onTap: () {
               Navigator.of(ctx).pop();
               onConfirm?.call();
@@ -108,19 +116,20 @@ class GroupImportantDialog {
     VoidCallback? onConfirm,
   }) async {
     SoundService.instance.play(Sfx.notifWarning);
+    final t = context.putarTheme;
     await _show<void>(
       context,
       barrierDismissible: false,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.tomat,
-        badgeIcon: const CustomTrashPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.danger,
+        badgeIcon: CustomTrashPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Grup sudah dihapus',
         message:
             'Pemilik menghapus $groupName. Catatan grup tidak bisa dibuka lagi.',
         actions: [
           _DialogButton(
             label: 'Mengerti',
-            backgroundColor: AppColors.matahari,
+            backgroundColor: t.secondary,
             onTap: () {
               Navigator.of(ctx).pop();
               onConfirm?.call();
@@ -138,24 +147,25 @@ class GroupImportantDialog {
     required Future<void> Function() onRetry,
   }) async {
     SoundService.instance.play(Sfx.notifWarning);
+    final t = context.putarTheme;
     return _show<bool>(
       context,
       barrierDismissible: true,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.tomat,
-        badgeIcon: const CustomCloudOfflinePainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.danger,
+        badgeIcon: CustomCloudOfflinePainter(color: t.ink, strokeWidth: 2.6),
         title: '$unSyncedCount perubahan belum terkirim',
         message:
             'Tersimpan aman di HP ini. Coba kirim lagi, atau biarkan dan kami coba otomatis saat sinyal bagus.',
         actions: [
           _DialogButton(
             label: 'Nanti saja',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
             label: 'Coba lagi',
-            backgroundColor: AppColors.tomat,
+            backgroundColor: t.danger,
             onTap: () async {
               Navigator.of(ctx).pop(true);
               await onRetry();
@@ -172,24 +182,25 @@ class GroupImportantDialog {
     required String memberName,
   }) async {
     SoundService.instance.play(Sfx.uiTap);
+    final t = context.putarTheme;
     return _show<bool>(
       context,
       barrierDismissible: true,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.matahari,
-        badgeIcon: const CustomUserMinusPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.secondary,
+        badgeIcon: CustomUserMinusPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Keluarkan $memberName?',
         message:
             '$memberName tidak bisa lagi melihat catatan grup. Catatan yang sudah ia buat tetap ada.',
         actions: [
           _DialogButton(
             label: 'Batal',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
             label: 'Keluarkan',
-            backgroundColor: AppColors.tomat,
+            backgroundColor: t.danger,
             onTap: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -202,24 +213,25 @@ class GroupImportantDialog {
     BuildContext context,
   ) async {
     SoundService.instance.play(Sfx.uiTap);
+    final t = context.putarTheme;
     return _show<bool>(
       context,
       barrierDismissible: true,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.tomat,
-        badgeIcon: const CustomExitPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.danger,
+        badgeIcon: CustomExitPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Keluar dari Grup?',
         message:
             'Kamu tidak akan lagi melihat aktivitas dan catatan bersama di grup ini.',
         actions: [
           _DialogButton(
             label: 'Batal',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
             label: 'Keluar',
-            backgroundColor: AppColors.tomat,
+            backgroundColor: t.danger,
             onTap: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -233,24 +245,25 @@ class GroupImportantDialog {
     required String oldCode,
   }) async {
     SoundService.instance.play(Sfx.uiTap);
+    final t = context.putarTheme;
     return _show<bool>(
       context,
       barrierDismissible: true,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.matahari,
-        badgeIcon: const CustomSyncArrowsPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.secondary,
+        badgeIcon: CustomSyncArrowsPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Ganti Kode Undangan?',
         message:
             'Kode lama ($oldCode) akan langsung tidak berlaku. Teman yang belum bergabung harus memakai kode baru.',
         actions: [
           _DialogButton(
             label: 'Batal',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
             label: 'Ganti Kode',
-            backgroundColor: AppColors.matahari,
+            backgroundColor: t.secondary,
             onTap: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -265,24 +278,25 @@ class GroupImportantDialog {
     required String formattedAmount,
   }) async {
     SoundService.instance.play(Sfx.uiTap);
+    final t = context.putarTheme;
     return _show<bool>(
       context,
       barrierDismissible: true,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.tomat,
-        badgeIcon: const CustomTrashPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.danger,
+        badgeIcon: CustomTrashPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Hapus Catatan?',
         message:
             'Catatan "$title" sebesar $formattedAmount akan dihapus dari catatan grup.',
         actions: [
           _DialogButton(
             label: 'Batal',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
             label: 'Hapus',
-            backgroundColor: AppColors.tomat,
+            backgroundColor: t.danger,
             onTap: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -290,34 +304,73 @@ class GroupImportantDialog {
     );
   }
 
-  /// 8. Dialog Konfirmasi Mengakhiri Sesi Date Grup (Membuka kembali permainan)
+  /// 8. Dialog Konfirmasi Menyelesaikan Sesi Date Grup (Layar 67 - Hgrup3.dc.html)
   static Future<bool?> showConfirmEndGroupSession(
     BuildContext context, {
     required String groupName,
     int? budget,
+    int? totalSpent,
+    int? itemCount,
   }) async {
     SoundService.instance.play(Sfx.uiTap);
-    final budgetText = budget != null && budget > 0
-        ? ' (Budget: Rp${budget.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')})'
+    final t = context.putarTheme;
+    final resolvedBudget = budget ?? 0;
+    final resolvedSpent = totalSpent ?? 0;
+    final hasBudgetPreview = resolvedBudget > 0;
+    final isLolos = resolvedSpent <= resolvedBudget;
+    final diff = (resolvedBudget - resolvedSpent).abs();
+    final outcomePreview = hasBudgetPreview
+        ? (isLolos
+            ? ': Lolos, hemat ${RupiahFormatter.format(diff)}'
+            : ': Lewat ${RupiahFormatter.format(diff)}')
         : '';
+
     return _show<bool>(
       context,
       barrierDismissible: true,
+      duration: const Duration(milliseconds: 450),
+      barrierColor: t.ink.withValues(alpha: 0.5),
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.matahari,
-        badgeIcon: const CustomClockPainter(color: AppColors.ink, strokeWidth: 2.6),
-        title: 'Akhiri Date Grup?',
+        badgeColor: t.success,
+        badgeIcon: CustomFlagPainter(color: t.ink, strokeWidth: 2.6),
+        title: 'Selesaikan date ini?',
+        extraContent: (budget != null || totalSpent != null || itemCount != null)
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (budget != null)
+                      _SummaryMiniChip(
+                        label: 'Budget ${RupiahFormatter.format(budget)}',
+                        backgroundColor: t.surface,
+                      ),
+                    if (totalSpent != null)
+                      _SummaryMiniChip(
+                        label: 'Terpakai ${RupiahFormatter.format(totalSpent)}',
+                        backgroundColor: t.secondary,
+                      ),
+                    if (itemCount != null)
+                      _SummaryMiniChip(
+                        label: '$itemCount catatan',
+                        backgroundColor: t.surface,
+                      ),
+                  ],
+                ),
+              )
+            : null,
         message:
-            'Sesi date grup$budgetText akan diselesaikan. Semua anggota bisa kembali bermain atau memutar roda date.',
+            'Catatan date ini akan dibekukan dan semua anggota langsung melihat hasilnya$outcomePreview. Catatan yang dibuat offline sebelum sekarang tetap dihitung bila tersinkron dalam 24 jam.',
         actions: [
           _DialogButton(
             label: 'Batal',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
-            label: 'Akhiri Date',
-            backgroundColor: AppColors.matahari,
+            label: 'Selesaikan',
+            backgroundColor: t.success,
             onTap: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -332,29 +385,87 @@ class GroupImportantDialog {
     required int budget,
   }) async {
     SoundService.instance.play(Sfx.uiTap);
+    final t = context.putarTheme;
     final name = startedByName.trim().isNotEmpty ? startedByName.trim() : 'anggota';
     final formattedBudget = 'Rp${budget.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
     return _show<bool>(
       context,
       barrierDismissible: true,
       builder: (ctx) => _BaseImportantDialog(
-        badgeColor: AppColors.matahari,
-        badgeIcon: const CustomClockPainter(color: AppColors.ink, strokeWidth: 2.6),
+        badgeColor: t.secondary,
+        badgeIcon: CustomClockPainter(color: t.ink, strokeWidth: 2.6),
         title: 'Ulangi Budget?',
         message: 'Hasil $name $formattedBudget akan diganti.',
         actions: [
           _DialogButton(
             label: 'Batal',
-            backgroundColor: AppColors.surface,
+            backgroundColor: t.surface,
             onTap: () => Navigator.of(ctx).pop(false),
           ),
           _DialogButton(
             label: 'Ulangi budget',
-            backgroundColor: AppColors.tomat,
+            backgroundColor: t.danger,
             onTap: () => Navigator.of(ctx).pop(true),
           ),
         ],
       ),
+    );
+  }
+
+  /// Dialog Konfirmasi Persetujuan Hasil Permainan Grup saat Catatan Grup sudah memiliki budget aktif
+  static Future<bool?> showConfirmAcceptGameBudget(
+    BuildContext context, {
+    required int budget,
+    int? currentBudget,
+    String gameName = 'Permainan',
+  }) async {
+    SoundService.instance.play(Sfx.winLolos);
+    final t = context.putarTheme;
+    String fmt(int v) =>
+        'Rp${v.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+    final formattedBudget = fmt(budget);
+    final hasExisting = currentBudget != null && currentBudget > 0;
+    final title = hasExisting
+        ? 'Ganti Budget ke $formattedBudget?'
+        : 'Setuju Budget $formattedBudget?';
+    final message = hasExisting
+        ? 'Catatan grup saat ini sudah memiliki budget ${fmt(currentBudget)}. Setuju menggantinya dengan hasil $gameName sebesar $formattedBudget? Jika tidak, catatan grup sebelumnya tetap dipertahankan.'
+        : '$gameName menghasilkan $formattedBudget. Setuju memasang budget ini di Catatan Grup? Jika tidak, catatan grup tetap 0.';
+    return _show<bool>(
+      context,
+      barrierDismissible: false,
+      builder: (ctx) => _BaseImportantDialog(
+        badgeColor: t.secondary,
+        badgeIcon: CustomCheckPainter(color: t.ink, strokeWidth: 2.8),
+        title: title,
+        message: message,
+        actions: [
+          _DialogButton(
+            label: 'Tidak',
+            backgroundColor: t.surface,
+            onTap: () => Navigator.of(ctx).pop(false),
+          ),
+          _DialogButton(
+            label: 'Setuju',
+            backgroundColor: t.success,
+            onTap: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Dialog Konfirmasi Persetujuan Hasil Putaran Roda Grup
+  static Future<bool?> showConfirmAcceptWheelBudget(
+    BuildContext context, {
+    required int budget,
+    int? currentBudget,
+  }) {
+    return showConfirmAcceptGameBudget(
+      context,
+      budget: budget,
+      currentBudget: currentBudget,
+      gameName: 'Roda Putar',
     );
   }
 }
@@ -363,6 +474,7 @@ class _BaseImportantDialog extends StatelessWidget {
   final Color badgeColor;
   final CustomPainter badgeIcon;
   final String title;
+  final Widget? extraContent;
   final String message;
   final List<Widget> actions;
 
@@ -370,78 +482,114 @@ class _BaseImportantDialog extends StatelessWidget {
     required this.badgeColor,
     required this.badgeIcon,
     required this.title,
+    this.extraContent,
     required this.message,
     required this.actions,
   });
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppColors.ink, width: 3.0),
-          boxShadow: const [
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.cardRadius),
+          border: Border.all(color: t.ink, width: t.borderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(4, 4),
+              color: t.ink,
+              offset: t.heroShadowOffset,
               blurRadius: 0,
             ),
           ],
         ),
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                _WiggleBadge(
-                  badgeColor: badgeColor,
-                  badgeIcon: badgeIcon,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: AppTypography.titleMedium.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      height: 1.15,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+        padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  _WiggleBadge(
+                    badgeColor: badgeColor,
+                    badgeIcon: badgeIcon,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: AppTypography.bodySmall.copyWith(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                color: AppColors.ink,
-                height: 1.35,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: t.titleMedium.copyWith(
+                        fontSize: 18,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
+                        height: 1.15,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: actions
-                  .map((act) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: act,
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ],
+              const SizedBox(height: 10),
+              ?extraContent,
+              Text(
+                message,
+                style: t.bodySmall.copyWith(
+                  fontSize: 13,
+                  fontWeight: t.weightMedium,
+                  color: t.ink,
+                  height: 1.38,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: actions
+                    .map((act) => Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                            child: act,
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryMiniChip extends StatelessWidget {
+  final String label;
+  final Color backgroundColor;
+
+  const _SummaryMiniChip({
+    required this.label,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.putarTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(t.chipRadius),
+        border: Border.all(color: t.ink, width: 2),
+      ),
+      child: Text(
+        label,
+        style: t.bodySmall.copyWith(
+          fontSize: 11,
+          fontWeight: t.weightExtraBold,
+          color: t.ink,
         ),
       ),
     );
@@ -525,6 +673,7 @@ class _WiggleBadgeState extends State<_WiggleBadge>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return AnimatedBuilder(
       animation: _rotationAnimation,
       builder: (context, child) {
@@ -539,7 +688,7 @@ class _WiggleBadgeState extends State<_WiggleBadge>
         decoration: BoxDecoration(
           color: widget.badgeColor,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ink, width: 3.0),
+          border: Border.all(color: t.ink, width: t.borderWidth),
         ),
         alignment: Alignment.center,
         child: CustomPaint(
@@ -564,6 +713,7 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
@@ -574,15 +724,15 @@ class _DialogButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.ink, width: 3.0),
+          border: Border.all(color: t.ink, width: t.borderWidth),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
-          style: AppTypography.buttonSmall.copyWith(
+          style: t.buttonSmall.copyWith(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
       ),

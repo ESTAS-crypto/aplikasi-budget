@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../theme/putar_theme.dart';
 import '../painters/sticker_icons.dart';
 import '../utils/sound_service.dart';
 
-/// Modal Bottom Sheet Pengaturan Suara & Getaran (Neo-Brutalist)
+/// Modal Bottom Sheet Pengaturan Suara & Getaran bertema
 class SettingsBottomSheet extends ConsumerWidget {
   const SettingsBottomSheet({super.key});
 
@@ -24,6 +23,7 @@ class SettingsBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.putarTheme;
     final settings = ref.watch(soundSettingsProvider);
     final notifier = ref.read(soundSettingsProvider.notifier);
 
@@ -34,13 +34,13 @@ class SettingsBottomSheet extends ConsumerWidget {
         top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 28,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.cream,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: t.bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.sheetRadius)),
         border: Border(
-          top: BorderSide(color: AppColors.ink, width: 3.5),
-          left: BorderSide(color: AppColors.ink, width: 3.5),
-          right: BorderSide(color: AppColors.ink, width: 3.5),
+          top: BorderSide(color: t.borderColor, width: t.heroBorderWidth),
+          left: BorderSide(color: t.borderColor, width: t.heroBorderWidth),
+          right: BorderSide(color: t.borderColor, width: t.heroBorderWidth),
         ),
       ),
       child: Column(
@@ -58,21 +58,24 @@ class SettingsBottomSheet extends ConsumerWidget {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: AppColors.matahari,
+                        color: t.secondary,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.ink, width: 2.5),
-                        boxShadow: const [
+                        border: Border.all(
+                          color: t.borderColor,
+                          width: t.subtleBorderWidth,
+                        ),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(2, 2),
+                            color: t.shadowColor,
+                            offset: t.miniShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       padding: const EdgeInsets.all(7),
-                      child: const CustomPaint(
+                      child: CustomPaint(
                         painter: CustomSettingsIconPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 2.5,
                         ),
                       ),
@@ -84,18 +87,18 @@ class SettingsBottomSheet extends ConsumerWidget {
                         children: [
                           Text(
                             'Pengaturan',
-                            style: AppTypography.displayMedium.copyWith(
+                            style: t.displayMedium.copyWith(
                               fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                           Text(
                             'Audio & Getaran gameplay',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
+                            style: t.bodySmall.copyWith(
+                              color: t.textSecondary,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: t.weightSemiBold,
                             ),
                           ),
                         ],
@@ -114,21 +117,24 @@ class SettingsBottomSheet extends ConsumerWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: t.surface,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.ink, width: 2.5),
-                    boxShadow: const [
+                    border: Border.all(
+                      color: t.borderColor,
+                      width: t.subtleBorderWidth,
+                    ),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(2, 2),
+                        color: t.shadowColor,
+                        offset: t.miniShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   padding: const EdgeInsets.all(9),
-                  child: const CustomPaint(
+                  child: CustomPaint(
                     painter: CustomCloseIconPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: 2.5,
                     ),
                   ),
@@ -144,7 +150,7 @@ class SettingsBottomSheet extends ConsumerWidget {
             subtitle: '19 audio kalimba resmi pentatonik C',
             trailing: _NeoSwitch(
               value: settings.soundEnabled,
-              activeColor: AppColors.mint,
+              activeColor: t.success,
               onChanged: (val) {
                 notifier.setSoundEnabled(val);
                 if (val) {
@@ -165,10 +171,10 @@ class SettingsBottomSheet extends ConsumerWidget {
                 SliderTheme(
                   data: SliderThemeData(
                     trackHeight: 12,
-                    activeTrackColor: AppColors.matahari,
-                    inactiveTrackColor: AppColors.surface,
-                    thumbColor: AppColors.ink,
-                    overlayColor: AppColors.matahari.withAlpha(50),
+                    activeTrackColor: t.secondary,
+                    inactiveTrackColor: t.surface,
+                    thumbColor: t.ink,
+                    overlayColor: t.secondary.withAlpha(50),
                     thumbShape: const RoundSliderThumbShape(
                       enabledThumbRadius: 11,
                       elevation: 2,
@@ -201,7 +207,7 @@ class SettingsBottomSheet extends ConsumerWidget {
             subtitle: 'Sentuhan sinkron pada roda, dadu & amplop',
             trailing: _NeoSwitch(
               value: settings.vibrationEnabled,
-              activeColor: AppColors.permen,
+              activeColor: t.accentPink,
               onChanged: (val) {
                 notifier.setVibrationEnabled(val);
                 if (val) {
@@ -222,13 +228,16 @@ class SettingsBottomSheet extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: t.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.ink, width: 2.5),
-                boxShadow: const [
+                border: Border.all(
+                  color: t.borderColor,
+                  width: t.subtleBorderWidth,
+                ),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: t.shadowColor,
+                    offset: t.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
@@ -243,29 +252,31 @@ class SettingsBottomSheet extends ConsumerWidget {
                           width: 28,
                           height: 28,
                           decoration: BoxDecoration(
-                            color: AppColors.langit,
+                            color: t.info,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.ink, width: 2),
+                            border: Border.all(color: t.borderColor, width: 2),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'PJ',
                               style: TextStyle(
+                                fontFamily: t.fontFamily,
                                 fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                fontWeight: t.weightExtraBold,
+                                color: t.ink,
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Lihat Sistem Brand & Desain',
                             style: TextStyle(
+                              fontFamily: t.fontFamily,
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                              fontWeight: t.weightBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -273,12 +284,12 @@ class SettingsBottomSheet extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const SizedBox(
+                  SizedBox(
                     width: 14,
                     height: 14,
                     child: CustomPaint(
                       painter: CustomForwardIconPainter(
-                        color: AppColors.ink,
+                        color: t.ink,
                         strokeWidth: 2.5,
                       ),
                     ),
@@ -299,34 +310,38 @@ class SettingsBottomSheet extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.matahari,
+                color: t.secondary,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.ink, width: 2.5),
-                boxShadow: const [
+                border: Border.all(
+                  color: t.borderColor,
+                  width: t.subtleBorderWidth,
+                ),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: t.shadowColor,
+                    offset: t.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CustomPaint(
-                    size: Size(16, 16),
+                    size: const Size(16, 16),
                     painter: CustomSettingsIconPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: 2.5,
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     'Buka Pengaturan Lengkap',
                     style: TextStyle(
+                      fontFamily: t.fontFamily,
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                 ],
@@ -354,16 +369,17 @@ class _SettingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.ink, width: 2.5),
-        boxShadow: const [
+        border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -380,19 +396,19 @@ class _SettingCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: AppTypography.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                      style: t.bodyMedium.copyWith(
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                         fontSize: 15,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
+                      style: t.bodySmall.copyWith(
+                        color: t.textSecondary,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: t.weightSemiBold,
                       ),
                     ),
                   ],
@@ -422,6 +438,7 @@ class _NeoSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return GestureDetector(
       onTap: () => onChanged(!value),
       child: AnimatedContainer(
@@ -430,13 +447,13 @@ class _NeoSwitch extends StatelessWidget {
         height: 30,
         padding: const EdgeInsets.all(2.5),
         decoration: BoxDecoration(
-          color: value ? activeColor : AppColors.cream,
+          color: value ? activeColor : t.bg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.ink, width: 2.5),
-          boxShadow: const [
+          border: Border.all(color: t.borderColor, width: t.subtleBorderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(2, 2),
+              color: t.shadowColor,
+              offset: t.miniShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -449,9 +466,9 @@ class _NeoSwitch extends StatelessWidget {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: t.surface,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.ink, width: 2),
+              border: Border.all(color: t.borderColor, width: 2),
             ),
           ),
         ),
@@ -459,4 +476,3 @@ class _NeoSwitch extends StatelessWidget {
     );
   }
 }
-

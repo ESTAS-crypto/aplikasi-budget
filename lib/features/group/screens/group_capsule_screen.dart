@@ -13,8 +13,7 @@ import '../../../core/group/services/group_game_service.dart';
 import '../../../core/group/widgets/member_avatar.dart';
 import '../../../core/group/widgets/group_important_dialog.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/widgets/in_app_toast.dart';
@@ -24,31 +23,31 @@ import '../../../core/widgets/sticker_button.dart';
 class _CapsulePos {
   final double left;
   final double top;
-  final Color color;
+  final int colorIndex;
   final double delay;
 
   const _CapsulePos({
     required this.left,
     required this.top,
-    required this.color,
+    required this.colorIndex,
     required this.delay,
   });
 }
 
-/// Posisi dan warna hingga 12 kapsul di dalam kubah sesuai GKapsul.dc.html
+/// Posisi dan indeks warna hingga 12 kapsul di dalam kubah sesuai GKapsul.dc.html
 const List<_CapsulePos> _kGroupDomeCapsuleSlots = [
-  _CapsulePos(left: 28, top: 130, color: AppColors.tomat, delay: 0.0),
-  _CapsulePos(left: 70, top: 140, color: AppColors.jeruk, delay: 0.1),
-  _CapsulePos(left: 114, top: 126, color: AppColors.matahari, delay: 0.2),
-  _CapsulePos(left: 150, top: 138, color: AppColors.mint, delay: 0.3),
-  _CapsulePos(left: 46, top: 92, color: AppColors.langit, delay: 0.4),
-  _CapsulePos(left: 92, top: 98, color: AppColors.lavender, delay: 0.0),
-  _CapsulePos(left: 136, top: 88, color: AppColors.permen, delay: 0.1),
-  _CapsulePos(left: 64, top: 52, color: AppColors.lemon, delay: 0.2),
-  _CapsulePos(left: 110, top: 56, color: AppColors.tomat, delay: 0.3),
-  _CapsulePos(left: 36, top: 160, color: AppColors.mint, delay: 0.15),
-  _CapsulePos(left: 130, top: 160, color: AppColors.jeruk, delay: 0.25),
-  _CapsulePos(left: 85, top: 40, color: AppColors.langit, delay: 0.35),
+  _CapsulePos(left: 28, top: 130, colorIndex: 0, delay: 0.0),
+  _CapsulePos(left: 70, top: 140, colorIndex: 1, delay: 0.1),
+  _CapsulePos(left: 114, top: 126, colorIndex: 2, delay: 0.2),
+  _CapsulePos(left: 150, top: 138, colorIndex: 3, delay: 0.3),
+  _CapsulePos(left: 46, top: 92, colorIndex: 4, delay: 0.4),
+  _CapsulePos(left: 92, top: 98, colorIndex: 5, delay: 0.0),
+  _CapsulePos(left: 136, top: 88, colorIndex: 6, delay: 0.1),
+  _CapsulePos(left: 64, top: 52, colorIndex: 7, delay: 0.2),
+  _CapsulePos(left: 110, top: 56, colorIndex: 0, delay: 0.3),
+  _CapsulePos(left: 36, top: 160, colorIndex: 3, delay: 0.15),
+  _CapsulePos(left: 130, top: 160, colorIndex: 1, delay: 0.25),
+  _CapsulePos(left: 85, top: 40, colorIndex: 4, delay: 0.35),
 ];
 
 /// Layar 58: Gacha Kapsul Grup
@@ -71,7 +70,7 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
   bool _hasPlayedDropSound = false;
   bool _hasPlayedOpenSound = false;
   int? _wonAmount;
-  Color _wonColor = AppColors.lavender;
+  int _wonColorIndex = 5;
 
   @override
   void initState() {
@@ -167,21 +166,9 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     final chosenIndex = random.nextInt(pool.length);
     final won = pool[chosenIndex];
 
-    const palette = [
-      AppColors.tomat,
-      AppColors.jeruk,
-      AppColors.matahari,
-      AppColors.mint,
-      AppColors.langit,
-      AppColors.lavender,
-      AppColors.permen,
-      AppColors.lemon,
-    ];
-    final color = palette[chosenIndex % palette.length];
-
     setState(() {
       _isCranking = true;
-      _wonColor = color;
+      _wonColorIndex = chosenIndex;
       _wonAmount = null;
     });
 
@@ -202,6 +189,28 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
       'Isi kapsul ${RupiahFormatter.format(won)}',
       TextDirection.ltr,
     );
+
+    // Jika catatan grup sebelumnya masih ada (budget > 0), tanyakan persetujuan terlebih dahulu.
+    // Jika catatan grup kosong, langsung pasang hasil kapsul ke catatan grup.
+    final groupService = ref.read(groupServiceProvider);
+    final existingSession = groupService.getEffectiveActiveSession(group.id, group);
+    if (existingSession != null && existingSession.budget > 0) {
+      final accepted = await GroupImportantDialog.showConfirmAcceptGameBudget(
+        context,
+        budget: won,
+        currentBudget: existingSession.budget,
+        gameName: 'Mesin Kapsul',
+      );
+      if (!mounted) return;
+      if (accepted != true) {
+        InAppToast.show(
+          context,
+          message:
+              'Hasil kapsul dibatalkan. Catatan grup tetap ${RupiahFormatter.format(existingSession.budget)}.',
+        );
+        return;
+      }
+    }
 
     // Klaim sesi grup & tulis event game_result
     final gameService = ref.read(groupGameServiceProvider);
@@ -232,30 +241,44 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
+    final groupService = ref.read(groupServiceProvider);
 
-    final group = activeGroupAsync.valueOrNull ??
-        (activeGroupId != null && activeGroupId.isNotEmpty
-            ? ref.read(groupServiceProvider).getLocalGroup(activeGroupId)
-            : null);
+    final streamedGroup = activeGroupAsync.valueOrNull;
+    final localGroup = (activeGroupId != null && activeGroupId.isNotEmpty)
+        ? groupService.getLocalGroup(activeGroupId)
+        : null;
+    final rawGroup = streamedGroup ?? localGroup;
+    final resolvedSession = rawGroup != null
+        ? groupService.resolveEffectiveSession(
+            rawGroup.id,
+            streamedGroup?.activeSession,
+            localGroup?.activeSession,
+          )
+        : null;
+    final group = rawGroup?.copyWith(
+      activeSession: resolvedSession,
+      clearActiveSession: resolvedSession == null,
+    );
 
     if (group == null) {
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBackButton(),
+                _buildBackButton(t),
                 const SizedBox(height: 40),
                 Center(
                   child: Text(
                     'Grup tidak ditemukan',
-                    style: AppTypography.displayMedium.copyWith(fontSize: 20),
+                    style: t.displayMedium.copyWith(fontSize: 20),
                   ),
                 ),
               ],
@@ -277,7 +300,7 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     final currentBudget = session?.budget ?? _wonAmount ?? 0;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -287,15 +310,15 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
               // 1. Top Bar: Tombol Kembali & Judul Layar
               Row(
                 children: [
-                  _buildBackButton(),
+                  _buildBackButton(t),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
                       'Gacha Kapsul',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -308,23 +331,23 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     'Isi kapsul rahasia, nominal acak',
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -332,23 +355,23 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
               const SizedBox(height: 10),
 
               // 3. Group Status Strip
-              _buildGroupStatusStrip(group: group, members: members, canPlay: canPlay),
+              _buildGroupStatusStrip(t: t, group: group, members: members, canPlay: canPlay),
               const SizedBox(height: 22),
 
               // 4. Mesin Gacha Kapsul (Kubah 230x230 & Base Mesin 250x128)
-              _buildCapsuleMachine(capsuleCount: capsulePool.length),
+              _buildCapsuleMachine(theme: t, capsuleCount: capsulePool.length),
               const SizedBox(height: 20),
 
               // 5. Kartu Hasil Pop Reveal
-              _buildResultCard(session: session),
+              _buildResultCard(t: t, session: session),
               const SizedBox(height: 24),
 
               // 6. Bar Budget Grup untuk Date Ini
-              _buildBudgetStatusBar(budget: currentBudget, isLocked: isLocked),
+              _buildBudgetStatusBar(t: t, budget: currentBudget, isLocked: isLocked),
               const SizedBox(height: 12),
 
               // 7. Tombol Aksi PUTAR TUAS (bg Permen / #FF8FC0)
-              _buildActionButton(group: group, canPlay: canPlay, isLocked: isLocked),
+              _buildActionButton(t: t, group: group, canPlay: canPlay, isLocked: isLocked),
             ],
           ),
         ),
@@ -356,7 +379,7 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     );
   }
 
-  Widget _buildBackButton() {
+  Widget _buildBackButton(PutarTheme t) {
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
@@ -370,24 +393,24 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ink, width: 3),
-          boxShadow: const [
+          border: Border.all(color: t.ink, width: t.borderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.shadowColor,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
         ),
         alignment: Alignment.center,
-        child: const SizedBox(
+        child: SizedBox(
           width: 22,
           height: 22,
           child: CustomPaint(
             painter: CustomBackIconPainter(
-              color: AppColors.ink,
+              color: t.ink,
               strokeWidth: 3.0,
             ),
           ),
@@ -397,6 +420,7 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
   }
 
   Widget _buildGroupStatusStrip({
+    required PutarTheme t,
     required GroupModel group,
     required List<GroupMemberModel> members,
     required bool canPlay,
@@ -411,13 +435,13 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        color: t.surface,
+        borderRadius: BorderRadius.circular(t.smallCardRadius),
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.shadowColor,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -454,10 +478,10 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                   'Grup · ${group.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                     height: 1.2,
                   ),
                 ),
@@ -465,10 +489,10 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                   '$onlineCount online · $turnPolicyLabel · hasil dilihat semua',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    fontWeight: t.weightSemiBold,
+                    color: t.textSecondary,
                   ),
                 ),
               ],
@@ -479,7 +503,7 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     );
   }
 
-  Widget _buildCapsuleMachine({required int capsuleCount}) {
+  Widget _buildCapsuleMachine({required PutarTheme theme, required int capsuleCount}) {
     // Batasi jumlah kapsul di kubah maksimum 12 sesuai spek UPDATE 2D
     final visibleCount = capsuleCount.clamp(2, 12);
 
@@ -490,13 +514,13 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
           width: 230,
           height: 230,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: theme.surface,
             shape: BoxShape.circle,
-            border: Border.all(color: AppColors.ink, width: 4),
-            boxShadow: const [
+            border: Border.all(color: theme.ink, width: 4),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(5, 5),
+                color: theme.shadowColor,
+                offset: theme.dialogShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -519,9 +543,9 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
-                            color: pos.color,
+                            color: theme.getWheelColor(pos.colorIndex),
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.ink, width: 3),
+                            border: Border.all(color: theme.ink, width: theme.borderWidth),
                           ),
                         ),
                       );
@@ -541,13 +565,13 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
             height: 128,
             padding: const EdgeInsets.symmetric(horizontal: 24),
             decoration: BoxDecoration(
-              color: AppColors.tomat,
+              color: theme.primary,
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: AppColors.ink, width: 4),
-              boxShadow: const [
+              border: Border.all(color: theme.ink, width: 4),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(5, 5),
+                  color: theme.shadowColor,
+                  offset: theme.dialogShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -569,16 +593,16 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                     width: 74,
                     height: 74,
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: theme.secondary,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.ink, width: 4),
+                      border: Border.all(color: theme.ink, width: 4),
                     ),
                     alignment: Alignment.center,
                     child: Container(
                       width: 46,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: AppColors.ink,
+                        color: theme.ink,
                         borderRadius: BorderRadius.circular(5),
                       ),
                     ),
@@ -589,9 +613,9 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                 Container(
                   width: 84,
                   height: 48,
-                  decoration: const BoxDecoration(
-                    color: AppColors.ink,
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    color: theme.ink,
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(14),
                       topRight: Radius.circular(14),
                       bottomLeft: Radius.circular(4),
@@ -653,9 +677,9 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color: _wonColor,
+                        color: theme.getWheelColor(_wonColorIndex),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
+                        border: Border.all(color: theme.surface, width: theme.borderWidth),
                       ),
                     ),
                   ),
@@ -668,7 +692,7 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     );
   }
 
-  Widget _buildResultCard({required GroupSessionModel? session}) {
+  Widget _buildResultCard({required PutarTheme t, required GroupSessionModel? session}) {
     if (_isCranking) {
       return const SizedBox(height: 72);
     }
@@ -680,13 +704,13 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.ink, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -696,19 +720,19 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
             children: [
               Text(
                 'Putar tuas untuk buka kapsul',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Rp0',
-                style: AppTypography.displayMedium.copyWith(
+                style: t.displayMedium.copyWith(
                   fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ],
@@ -722,13 +746,13 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.ink, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -738,19 +762,19 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
             children: [
               Text(
                 'Isi kapsul',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  fontWeight: t.weightBold,
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 RupiahFormatter.format(displayedAmount),
-                style: AppTypography.displayLarge.copyWith(
+                style: t.displayLarge.copyWith(
                   fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                   height: 1.1,
                 ),
               ),
@@ -761,7 +785,11 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
     );
   }
 
-  Widget _buildBudgetStatusBar({required int budget, required bool isLocked}) {
+  Widget _buildBudgetStatusBar({
+    required PutarTheme t,
+    required int budget,
+    required bool isLocked,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -770,18 +798,18 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
           children: [
             Text(
               'Budget grup untuk date ini',
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
             Text(
               RupiahFormatter.format(budget),
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
               ),
             ),
           ],
@@ -790,21 +818,21 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
         Container(
           height: 14,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.ink, width: 3),
+            border: Border.all(color: t.ink, width: t.borderWidth),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
             widthFactor: budget > 0 ? 1.0 : 0.0,
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.mint,
+                color: t.success,
                 borderRadius: BorderRadius.circular(6),
                 border: Border(
                   right: BorderSide(
-                    color: budget > 0 ? AppColors.ink : Colors.transparent,
-                    width: 3,
+                    color: budget > 0 ? t.ink : Colors.transparent,
+                    width: t.borderWidth,
                   ),
                 ),
               ),
@@ -814,10 +842,10 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
         const SizedBox(height: 4),
         Text(
           'Permainan lain terkunci sampai date selesai.',
-          style: AppTypography.bodySmall.copyWith(
+          style: t.bodySmall.copyWith(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            fontWeight: t.weightSemiBold,
+            color: t.textSecondary,
           ),
         ),
       ],
@@ -825,20 +853,28 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
   }
 
   Future<void> _confirmEndSession(GroupModel group) async {
+    final groupService = ref.read(groupServiceProvider);
+    final summary = groupService.getActiveSessionSummary(group.id);
     final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
       context,
       groupName: group.name,
-      budget: group.activeSession?.budget,
+      budget: summary.budget > 0 ? summary.budget : group.activeSession?.budget,
+      totalSpent: summary.totalSpent,
+      itemCount: summary.itemCount,
     );
     if (confirm == true) {
       await ref.read(groupGameServiceProvider).endSession(gid: group.id);
       if (mounted) {
+        setState(() {
+          _wonAmount = null;
+        });
         InAppToast.show(context, message: 'Date grup telah diakhiri. Permainan kini terbuka!');
       }
     }
   }
 
   Widget _buildActionButton({
+    required PutarTheme t,
     required GroupModel group,
     required bool canPlay,
     required bool isLocked,
@@ -868,9 +904,9 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
       children: [
         StickerButton.large(
           text: label,
-          backgroundColor: isEnabled ? AppColors.permen : AppColors.surface,
-          textColor: AppColors.ink,
-          borderColor: AppColors.ink,
+          backgroundColor: isEnabled ? t.accentPink : t.surface,
+          textColor: t.ink,
+          borderColor: t.ink,
           onPressed: isEnabled
               ? () => _turnCrank(group, canPlay, isLocked)
               : (isLocked && isOwner ? () => _confirmEndSession(group) : null),
@@ -879,9 +915,9 @@ class _GroupCapsuleScreenState extends ConsumerState<GroupCapsuleScreen>
           const SizedBox(height: 10),
           StickerButton.large(
             text: 'AKHIRI DATE GRUP',
-            backgroundColor: AppColors.matahari,
-            textColor: AppColors.ink,
-            borderColor: AppColors.ink,
+            backgroundColor: t.secondary,
+            textColor: t.ink,
+            borderColor: t.ink,
             onPressed: () => _confirmEndSession(group),
           ),
         ],

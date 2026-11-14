@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/putar_theme.dart';
 
 /// Ikon Custom: Panah Kembali (Back)
 class CustomBackIconPainter extends CustomPainter {
@@ -8,7 +8,7 @@ class CustomBackIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomBackIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -45,7 +45,7 @@ class CustomForwardIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomForwardIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -82,7 +82,7 @@ class CustomCheckIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomCheckIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.5,
   });
 
@@ -120,8 +120,8 @@ class CustomWarningIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomWarningIconPainter({
-    this.color = AppColors.ink,
-    this.markColor = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
+    this.markColor = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.8,
   });
 
@@ -176,7 +176,7 @@ class CustomCloseIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomCloseIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -209,7 +209,7 @@ class CustomPlusIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomPlusIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 3.0,
   });
 
@@ -242,7 +242,7 @@ class CustomShareIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomShareIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.5,
   });
 
@@ -288,7 +288,7 @@ class CustomVolumeIconPainter extends CustomPainter {
 
   const CustomVolumeIconPainter({
     required this.isMuted,
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -356,7 +356,7 @@ class CustomSettingsIconPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomSettingsIconPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.8,
   });
 
@@ -392,5 +392,183 @@ class CustomSettingsIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomSettingsIconPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+}
+
+/// Ikon Custom: Lonceng Notifikasi (24x24)
+class CustomBellIconPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  const CustomBellIconPainter({
+    this.color = PutarTheme.kPasarMalamInk,
+    this.strokeWidth = 2.4,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+    canvas.save();
+    canvas.scale(scale, scale);
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final body = Path()
+      ..moveTo(6.5, 10.5)
+      ..cubicTo(6.5, 6.8, 9.0, 4.5, 12.0, 4.5)
+      ..cubicTo(15.0, 4.5, 17.5, 6.8, 17.5, 10.5)
+      ..lineTo(18.5, 15.0)
+      ..quadraticBezierTo(19.2, 16.8, 19.8, 17.5)
+      ..lineTo(4.2, 17.5)
+      ..quadraticBezierTo(4.8, 16.8, 5.5, 15.0)
+      ..close();
+
+    canvas.drawPath(body, paint);
+    canvas.drawLine(const Offset(12, 3.0), const Offset(12, 4.5), paint);
+    final clapper = Path()
+      ..moveTo(9.8, 17.8)
+      ..quadraticBezierTo(12, 20.6, 14.2, 17.8);
+    canvas.drawPath(clapper, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomBellIconPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+}
+
+/// Ikon Custom: Grup / Dua Orang (24x24)
+class CustomGroupsIconPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  const CustomGroupsIconPainter({
+    this.color = PutarTheme.kPasarMalamInk,
+    this.strokeWidth = 2.3,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+    canvas.save();
+    canvas.scale(scale, scale);
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawCircle(const Offset(9, 8.5), 3.0, paint);
+    final leftBody = Path()
+      ..moveTo(3.5, 18.5)
+      ..quadraticBezierTo(4.5, 14.0, 9.0, 14.0)
+      ..quadraticBezierTo(13.5, 14.0, 14.5, 18.5);
+    canvas.drawPath(leftBody, paint);
+
+    canvas.drawCircle(const Offset(16.2, 9.5), 2.4, paint);
+    final rightBody = Path()
+      ..moveTo(15.2, 14.4)
+      ..quadraticBezierTo(19.2, 14.8, 20.5, 18.5);
+    canvas.drawPath(rightBody, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomGroupsIconPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+}
+
+/// Ikon Custom: Sinkron / Siaran Ulang (24x24)
+class CustomSyncIconPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  const CustomSyncIconPainter({
+    this.color = PutarTheme.kPasarMalamInk,
+    this.strokeWidth = 2.4,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+    canvas.save();
+    canvas.scale(scale, scale);
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final rect = Rect.fromCircle(center: const Offset(12, 12), radius: 6.8);
+    canvas.drawArc(rect, -2.5, 2.3, false, paint);
+    canvas.drawArc(rect, 0.65, 2.3, false, paint);
+
+    // Panah atas kanan & bawah kiri
+    canvas.drawLine(const Offset(17.2, 6.2), const Offset(18.2, 9.2), paint);
+    canvas.drawLine(const Offset(18.2, 9.2), const Offset(15.2, 9.4), paint);
+
+    canvas.drawLine(const Offset(6.8, 17.8), const Offset(5.8, 14.8), paint);
+    canvas.drawLine(const Offset(5.8, 14.8), const Offset(8.8, 14.6), paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomSyncIconPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+}
+
+/// Ikon Custom: Kontroller Permainan / Gamepad (24x24)
+class CustomGamepadIconPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  const CustomGamepadIconPainter({
+    this.color = PutarTheme.kPasarMalamInk,
+    this.strokeWidth = 2.3,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+    canvas.save();
+    canvas.scale(scale, scale);
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final body = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(3.2, 7.2, 17.6, 10.2),
+      const Radius.circular(5.1),
+    );
+    canvas.drawRRect(body, paint);
+
+    // D-pad kiri
+    canvas.drawLine(const Offset(6.8, 12.3), const Offset(10.0, 12.3), paint);
+    canvas.drawLine(const Offset(8.4, 10.7), const Offset(8.4, 13.9), paint);
+
+    // Dua tombol kanan
+    final dot = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(const Offset(14.8, 13.2), 1.2, dot);
+    canvas.drawCircle(const Offset(17.1, 11.4), 1.2, dot);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomGamepadIconPainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
 }

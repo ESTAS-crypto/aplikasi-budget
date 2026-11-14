@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/notifications/coordinator/notification_coordinator.dart';
 import '../../../core/notifications/models/notification_intent.dart';
 import '../../../core/notifications/storage/notified_claim_store.dart';
@@ -46,28 +45,29 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final coordinator = ref.watch(notificationCoordinatorProvider);
     final decisions = coordinator.recentDecisions.reversed.toList();
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: t.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.ink),
+          icon: Icon(Icons.arrow_back, color: t.ink),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           'Debug Notifikasi',
-          style: AppTypography.titleMedium.copyWith(
+          style: t.titleMedium.copyWith(
             fontWeight: FontWeight.w900,
-            color: AppColors.ink,
+            color: t.ink,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.ink),
+            icon: Icon(Icons.refresh, color: t.ink),
             tooltip: 'Segarkan',
             onPressed: () {
               setState(() {});
@@ -75,7 +75,7 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
             },
           ),
           IconButton(
-            icon: const Icon(Icons.delete_sweep, color: AppColors.tomat),
+            icon: Icon(Icons.delete_sweep, color: t.danger),
             tooltip: 'Hapus Histori',
             onPressed: () async {
               coordinator.clearDecisionHistory();
@@ -91,9 +91,9 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0EBF8),
+              color: t.debugMutedSurface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.ink, width: 2),
+              border: Border.all(color: t.ink, width: 2),
             ),
             child: Row(
               children: [
@@ -103,15 +103,15 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: _selectedTab == 0 ? AppColors.matahari : Colors.transparent,
+                        color: _selectedTab == 0 ? t.secondary : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         'Keputusan (${decisions.length})',
-                        style: AppTypography.buttonSmall.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                        style: t.buttonSmall.copyWith(
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -126,15 +126,15 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: _selectedTab == 1 ? AppColors.matahari : Colors.transparent,
+                        color: _selectedTab == 1 ? t.secondary : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         'Tabel Notified (${_claims.length})',
-                        style: AppTypography.buttonSmall.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                        style: t.buttonSmall.copyWith(
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -145,11 +145,11 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
           ),
         ),
       ),
-      body: _selectedTab == 0 ? _buildDecisionsView(decisions) : _buildClaimsView(),
+      body: _selectedTab == 0 ? _buildDecisionsView(t, decisions) : _buildClaimsView(t),
     );
   }
 
-  Widget _buildDecisionsView(List<NotificationDecision> decisions) {
+  Widget _buildDecisionsView(PutarTheme t, List<NotificationDecision> decisions) {
     if (decisions.isEmpty) {
       return Center(
         child: Padding(
@@ -157,17 +157,17 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.notifications_off_outlined, size: 48, color: Color(0xFF5B4B7A)),
+              Icon(Icons.notifications_off_outlined, size: 48, color: t.textSecondary),
               const SizedBox(height: 12),
               Text(
                 'Belum Ada Keputusan',
-                style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                style: t.titleMedium.copyWith(fontWeight: t.weightExtraBold),
               ),
               const SizedBox(height: 6),
               Text(
                 'Semua aktivitas notifikasi yang diproses oleh NotificationCoordinator akan dicatat di sini (maks 50).',
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmall.copyWith(color: const Color(0xFF5B4B7A)),
+                style: t.bodySmall.copyWith(color: t.textSecondary),
               ),
             ],
           ),
@@ -181,42 +181,42 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final d = decisions[index];
-        return _buildDecisionCard(d);
+        return _buildDecisionCard(t, d);
       },
     );
   }
 
-  Widget _buildDecisionCard(NotificationDecision d) {
+  Widget _buildDecisionCard(PutarTheme t, NotificationDecision d) {
     Color surfaceColor;
     switch (d.surface) {
       case NotificationSurface.banner:
-        surfaceColor = AppColors.mint;
+        surfaceColor = t.success;
         break;
       case NotificationSurface.system:
-        surfaceColor = AppColors.tomat;
+        surfaceColor = t.danger;
         break;
       case NotificationSurface.dialog:
-        surfaceColor = AppColors.lavender;
+        surfaceColor = t.accentPurple;
         break;
       case NotificationSurface.dropped:
-        surfaceColor = const Color(0xFFE2DDF0);
+        surfaceColor = t.debugHeaderBg;
         break;
     }
 
     final reasonColor = d.reason == NotificationDropReason.none
-        ? AppColors.mint
+        ? t.success
         : (d.reason == NotificationDropReason.duplicate
-            ? AppColors.tomat
-            : (d.reason == NotificationDropReason.merged ? AppColors.langit : AppColors.matahari));
+            ? t.danger
+            : (d.reason == NotificationDropReason.merged ? t.accentBlue : t.secondary));
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: t.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.ink, width: 2),
-        boxShadow: const [
-          BoxShadow(color: AppColors.ink, offset: Offset(2, 2), blurRadius: 0),
+        border: Border.all(color: t.ink, width: 2),
+        boxShadow: [
+          BoxShadow(color: t.ink, offset: t.miniShadowOffset, blurRadius: 0),
         ],
       ),
       child: Column(
@@ -230,14 +230,14 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
                 decoration: BoxDecoration(
                   color: surfaceColor,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.ink, width: 1.5),
+                  border: Border.all(color: t.ink, width: 1.5),
                 ),
                 child: Text(
                   d.surface.name.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -249,14 +249,14 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
                 decoration: BoxDecoration(
                   color: reasonColor,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.ink, width: 1.5),
+                  border: Border.all(color: t.ink, width: 1.5),
                 ),
                 child: Text(
                   'reason: ${d.reason.name}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -265,10 +265,10 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
               // Timestamp
               Text(
                 _formatTime(d.timestamp),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF5B4B7A),
+                  fontWeight: t.weightSemiBold,
+                  color: t.textSecondary,
                 ),
               ),
             ],
@@ -276,18 +276,18 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
           const SizedBox(height: 8),
           Text(
             d.title.isNotEmpty ? d.title : (d.groupName ?? 'Notifikasi'),
-            style: AppTypography.bodyMedium.copyWith(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+            style: t.bodyMedium.copyWith(
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
             ),
           ),
           const SizedBox(height: 4),
           SelectableText(
             'key: ${d.dedupeKey}\nsource: ${d.source.name}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontFamily: 'monospace',
-              color: Color(0xFF4A3E60),
+              color: t.ink.withValues(alpha: 0.78),
             ),
           ),
         ],
@@ -295,7 +295,7 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
     );
   }
 
-  Widget _buildClaimsView() {
+  Widget _buildClaimsView(PutarTheme t) {
     if (_isLoadingClaims) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -307,17 +307,17 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.table_rows_outlined, size: 48, color: Color(0xFF5B4B7A)),
+              Icon(Icons.table_rows_outlined, size: 48, color: t.textSecondary),
               const SizedBox(height: 12),
               Text(
                 'Tabel Notified Kosong',
-                style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                style: t.titleMedium.copyWith(fontWeight: t.weightExtraBold),
               ),
               const SizedBox(height: 6),
               Text(
                 'Setiap klaim atomik anti-double disimpan ke tabel lokal notified.',
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmall.copyWith(color: const Color(0xFF5B4B7A)),
+                style: t.bodySmall.copyWith(color: t.textSecondary),
               ),
             ],
           ),
@@ -334,11 +334,11 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: t.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.ink, width: 2),
-            boxShadow: const [
-              BoxShadow(color: AppColors.ink, offset: Offset(2, 2), blurRadius: 0),
+            border: Border.all(color: t.ink, width: 2),
+            boxShadow: [
+              BoxShadow(color: t.ink, offset: t.miniShadowOffset, blurRadius: 0),
             ],
           ),
           child: Column(
@@ -349,26 +349,26 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.ink, width: 1.5),
+                      border: Border.all(color: t.ink, width: 1.5),
                     ),
                     child: Text(
                       claim.surface.name.toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
                   const Spacer(),
                   Text(
                     _formatTime(claim.at),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF5B4B7A),
+                      fontWeight: t.weightSemiBold,
+                      color: t.textSecondary,
                     ),
                   ),
                 ],
@@ -376,11 +376,11 @@ class _NotificationDebugScreenState extends ConsumerState<NotificationDebugScree
               const SizedBox(height: 8),
               SelectableText(
                 claim.dedupeKey,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontFamily: 'monospace',
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
+                  fontWeight: t.weightBold,
+                  color: t.ink,
                 ),
               ),
             ],

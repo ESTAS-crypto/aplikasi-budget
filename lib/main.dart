@@ -5,8 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'core/theme/app_icon_service.dart';
 import 'core/theme/app_theme.dart';
-import 'core/theme/app_colors.dart';
+import 'core/theme/theme_controller.dart';
+import 'core/theme/theme_transition_overlay.dart';
 import 'core/utils/sound_service.dart';
 import 'core/supabase/supabase_config.dart';
 import 'core/group/services/group_auth_service.dart';
@@ -25,16 +27,6 @@ void main() async {
       DeviceOrientation.portraitDown,
     ]);
   } catch (_) {}
-
-  // Atur warna status bar dan navigation bar sistem Android
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: AppColors.surface,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
 
   // Inisialisasi SharedPreferences dengan pertahanan berlapis (fail-safe)
   SharedPreferences? prefs;
@@ -62,22 +54,57 @@ void main() async {
 
   setGlobalSharedPreferences(prefs);
 
+  // Baca tema aktif SEBELUM runApp agar frame pertama & Splash memakai tema yang benar
+  final initialTheme = readInitialThemeFromPrefs(prefs);
+
+  // Atur warna status bar dan navigation bar sistem Android sesuai tema awal
+  SystemChrome.setSystemUIOverlayStyle(
+    SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: initialTheme.surface,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  // Pra-inisialisasi Supabase dan jingle splash sebelum runApp
+  // agar realtime aktif sejak frame 1 dan audio splash serentak (0 delay)
+  await Future.wait([
+    SupabaseConfig.initialize().timeout(
+      const Duration(seconds: 2),
+      onTimeout: () {},
+    ),
+    SoundService.instance
+        .prepareSplashJingle(
+          prefs: prefs,
+          soundPackId: initialTheme.soundPackId,
+        )
+        .timeout(
+          const Duration(milliseconds: 600),
+          onTimeout: () {},
+        ),
+  ]);
+
   // Mount aplikasi SEGERA agar frame pertama langsung digambar
   // dan splash screen native Android langsung terlepas tanpa delay
   runApp(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
+        initialThemeProvider.overrideWithValue(initialTheme),
       ],
       child: const PutarJajanApp(),
     ),
   );
 
   // Jalankan inisialisasi services secara non-blocking di latar belakang
-  _initBackgroundServices(prefs);
+  _initBackgroundServices(prefs, initialTheme);
 }
 
-Future<void> _initBackgroundServices(SharedPreferences prefs) async {
+Future<void> _initBackgroundServices(
+  SharedPreferences prefs,
+  PutarTheme initialTheme,
+) async {
   // Inisialisasi lokalisasi tanggal Bahasa Indonesia
   try {
     await initializeDateFormatting('id_ID', null);
@@ -85,25 +112,38 @@ Future<void> _initBackgroundServices(SharedPreferences prefs) async {
     debugPrint('DateFormatting init error: $e');
   }
 
-  // Inisialisasi audio sound service
+  // Beri jeda singkat agar pemutaran splash MediaPlayer tidak bersaing I/O saat frame 1,
+  // lalu pra-decode 23 SFX SoundPool untuk tema aktif
   try {
-    await SoundService.instance.initialize();
+    await Future.delayed(const Duration(milliseconds: 250));
+    await SoundService.instance.initialize(
+      soundPackId: initialTheme.soundPackId,
+    );
   } catch (e) {
     debugPrint('SoundService init error: $e');
   }
 
-  // Inisialisasi Supabase (Free tier PostgreSQL & Realtime)
+  // Pastikan Supabase terinisialisasi jika sempat timeout sebelumnya
   try {
     await SupabaseConfig.initialize();
   } catch (e) {
     debugPrint('Supabase init error: $e');
   }
 
-  // Inisialisasi notifikasi lokal & pengingat Jumat
+  // Inisialisasi notifikasi lokal & pengingat Jumat pada channel tema aktif
   try {
-    await NotificationService.instance.initialize();
+    await NotificationService.instance.initialize(
+      initialTheme: initialTheme,
+    );
   } catch (e) {
     debugPrint('NotificationService init error: $e');
+  }
+
+  // Selaraskan ikon launcher & TaskDescription Android dengan tema tersimpan
+  try {
+    await AppIconService.instance.applyTheme(initialTheme, force: true);
+  } catch (e) {
+    debugPrint('AppIconService init error: $e');
   }
 
   try {
@@ -116,17 +156,18 @@ Future<void> _initBackgroundServices(SharedPreferences prefs) async {
   }
 }
 
-class PutarJajanApp extends StatefulWidget {
+class PutarJajanApp extends ConsumerStatefulWidget {
   const PutarJajanApp({super.key});
 
   @override
-  State<PutarJajanApp> createState() => _PutarJajanAppState();
+  ConsumerState<PutarJajanApp> createState() => _PutarJajanAppState();
 }
 
-class _PutarJajanAppState extends State<PutarJajanApp> {
+class _PutarJajanAppState extends ConsumerState<PutarJajanApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(NotificationCoordinator.instance);
     // Inisialisasi renderer bawaan NotificationCoordinator
     NotificationCoordinator.instance.setupDefaultRenderers(
       contextGetter: () => rootNavigatorKey.currentContext ?? context,
@@ -146,6 +187,7 @@ class _PutarJajanAppState extends State<PutarJajanApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(NotificationCoordinator.instance);
     NotificationService.instance.pendingNavigationRoute.removeListener(_handleNotificationRoute);
     super.dispose();
   }
@@ -160,14 +202,32 @@ class _PutarJajanAppState extends State<PutarJajanApp> {
 
   @override
   Widget build(BuildContext context) {
+    final activeTheme = ref.watch(themeControllerProvider);
+    ref.listen<PutarTheme>(themeControllerProvider, (prev, next) {
+      if (prev?.id != next.id) {
+        SystemChrome.setSystemUIOverlayStyle(
+          SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+            systemNavigationBarColor: next.surface,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          ),
+        );
+      }
+    });
+
     return MaterialApp.router(
       title: 'Putar Jajan',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.buildTheme(activeTheme),
+      themeAnimationDuration: const Duration(milliseconds: 580),
+      themeAnimationCurve: Curves.easeInOutCubic,
       routerConfig: appRouter,
       builder: (context, child) {
-        return GroupRealtimeNotificationListener(
-          child: child ?? const SizedBox(),
+        return ThemeTransitionOverlay(
+          child: GroupRealtimeNotificationListener(
+            child: child ?? const SizedBox(),
+          ),
         );
       },
     );

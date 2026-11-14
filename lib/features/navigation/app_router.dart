@@ -19,15 +19,17 @@ import '../group/screens/join_or_create_group_screen.dart';
 import '../group/screens/group_invite_screen.dart';
 import '../group/screens/group_activity_screen.dart';
 import '../group/screens/group_date_detail_screen.dart';
+import '../group/screens/group_date_result_screen.dart';
 import '../group/screens/group_budget_settings_screen.dart';
 import '../group/screens/group_dice_screen.dart';
 import '../group/screens/group_capsule_screen.dart';
 import '../group/screens/group_envelope_screen.dart';
 import '../group/screens/group_coin_screen.dart';
 import '../settings/screens/settings_screen.dart';
+import '../settings/screens/theme_selection_screen.dart';
 import '../notifications/screens/notification_debug_screen.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/painters/sticker_icons.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/widgets/sticker_button.dart';
 import 'bottom_nav_bar.dart';
 
@@ -70,14 +72,15 @@ final appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/splash',
   errorBuilder: (context, state) {
+    final t = context.putarTheme;
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(
           'Halaman Tidak Ditemukan',
-          style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
+          style: t.titleMedium.copyWith(color: t.ink),
         ),
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         elevation: 0,
         centerTitle: true,
       ),
@@ -87,23 +90,33 @@ final appRouter = GoRouter(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline_rounded, size: 64, color: AppColors.tomat),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: CustomPaint(
+                  painter: CustomWarningIconPainter(
+                    color: t.ink,
+                    markColor: t.danger,
+                    strokeWidth: t.borderWidth,
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Oops! Halaman Tidak Ditemukan',
-                style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
+                style: t.titleMedium.copyWith(color: t.ink),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Rute "${state.uri.path}" tidak tersedia.',
-                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                style: t.bodySmall.copyWith(color: t.textSecondary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               StickerButton(
                 text: 'Kembali ke Roda',
-                backgroundColor: AppColors.mint,
+                backgroundColor: t.success,
                 onPressed: () => context.go('/roda'),
               ),
             ],
@@ -165,6 +178,41 @@ final appRouter = GoRouter(
           context: context,
           state: state,
           child: DateResultScreen(dateId: id),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/group/date-result',
+      parentNavigatorKey: rootNavigatorKey,
+      pageBuilder: (context, state) {
+        final qp = state.uri.queryParameters;
+        final groupName = qp['groupName'] ?? 'Grup';
+        final budget = int.tryParse(qp['budget'] ?? '0') ?? 0;
+        final totalSpent = int.tryParse(qp['totalSpent'] ?? '0') ?? 0;
+        final itemCount = int.tryParse(qp['itemCount'] ?? '0') ?? 0;
+        final sessionDateMs = int.tryParse(qp['sessionDateMs'] ?? '');
+        final endedAtMs = int.tryParse(qp['endedAtMs'] ?? '');
+        return _buildCustomTransitionPage(
+          context: context,
+          state: state,
+          child: GroupDateResultScreen(
+            groupName: groupName,
+            budget: budget,
+            totalSpent: totalSpent,
+            itemCount: itemCount,
+            groupId: qp['gid'],
+            sessionId: qp['sessionId'],
+            budgetByName: qp['budgetByName'],
+            budgetGame: qp['budgetGame'],
+            endedByName: qp['endedByName'],
+            endedByUid: qp['endedByUid'],
+            sessionDate: sessionDateMs != null
+                ? DateTime.fromMillisecondsSinceEpoch(sessionDateMs)
+                : null,
+            endedAt: endedAtMs != null
+                ? DateTime.fromMillisecondsSinceEpoch(endedAtMs)
+                : null,
+          ),
         );
       },
     ),
@@ -300,6 +348,15 @@ final appRouter = GoRouter(
           child: SettingsScreen(initialTab: initialTab),
         );
       },
+    ),
+    GoRoute(
+      path: '/themes',
+      parentNavigatorKey: rootNavigatorKey,
+      pageBuilder: (context, state) => _buildCustomTransitionPage(
+        context: context,
+        state: state,
+        child: const ThemeSelectionScreen(),
+      ),
     ),
     GoRoute(
       path: '/group/notifications',

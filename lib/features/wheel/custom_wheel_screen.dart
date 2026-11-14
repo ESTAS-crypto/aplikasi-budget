@@ -6,8 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/games/game_engine.dart';
 import '../../core/group/services/group_service.dart';
 import '../../core/painters/sticker_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/in_app_toast.dart';
@@ -202,8 +201,8 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
     }
   }
 
-  Widget _buildNominalChip(int index, int amount, double chipWidth) {
-    final slotColor = AppColors.getWheelColor(index);
+  Widget _buildNominalChip(PutarTheme t, int index, int amount, double chipWidth) {
+    final slotColor = t.getWheelColor(index);
 
     return Semantics(
       button: true,
@@ -218,13 +217,13 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
             color: slotColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.ink,
-              width: 3.0,
+              color: t.ink,
+              width: t.borderWidth,
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(3, 3),
+                color: t.ink,
+                offset: t.smallShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -239,19 +238,19 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
               children: [
                 Text(
                   RupiahFormatter.formatCompact(amount),
-                  style: AppTypography.bodyLargeBold.copyWith(
+                  style: t.bodyLargeBold.copyWith(
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(width: 8),
-                const SizedBox(
+                SizedBox(
                   width: 14,
                   height: 14,
                   child: CustomPaint(
                     painter: CustomCloseIconPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: 2.8,
                     ),
                   ),
@@ -266,12 +265,13 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final double chipWidth =
         ((screenWidth - 40 - (10 * 2)) / 3).floorToDouble().clamp(90.0, 130.0);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -296,27 +296,27 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.ink,
-                            width: 3.0,
+                            color: t.ink,
+                            width: t.borderWidth,
                           ),
-                          boxShadow: const [
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.ink,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const SizedBox(
+                        child: SizedBox(
                           width: 22,
                           height: 22,
                           child: CustomPaint(
                             painter: CustomBackIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 3.0,
                             ),
                           ),
@@ -328,10 +328,10 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                   Expanded(
                     child: Text(
                       _screenTitle,
-                      style: AppTypography.titleLarge.copyWith(
+                      style: t.titleLarge.copyWith(
                         fontSize: 23,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -349,12 +349,12 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                     Container(
                       width: 130,
                       height: 130,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(4, 4),
+                            color: t.ink,
+                            offset: t.standardShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
@@ -371,6 +371,7 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                                 rotationAngleDegrees: angle,
                                 cachedTextPainters: const {},
                                 isMiniPreview: true,
+                                theme: t,
                               ),
                             ),
                           );
@@ -382,10 +383,10 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                     // Indikator jumlah nominal
                     Text(
                       '${_slots.length} dari maks. ${widget.gameType == GameType.envelope ? 16 : 12} pilihan nominal',
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
+                        fontWeight: t.weightBold,
+                        color: t.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -395,10 +396,10 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                       alignment: Alignment.centerLeft,
                       child: Text(
                         _nominalSectionTitle,
-                        style: AppTypography.titleMedium.copyWith(
+                        style: t.titleMedium.copyWith(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -411,7 +412,7 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                         spacing: 10,
                         runSpacing: 12,
                         children: List.generate(_slots.length, (index) {
-                          return _buildNominalChip(index, _slots[index], chipWidth);
+                          return _buildNominalChip(t, index, _slots[index], chipWidth);
                         }),
                       ),
                     ),
@@ -422,10 +423,10 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Tambah nominal',
-                        style: AppTypography.titleMedium.copyWith(
+                        style: t.titleMedium.copyWith(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                         ),
                       ),
                     ),
@@ -439,16 +440,16 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                             height: 56,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(18),
+                              color: t.surface,
+                              borderRadius: BorderRadius.circular(t.smallCardRadius),
                               border: Border.all(
-                                color: AppColors.ink,
-                                width: 3.0,
+                                color: t.ink,
+                                width: t.borderWidth,
                               ),
-                              boxShadow: const [
+                              boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.ink,
-                                  offset: Offset(3, 3),
+                                  color: t.ink,
+                                  offset: t.smallShadowOffset,
                                   blurRadius: 0,
                                 ),
                               ],
@@ -457,9 +458,9 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                               children: [
                                 Text(
                                   'Rp ',
-                                  style: AppTypography.titleMedium.copyWith(
-                                    color: AppColors.tomat,
-                                    fontWeight: FontWeight.w800,
+                                  style: t.titleMedium.copyWith(
+                                    color: t.danger,
+                                    fontWeight: t.weightExtraBold,
                                     fontSize: 18,
                                   ),
                                 ),
@@ -471,18 +472,18 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                                     inputFormatters: const [
                                       ThousandsSeparatorInputFormatter(),
                                     ],
-                                    style: AppTypography.titleMedium.copyWith(
-                                      color: AppColors.ink,
-                                      fontWeight: FontWeight.w700,
+                                    style: t.titleMedium.copyWith(
+                                      color: t.ink,
+                                      fontWeight: t.weightBold,
                                       fontSize: 17,
                                     ),
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
                                       hintText: '75.000',
                                       hintStyle: TextStyle(
-                                        color: AppColors.textSecondary
+                                        color: t.textSecondary
                                             .withValues(alpha: 0.6),
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: t.weightBold,
                                         fontSize: 17,
                                       ),
                                     ),
@@ -497,12 +498,12 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
                         StickerButton(
                           height: 56,
                           width: 100,
-                          borderRadius: 18,
-                          borderWidth: 3.0,
-                          shadowOffset: const Offset(3, 3),
+                          borderRadius: t.smallCardRadius,
+                          borderWidth: t.borderWidth,
+                          shadowOffset: t.smallShadowOffset,
                           text: 'Tambah',
-                          backgroundColor: AppColors.matahari,
-                          textColor: AppColors.ink,
+                          backgroundColor: t.secondary,
+                          textColor: t.ink,
                           onPressed: _addSlot,
                         ),
                       ],
@@ -518,8 +519,8 @@ class _CustomWheelScreenState extends ConsumerState<CustomWheelScreen>
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: StickerButton.large(
                 text: _saveButtonText,
-                backgroundColor: AppColors.tomat,
-                textColor: AppColors.ink,
+                backgroundColor: t.danger,
+                textColor: t.ink,
                 onPressed: _savePool,
               ),
             ),

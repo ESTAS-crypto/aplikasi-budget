@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../painters/group_icons_painter.dart';
 
 /// Badge Sinkronisasi Inline untuk Item Catatan Pengeluaran Grup
@@ -18,8 +17,9 @@ class SyncBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final isPending = hasPendingWrites;
-    final bgColor = isPending ? AppColors.matahari : AppColors.mint;
+    final bgColor = isPending ? t.secondary : t.success;
     final label = isPending ? 'Menunggu' : 'Terkirim';
     final semanticsLabel = isPending
         ? 'Catatan menunggu koneksi untuk terkirim ke server'
@@ -38,15 +38,15 @@ class SyncBadge extends StatelessWidget {
           color: bgColor,
           borderRadius: BorderRadius.circular(pill ? 99 : 6),
           border: Border.all(
-            color: AppColors.ink,
+            color: t.ink,
             width: pill ? 2.0 : 1.5,
           ),
           boxShadow: pill
               ? null
-              : const [
+              : [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(1, 1),
+                    color: t.ink,
+                    offset: const Offset(1, 1),
                     blurRadius: 0,
                   ),
                 ],
@@ -59,11 +59,11 @@ class SyncBadge extends StatelessWidget {
               size: pill ? const Size(13, 13) : const Size(11, 11),
               painter: isPending
                   ? CustomClockPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: pill ? 2.6 : 2.0,
                     )
                   : CustomCheckPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: pill ? 3.2 : 2.0,
                     ),
             ),
@@ -71,10 +71,10 @@ class SyncBadge extends StatelessWidget {
               SizedBox(width: pill ? 4 : 5),
               Text(
                 label,
-                style: AppTypography.bodySmall.copyWith(
+                style: t.bodySmall.copyWith(
                   fontSize: pill ? 11 : 10,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                   letterSpacing: pill ? 0 : 0.2,
                 ),
               ),

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../theme/putar_theme.dart';
 import '../painters/sticker_icons.dart';
 
-/// Chip bergaya neo-brutalist dengan radius penuh (stadium) dan border ink.
+/// Chip bertema dengan radius penuh (stadium) dan border ink.
 class StickerChip extends StatelessWidget {
   final String label;
-  final Color backgroundColor;
-  final Color textColor;
-  final Color borderColor;
-  final double borderWidth;
+  final Color? backgroundColor;
+  final Color? textColor;
+  final Color? borderColor;
+  final double? borderWidth;
   final VoidCallback? onDelete;
   final VoidCallback? onTap;
   final EdgeInsetsGeometry padding;
@@ -19,10 +18,10 @@ class StickerChip extends StatelessWidget {
   const StickerChip({
     super.key,
     required this.label,
-    this.backgroundColor = AppColors.lavender,
-    this.textColor = AppColors.ink,
-    this.borderColor = AppColors.ink,
-    this.borderWidth = 2.5,
+    this.backgroundColor,
+    this.textColor,
+    this.borderColor,
+    this.borderWidth,
     this.onDelete,
     this.onTap,
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -32,6 +31,12 @@ class StickerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
+    final effectiveBg = backgroundColor ?? t.accentPurple;
+    final effectiveText = textColor ?? t.ink;
+    final effectiveBorder = borderColor ?? t.borderColor;
+    final effectiveBorderWidth = borderWidth ?? t.subtleBorderWidth;
+
     Widget content = Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -43,8 +48,8 @@ class StickerChip extends StatelessWidget {
         Text(
           label,
           style: textStyle ??
-              AppTypography.chipLabel.copyWith(
-                color: textColor,
+              t.chipLabel.copyWith(
+                color: effectiveText,
               ),
         ),
         if (onDelete != null) ...[
@@ -59,7 +64,7 @@ class StickerChip extends StatelessWidget {
                 height: 14,
                 child: CustomPaint(
                   painter: CustomCloseIconPainter(
-                    color: textColor,
+                    color: effectiveText,
                     strokeWidth: 2.8,
                   ),
                 ),
@@ -73,11 +78,11 @@ class StickerChip extends StatelessWidget {
     Widget chip = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(999), // Stadium / pill shape
+        color: effectiveBg,
+        borderRadius: BorderRadius.circular(t.chipRadius), // Stadium / pill shape
         border: Border.all(
-          color: borderColor,
-          width: borderWidth,
+          color: effectiveBorder,
+          width: effectiveBorderWidth,
         ),
       ),
       child: content,

@@ -7,8 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/games/game_engine.dart';
 import '../../core/painters/sticker_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/pop_reveal.dart';
@@ -37,12 +36,6 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
   bool _hasPlayedOpenSound = false;
   List<int> _currentPool = GamePoolRepository.defaultEnvelopePool;
   List<int> _roundAmounts = [30000, 40000, 50000];
-
-  final List<Color> _envelopeColors = const [
-    AppColors.mint,
-    AppColors.permen,
-    AppColors.langit,
-  ];
 
   @override
   void initState() {
@@ -140,27 +133,28 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
     final currentActive = await db.getActiveDate();
 
     if (currentActive != null && mounted) {
+      final t = context.putarTheme;
       SoundService.instance.play(Sfx.uiTap);
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: AppColors.ink, width: 3),
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            side: BorderSide(color: t.ink, width: t.borderWidth),
           ),
-          title: const Text(
+          title: Text(
             'Date Masih Aktif!',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
               fontSize: 20,
             ),
           ),
           content: Text(
             'Kamu masih memiliki date yang aktif dengan budget ${RupiahFormatter.format(currentActive.budget)}.\n\nSelesaikan date yang sedang aktif di menu Catatan terlebih dahulu sebelum memulai sesi baru.',
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: t.ink,
               fontSize: 14,
               height: 1.4,
             ),
@@ -168,30 +162,30 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'Tutup',
                 style: TextStyle(
-                  color: AppColors.disabled,
-                  fontWeight: FontWeight.w700,
+                  color: t.textDisabled,
+                  fontWeight: t.weightBold,
                 ),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.matahari,
-                foregroundColor: AppColors.ink,
+                backgroundColor: t.secondary,
+                foregroundColor: t.ink,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.ink, width: 2),
+                  side: BorderSide(color: t.ink, width: 2),
                 ),
               ),
               onPressed: () {
                 Navigator.pop(ctx);
                 context.go('/catatan');
               },
-              child: const Text(
+              child: Text(
                 'Buka Catatan',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: t.weightExtraBold),
               ),
             ),
           ],
@@ -217,11 +211,17 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
+    final envelopeColors = [
+      t.accentMint,
+      t.accentPink,
+      t.accentBlue,
+    ];
     final activeDateAsync = ref.watch(activeDateStreamProvider);
     final activeDate = activeDateAsync.value;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -244,24 +244,24 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.shadowColor,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 22,
                         height: 22,
                         child: CustomPaint(
                           painter: CustomBackIconPainter(
-                            color: AppColors.ink,
+                            color: t.ink,
                             strokeWidth: 3.0,
                           ),
                         ),
@@ -272,10 +272,10 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                   Expanded(
                     child: Text(
                       'Pilih Amplop',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -289,13 +289,13 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppColors.matahari,
+                        color: t.secondary,
                         borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.shadowColor,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
@@ -303,12 +303,12 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 16,
                             height: 16,
                             child: CustomPaint(
                               painter: CustomSettingsIconPainter(
-                                color: AppColors.ink,
+                                color: t.ink,
                                 strokeWidth: 2.8,
                               ),
                             ),
@@ -316,10 +316,10 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                           const SizedBox(width: 6),
                           Text(
                             'Atur Isi',
-                            style: AppTypography.chipLabel.copyWith(
+                            style: t.chipLabel.copyWith(
                               fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ],
@@ -341,25 +341,25 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.shadowColor,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 16,
                           height: 16,
                           child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.2,
                             ),
                           ),
@@ -368,9 +368,9 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                         Expanded(
                           child: Text(
                             'Date aktif: ${RupiahFormatter.format(activeDate.budget)} · Buka Catatan',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -385,22 +385,22 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     'Satu amplop, isinya rahasia',
-                    style: AppTypography.bodySmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                    style: t.bodySmall.copyWith(
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                       fontSize: 13,
                     ),
                   ),
@@ -414,7 +414,7 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                 children: List.generate(3, (index) {
                   final isChosen = _selectedIndex == index;
                   final isOther = _selectedIndex != null && !isChosen;
-                  final color = _envelopeColors[index % _envelopeColors.length];
+                  final color = envelopeColors[index % envelopeColors.length];
 
                   return Expanded(
                     child: Padding(
@@ -441,9 +441,9 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                   _selectedIndex == null
                       ? 'Pilih salah satu amplop di atas'
                       : 'Amplop ${_selectedIndex == 0 ? "kiri" : _selectedIndex == 1 ? "tengah" : "kanan"} yang kamu pilih',
-                  style: AppTypography.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                  style: t.bodyMedium.copyWith(
+                    fontWeight: t.weightSemiBold,
+                    color: t.textSecondary,
                     fontSize: 14,
                   ),
                 ),
@@ -454,26 +454,26 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
               if (_wonAmount != null && !_isOpening) ...[
                 PopReveal(
                   child: StickerCard(
-                    backgroundColor: AppColors.surface,
-                    borderRadius: 22,
-                    borderWidth: 3,
+                    backgroundColor: t.surface,
+                    borderRadius: t.cardRadius,
+                    borderWidth: t.borderWidth,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: Column(
                       children: [
                         Text(
                           'Isi amplop kamu',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightBold,
+                            color: t.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           RupiahFormatter.format(_wonAmount!),
-                          style: AppTypography.displayLarge.copyWith(
+                          style: t.displayLarge.copyWith(
                             fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ],
@@ -487,8 +487,8 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
               if (_wonAmount != null && !_isOpening) ...[
                 StickerButton.large(
                   text: 'Ambil Budget ${RupiahFormatter.format(_wonAmount!)}',
-                  backgroundColor: AppColors.matahari,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.secondary,
+                  textColor: t.ink,
                   onPressed: () => _startActiveDate(_wonAmount!),
                 ),
                 const SizedBox(height: 12),
@@ -500,8 +500,8 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                     : _isOpening
                         ? 'MEMBUKA...'
                         : 'Kocok Lagi Ronde Ini',
-                backgroundColor: AppColors.mint,
-                textColor: AppColors.ink,
+                backgroundColor: t.success,
+                textColor: t.ink,
                 onPressed: _isOpening
                     ? () {}
                     : _selectedIndex == null
@@ -514,8 +514,8 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
               StickerButton(
                 height: 50,
                 borderRadius: 25,
-                backgroundColor: AppColors.surface,
-                textColor: AppColors.ink,
+                backgroundColor: t.surface,
+                textColor: t.ink,
                 onPressed: () async {
                   SoundService.instance.play(Sfx.uiTap);
                   await context.push('/custom-wheel?game=envelope');
@@ -525,12 +525,12 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 18,
                       height: 18,
                       child: CustomPaint(
                         painter: CustomSettingsIconPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 2.6,
                         ),
                       ),
@@ -541,9 +541,9 @@ class _EnvelopeScreenState extends ConsumerState<EnvelopeScreen>
                         fit: BoxFit.scaleDown,
                         child: Text(
                           'Atur Isi Amplop (${_currentPool.length} Nominal)',
-                          style: AppTypography.buttonSmall.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
+                          style: t.buttonSmall.copyWith(
+                            color: t.ink,
+                            fontWeight: t.weightExtraBold,
                             fontSize: 14,
                           ),
                         ),
@@ -579,6 +579,7 @@ class _AnimatedEnvelope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -661,15 +662,15 @@ class _AnimatedEnvelope extends StatelessWidget {
                         width: 80,
                         height: 70,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: theme.surface,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.ink, width: 3),
+                          border: Border.all(color: theme.ink, width: theme.borderWidth),
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           isChosen && t > 0.7 ? amountText : '?',
-                          style: AppTypography.bodyLargeBold.copyWith(
-                            color: AppColors.ink,
+                          style: theme.bodyLargeBold.copyWith(
+                            color: theme.ink,
                             fontSize: 16,
                           ),
                         ),
@@ -685,11 +686,11 @@ class _AnimatedEnvelope extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: color,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 3.5),
-                          boxShadow: const [
+                          border: Border.all(color: theme.ink, width: theme.heroBorderWidth),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: theme.shadowColor,
+                              offset: theme.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
@@ -697,10 +698,10 @@ class _AnimatedEnvelope extends StatelessWidget {
                         alignment: Alignment.center,
                         child: Text(
                           '?',
-                          style: AppTypography.displayLarge.copyWith(
+                          style: theme.displayLarge.copyWith(
                             fontSize: 36,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: theme.weightExtraBold,
+                            color: theme.ink,
                           ),
                         ),
                       ),
@@ -716,7 +717,10 @@ class _AnimatedEnvelope extends StatelessWidget {
                           width: 100,
                           height: 50,
                           child: CustomPaint(
-                            painter: _EnvelopeFlapPainter(color: color),
+                            painter: _EnvelopeFlapPainter(
+                              color: color,
+                              strokeColor: theme.ink,
+                            ),
                           ),
                         ),
                       ),
@@ -734,8 +738,12 @@ class _AnimatedEnvelope extends StatelessWidget {
 
 class _EnvelopeFlapPainter extends CustomPainter {
   final Color color;
+  final Color strokeColor;
 
-  const _EnvelopeFlapPainter({required this.color});
+  const _EnvelopeFlapPainter({
+    required this.color,
+    required this.strokeColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -744,7 +752,7 @@ class _EnvelopeFlapPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = AppColors.ink
+      ..color = strokeColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5
       ..strokeJoin = StrokeJoin.round;
@@ -760,6 +768,7 @@ class _EnvelopeFlapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _EnvelopeFlapPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(covariant _EnvelopeFlapPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.strokeColor != strokeColor;
 }
 

@@ -5,13 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/widgets/sticker_card.dart';
 import '../../core/widgets/sticker_button.dart';
 import '../../core/widgets/sticker_snackbar.dart';
-import '../../core/widgets/in_app_toast.dart';
+import '../../core/widgets/sheet_inline_error_banner.dart';
 import '../../core/widgets/overbudget_dialog.dart';
+import '../../core/painters/mochi_painter.dart';
+import '../../core/painters/paw_painter.dart';
 import '../../core/painters/sticker_icons.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/budget_calculator.dart';
@@ -145,27 +146,29 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
     final totalSpent = items.fold(0, (sum, item) => sum + item.price);
     final isPassed = totalSpent <= activeDate.budget;
 
+    final t = context.putarTheme;
+
     // Dialog konfirmasi penutupan sesi date
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: t.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: AppColors.ink, width: 3),
+          borderRadius: BorderRadius.circular(t.cardRadius),
+          side: BorderSide(color: t.ink, width: t.borderWidth),
         ),
-        title: const Text(
+        title: Text(
           'Selesaikan Date?',
           style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
             fontSize: 20,
           ),
         ),
         content: Text(
           'Date malam ini akan ditutup dengan total belanja ${RupiahFormatter.format(totalSpent)} dari budget ${RupiahFormatter.format(activeDate.budget)}.\n\nLanjutkan?',
-          style: const TextStyle(
-            color: AppColors.ink,
+          style: TextStyle(
+            color: t.ink,
             fontSize: 14,
             height: 1.4,
           ),
@@ -173,27 +176,27 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Batal',
               style: TextStyle(
-                color: AppColors.disabled,
-                fontWeight: FontWeight.w700,
+                color: t.textDisabled,
+                fontWeight: t.weightBold,
               ),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.matahari,
-              foregroundColor: AppColors.ink,
+              backgroundColor: t.secondary,
+              foregroundColor: t.ink,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppColors.ink, width: 2),
+                side: BorderSide(color: t.ink, width: 2),
               ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
+            child: Text(
               'Selesaikan',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(fontWeight: t.weightExtraBold),
             ),
           ),
         ],
@@ -242,11 +245,12 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
 
     final activeDate = activeDateAsync.value;
     final items = itemsAsync.value ?? [];
+    final t = context.putarTheme;
 
     if (activeDate == null) {
       // Tidak ada date yang sedang aktif
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
           child: Column(
             children: [
@@ -273,25 +277,25 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                           width: 80,
                           height: 80,
                           decoration: BoxDecoration(
-                            color: AppColors.matahari,
+                            color: t.secondary,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.ink, width: 3.5),
-                            boxShadow: const [
+                            border: Border.all(color: t.ink, width: t.heroBorderWidth),
+                            boxShadow: [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(4, 4),
+                                color: t.shadowColor,
+                                offset: t.standardShadowOffset,
                                 blurRadius: 0,
                               ),
                             ],
                           ),
                           alignment: Alignment.center,
-                          child: const SizedBox(
+                          child: SizedBox(
                             width: 40,
                             height: 40,
                             child: CustomPaint(
                               painter: CustomWarningIconPainter(
-                                color: AppColors.ink,
-                                markColor: AppColors.ink,
+                                color: t.ink,
+                                markColor: t.ink,
                                 strokeWidth: 3.2,
                               ),
                             ),
@@ -300,17 +304,17 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                         const SizedBox(height: 20),
                         Text(
                           'Belum ada date yang berjalan',
-                          style: AppTypography.displayMedium.copyWith(
+                          style: t.displayMedium.copyWith(
                             fontSize: 24,
-                            color: AppColors.ink,
+                            color: t.ink,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Putar roda dulu untuk menentukan batas maksimal jajan malam ini!',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                          style: t.bodyMedium.copyWith(
+                            color: t.textSecondary,
                             fontSize: 15,
                           ),
                           textAlign: TextAlign.center,
@@ -318,8 +322,8 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                         const SizedBox(height: 28),
                         StickerButton.large(
                           text: 'PUTAR RODA SEKARANG',
-                          backgroundColor: AppColors.tomat,
-                          textColor: AppColors.ink,
+                          backgroundColor: t.danger,
+                          textColor: t.ink,
                           onPressed: () => context.go('/roda'),
                         ),
                       ],
@@ -339,13 +343,14 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
     final statusColor = BudgetCalculator.getStatusColor(
       spent: totalSpent,
       budget: activeDate.budget,
+      theme: t,
     );
 
     // Format tanggal
     final dateString = IndonesianDateFormatter.dayWithNight(activeDate.startedAt);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -362,130 +367,208 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-                    // Header Subtitle: "Lagi ngedate"
-                    Text(
-                      'Lagi ngedate',
-                      style: AppTypography.bodySmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    // Header Title: "Jumat malam" / Tanggal aktif
-                    Text(
-                      dateString.isNotEmpty ? dateString : 'Malam ini',
-                      style: AppTypography.displayMedium.copyWith(
-                        fontSize: 32,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Kartu Matahari Hero: Sisa Budget
-                    StickerCard.hero(
-                      backgroundColor: AppColors.matahari,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 18,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sisa budget',
-                            style: AppTypography.bodyLargeBold.copyWith(
-                              fontSize: 16,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Angka sisa besar "Rp36.000"
-                          Text(
-                            remaining >= 0
-                                ? RupiahFormatter.format(remaining)
-                                : '-${RupiahFormatter.format(remaining.abs())}',
-                            style: AppTypography.displayLarge.copyWith(
-                              fontSize: 42,
-                              color: AppColors.ink,
-                              letterSpacing: -1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Bar progres berborder ink dengan animasi terisi halus
-                          Container(
-                            height: 20,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: AppColors.ink,
-                                width: 3.0,
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                return TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0.0, end: progress.clamp(0.0, 1.0)),
-                                  duration: const Duration(milliseconds: 600),
-                                  curve: Curves.easeOutCubic,
-                                  builder: (context, val, child) {
-                                    return Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Container(
-                                        width: constraints.maxWidth * val,
-                                        color: statusColor,
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          // "Terpakai Rp64.000 dari Rp100.000"
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Header: subtitle + tanggal (+ badge status di tema Kucing)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  'Terpakai ${RupiahFormatter.format(totalSpent)}',
-                                  style: AppTypography.bodySmall.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.ink,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                              Text(
+                                'Lagi ngedate',
+                                style: t.bodySmall.copyWith(
+                                  fontWeight: t.weightBold,
+                                  color: t.textSecondary,
+                                  fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'dari ${RupiahFormatter.format(activeDate.budget)}',
-                                  style: AppTypography.bodySmall.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.ink,
-                                  ),
-                                  textAlign: TextAlign.end,
-                                  overflow: TextOverflow.ellipsis,
+                              const SizedBox(height: 2),
+                              Text(
+                                dateString.isNotEmpty ? dateString : 'Malam ini',
+                                style: t.displayMedium.copyWith(
+                                  fontSize: 32,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
                           ),
+                        ),
+                        if (t.mascot != null) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 0,
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 155),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: remaining >= 0
+                                    ? t.success
+                                    : t.softDangerBg,
+                                borderRadius:
+                                    BorderRadius.circular(t.chipRadius),
+                                border: Border.all(
+                                  color: t.ink,
+                                  width: t.borderWidth,
+                                ),
+                              ),
+                              child: Text(
+                                remaining >= 0
+                                    ? t.text(PutarCopyKeys.budgetSafe)
+                                    : t.text(PutarCopyKeys.budgetOverShort),
+                                style: t.chipLabel.copyWith(
+                                  color: t.ink,
+                                  fontWeight: t.weightBold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
                         ],
-                      ),
+                      ],
+                    ),
+                    SizedBox(height: t.mascot != null ? 4 : 16),
+
+                    // Kartu Matahari Hero: Sisa Budget (+ Mochi mengintip di tema Kucing)
+                    Builder(
+                      builder: (context) {
+                        final heroCard = StickerCard.hero(
+                          backgroundColor: t.secondary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 18,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Sisa budget',
+                                style: t.bodyLargeBold.copyWith(
+                                  fontSize: 16,
+                                  color: t.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              // Angka sisa besar "Rp36.000"
+                              Text(
+                                remaining >= 0
+                                    ? RupiahFormatter.format(remaining)
+                                    : '-${RupiahFormatter.format(remaining.abs())}',
+                                style: t.displayLarge.copyWith(
+                                  fontSize: 42,
+                                  color: t.ink,
+                                  letterSpacing: -1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+
+                              // Bar progres berborder ink dengan animasi terisi halus
+                              Container(
+                                height: 20,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: t.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: t.ink,
+                                    width: t.borderWidth,
+                                  ),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return TweenAnimationBuilder<double>(
+                                      tween: Tween(
+                                        begin: 0.0,
+                                        end: progress.clamp(0.0, 1.0),
+                                      ),
+                                      duration:
+                                          const Duration(milliseconds: 600),
+                                      curve: Curves.easeOutCubic,
+                                      builder: (context, val, child) {
+                                        return Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Container(
+                                            width: constraints.maxWidth * val,
+                                            color: statusColor,
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+
+                              // "Terpakai Rp64.000 dari Rp100.000"
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Terpakai ${RupiahFormatter.format(totalSpent)}',
+                                      style: t.bodySmall.copyWith(
+                                        fontWeight: t.weightBold,
+                                        color: t.ink,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'dari ${RupiahFormatter.format(activeDate.budget)}',
+                                      style: t.bodySmall.copyWith(
+                                        fontWeight: t.weightBold,
+                                        color: t.ink,
+                                      ),
+                                      textAlign: TextAlign.end,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (t.mascot != PutarMascotKind.mochi) {
+                          return heroCard;
+                        }
+
+                        return Stack(
+                          children: [
+                            Positioned(
+                              right: 22,
+                              top: 2,
+                              child: MochiWidget(
+                                size: 76,
+                                expression: remaining < 0
+                                    ? MochiExpression.sad
+                                    : MochiExpression.normal,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 46),
+                              child: heroCard,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
 
                     // Judul Bagian: "Jajan malam ini"
                     Text(
                       'Jajan malam ini',
-                      style: AppTypography.titleLarge.copyWith(
+                      style: t.titleLarge.copyWith(
                         fontSize: 20,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -498,8 +581,8 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                           child: Text(
                             'Belum ada jajan yang dicatat.\nTekan tombol di bawah untuk mencatat!',
                             textAlign: TextAlign.center,
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
+                            style: t.bodyMedium.copyWith(
+                              color: t.textSecondary,
                             ),
                           ),
                         ),
@@ -507,7 +590,7 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                     else
                       ...List.generate(items.length, (index) {
                         final item = items[index];
-                        final dotColor = AppColors.getWheelColor(index);
+                        final dotColor = t.getWheelColor(index);
                         return _StaggeredItemCard(
                           key: ValueKey(item.id),
                           index: index,
@@ -539,8 +622,8 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Text(
                           'Selesaikan date malam ini',
-                          style: AppTypography.bodyLargeBold.copyWith(
-                            color: AppColors.textSecondary,
+                          style: t.bodyLargeBold.copyWith(
+                            color: t.textSecondary,
                             decoration: TextDecoration.underline,
                           ),
                         ),
@@ -549,8 +632,8 @@ class _ActiveDateScreenState extends ConsumerState<ActiveDateScreen> {
                   ],
                   StickerButton.large(
                     text: 'Catat jajan',
-                    backgroundColor: AppColors.tomat,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.danger,
+                    textColor: t.ink,
                     onPressed: _openAddExpenseSheet,
                   ),
                 ],
@@ -628,6 +711,7 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
@@ -635,31 +719,44 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
         child: Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: StickerCard(
-            backgroundColor: AppColors.surface,
-            borderRadius: 22,
+            backgroundColor: t.surface,
+            borderRadius: t.cardRadius,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                // Titik warna berborder ink
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: widget.dotColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.ink,
-                      width: 2.2,
+                // Penanda item: tapak kucing (Kucing Manis) atau titik bulat (Pasar Malam)
+                if (t.iconStyle == PutarIconStyle.kucing)
+                  SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CustomPaint(
+                      painter: PawPainter(
+                        fillColor: widget.dotColor,
+                        strokeColor: t.ink,
+                        strokeWidth: 2.2,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: widget.dotColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: t.ink,
+                        width: 2.2,
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(width: 14),
                 // Nama jajan
                 Expanded(
                   child: Text(
                     widget.name,
-                    style: AppTypography.bodyLargeBold.copyWith(
-                      color: AppColors.ink,
+                    style: t.bodyLargeBold.copyWith(
+                      color: t.ink,
                       fontSize: 16,
                     ),
                   ),
@@ -667,8 +764,8 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
                 // Harga jajan
                 Text(
                   RupiahFormatter.format(widget.price),
-                  style: AppTypography.bodyLargeBold.copyWith(
-                    color: AppColors.ink,
+                  style: t.bodyLargeBold.copyWith(
+                    color: t.ink,
                     fontSize: 16,
                   ),
                 ),
@@ -676,12 +773,12 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
                 // Tombol hapus silang
                 GestureDetector(
                   onTap: widget.onDelete,
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 16,
                     height: 16,
                     child: CustomPaint(
                       painter: CustomCloseIconPainter(
-                        color: AppColors.disabled,
+                        color: t.textDisabled,
                         strokeWidth: 2.4,
                       ),
                     ),
@@ -715,6 +812,8 @@ class _AddExpenseBottomSheetState extends ConsumerState<_AddExpenseBottomSheet> 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final FocusNode _priceFocusNode = FocusNode();
+  bool _isSaving = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -724,56 +823,80 @@ class _AddExpenseBottomSheetState extends ConsumerState<_AddExpenseBottomSheet> 
     super.dispose();
   }
 
+  void _clearError() {
+    if (_errorMessage != null) {
+      setState(() => _errorMessage = null);
+    }
+  }
+
   Future<void> _submit() async {
+    if (_isSaving) return;
+
     final rawName = _nameController.text.trim();
     final name = rawName.isEmpty ? 'Jajan' : rawName;
     final parsedPrice = RupiahFormatter.parse(_priceController.text);
     if (parsedPrice <= 0) {
       SoundService.instance.play(Sfx.uiTap);
-      InAppToast.show(context, message: 'Masukkan nominal harga jajan');
+      setState(() => _errorMessage = 'Masukkan nominal harga jajan');
       _priceFocusNode.requestFocus();
       return;
     }
     final price = parsedPrice;
 
-    final db = ref.read(databaseProvider);
-    final currentItems = await db.getItemsForDate(widget.activeDate.id);
-    final currentSpent = currentItems.fold(0, (sum, i) => sum + i.price);
-    final newTotalSpent = currentSpent + price;
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
 
-    // Cek apakah jajan ini menyebabkan budget lewat (100%+)
-    if (newTotalSpent > widget.activeDate.budget) {
-      final excess = newTotalSpent - widget.activeDate.budget;
-      if (!mounted) return;
-      final proceed = await showOverbudgetDialog(context, excessAmount: excess);
-      if (proceed != true) {
-        // Pengguna memilih "Hapus item"
-        return;
+    try {
+      final db = ref.read(databaseProvider);
+      final currentItems = await db.getItemsForDate(widget.activeDate.id);
+      final currentSpent = currentItems.fold(0, (sum, i) => sum + i.price);
+      final newTotalSpent = currentSpent + price;
+
+      // Cek apakah jajan ini menyebabkan budget lewat (100%+)
+      if (newTotalSpent > widget.activeDate.budget) {
+        final excess = newTotalSpent - widget.activeDate.budget;
+        if (!mounted) return;
+        final proceed = await showOverbudgetDialog(context, excessAmount: excess);
+        if (proceed != true) {
+          // Pengguna memilih "Hapus item"
+          return;
+        }
       }
-    }
 
-    final itemId = await db.addItem(
-      dateId: widget.activeDate.id,
-      name: name,
-      price: price,
-    );
+      final itemId = await db.addItem(
+        dateId: widget.activeDate.id,
+        name: name,
+        price: price,
+      );
 
-    final newItem = DateItemRecord(
-      id: itemId,
-      dateId: widget.activeDate.id,
-      name: name,
-      price: price,
-      createdAt: DateTime.now(),
-    );
+      final newItem = DateItemRecord(
+        id: itemId,
+        dateId: widget.activeDate.id,
+        name: name,
+        price: price,
+        createdAt: DateTime.now(),
+      );
 
-    if (mounted) {
-      Navigator.pop(context);
-      widget.onItemAdded(newItem, currentSpent);
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onItemAdded(newItem, currentSpent);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Gagal menyimpan jajan. Coba lagi.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -784,127 +907,133 @@ class _AddExpenseBottomSheetState extends ConsumerState<_AddExpenseBottomSheet> 
         top: 16,
         bottom: bottomInset > 0 ? bottomInset + 16 : bottomPadding + 20,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.sheetRadius)),
         border: Border(
-          top: BorderSide(color: AppColors.ink, width: 3.5),
-          left: BorderSide(color: AppColors.ink, width: 3.5),
-          right: BorderSide(color: AppColors.ink, width: 3.5),
+          top: BorderSide(color: t.ink, width: t.heroBorderWidth),
+          left: BorderSide(color: t.ink, width: t.heroBorderWidth),
+          right: BorderSide(color: t.ink, width: t.heroBorderWidth),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 44,
-              height: 5,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: t.ink,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            Text(
+              'Catat Jajan',
+              style: t.titleLarge.copyWith(
+                fontSize: 22,
+                color: t.ink,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Input Nama Jajan
+            Text(
+              'Nama Jajan / Makanan',
+              style: t.bodySmall.copyWith(
+                fontWeight: t.weightBold,
+                color: t.ink,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: AppColors.ink,
-                borderRadius: BorderRadius.circular(3),
+                color: t.bg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: t.ink, width: t.subtleBorderWidth),
               ),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          Text(
-            'Catat Jajan',
-            style: AppTypography.titleLarge.copyWith(
-              fontSize: 22,
-              color: AppColors.ink,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Input Nama Jajan
-          Text(
-            'Nama Jajan / Makanan',
-            style: AppTypography.bodySmall.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.ink,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: AppColors.cream,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.ink, width: 2.5),
-            ),
-            child: TextField(
-              controller: _nameController,
-              autofocus: false,
-              style: AppTypography.bodyLargeBold.copyWith(color: AppColors.ink),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Misal: Sate taichan',
-                hintStyle: TextStyle(color: AppColors.disabled),
-              ),
-              textInputAction: TextInputAction.next,
-              onSubmitted: (_) => _priceFocusNode.requestFocus(),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Input Harga Jajan
-          Text(
-            'Harga',
-            style: AppTypography.bodySmall.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.ink,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: AppColors.cream,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.ink, width: 2.5),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  'Rp ',
-                  style: AppTypography.titleMedium.copyWith(
-                    color: AppColors.tomat,
-                    fontWeight: FontWeight.w800,
-                  ),
+              child: TextField(
+                controller: _nameController,
+                autofocus: false,
+                onChanged: (_) => _clearError(),
+                style: t.bodyLargeBold.copyWith(color: t.ink),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Misal: Sate taichan',
+                  hintStyle: TextStyle(color: t.textDisabled),
                 ),
-                Expanded(
-                  child: TextField(
-                    controller: _priceController,
-                    focusNode: _priceFocusNode,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: const [ThousandsSeparatorInputFormatter()],
-                    style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: '32.000',
-                      hintStyle: TextStyle(color: AppColors.disabled),
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => _priceFocusNode.requestFocus(),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Input Harga Jajan
+            Text(
+              'Harga',
+              style: t.bodySmall.copyWith(
+                fontWeight: t.weightBold,
+                color: t.ink,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: t.bg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Rp ',
+                    style: t.titleMedium.copyWith(
+                      color: t.danger,
+                      fontWeight: t.weightExtraBold,
                     ),
-                    onSubmitted: (_) => _submit(),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: TextField(
+                      controller: _priceController,
+                      focusNode: _priceFocusNode,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                      onChanged: (_) => _clearError(),
+                      style: t.titleMedium.copyWith(color: t.ink),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '32.000',
+                        hintStyle: TextStyle(color: t.textDisabled),
+                      ),
+                      onSubmitted: (_) => _submit(),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 18),
 
-          // Tombol Simpan Jajan
-          StickerButton.large(
-            text: 'Simpan Jajan',
-            backgroundColor: AppColors.tomat,
-            textColor: AppColors.ink,
-            onPressed: _submit,
-          ),
-        ],
+            SheetInlineErrorBanner(message: _errorMessage),
+
+            // Tombol Simpan Jajan
+            StickerButton.large(
+              text: _isSaving ? 'Menyimpan...' : 'Simpan Jajan',
+              backgroundColor: t.danger,
+              textColor: t.ink,
+              onPressed: _isSaving ? null : _submit,
+            ),
+          ],
+        ),
       ),
     );
   }

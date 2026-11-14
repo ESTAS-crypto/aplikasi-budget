@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +13,9 @@ import '../services/group_notification_settings_service.dart';
 import 'in_app_banner.dart';
 import 'group_important_dialog.dart';
 import 'scope_switcher.dart';
+import '../../../features/group/screens/group_date_result_screen.dart';
 import '../../../features/navigation/app_router.dart';
+import '../../../features/notifications/notification_service.dart';
 import '../../notifications/notifications.dart';
 import '../models/live_play_model.dart';
 import '../services/clock_sync_service.dart';
@@ -22,10 +25,12 @@ import 'live_spin_overlay.dart';
 /// Menghubungkan Supabase/Firestore group_events ke InAppBanner dan Notifikasi Sistem Android.
 class GroupRealtimeNotificationListener extends ConsumerStatefulWidget {
   final Widget child;
+  final ValueChanged<String>? onNavigateRoute;
 
   const GroupRealtimeNotificationListener({
     super.key,
     required this.child,
+    this.onNavigateRoute,
   });
 
   @override
@@ -34,7 +39,8 @@ class GroupRealtimeNotificationListener extends ConsumerStatefulWidget {
 }
 
 class _GroupRealtimeNotificationListenerState
-    extends ConsumerState<GroupRealtimeNotificationListener> {
+    extends ConsumerState<GroupRealtimeNotificationListener>
+    with WidgetsBindingObserver {
   final Set<String> _seenEventIds = {};
   bool _isFirstEventSnapshot = true;
   String? _currentListeningGid;
@@ -78,18 +84,137 @@ class _GroupRealtimeNotificationListenerState
     });
   }
 
+  void _maybeOpenGroupResultScreen({
+    required String gid,
+    required String groupName,
+    required GroupEventModel evt,
+    required bool isMe,
+  }) {
+    if (isMe) return;
+    if (NotificationCoordinator.instance.currentLifecycleState !=
+        AppLifecycleState.resumed) {
+      return;
+    }
+    if (ref.read(groupOfflineModeProvider)) return;
+
+    final endedSid =
+        (evt.payload['endedSessionId'] ?? evt.payload['sessionId'])
+                ?.toString() ??
+            '';
+    if (endedSid.isEmpty) return;
+
+    final age = DateTime.now().difference(evt.createdAt).abs();
+    if (age > const Duration(seconds: 30)) {
+      return;
+    }
+
+    final groupService = ref.read(groupServiceProvider);
+    if (groupService.hasShownResultForSession(gid, endedSid)) return;
+
+    final customNavigate = widget.onNavigateRoute;
+    final navCtx = rootNavigatorKey.currentContext;
+    if (customNavigate == null && (navCtx == null || !navCtx.mounted)) {
+      return;
+    }
+    final contextRouter = navCtx != null ? GoRouter.maybeOf(navCtx) : null;
+    final hasMountedAppRouter = navCtx != null &&
+        navCtx.mounted &&
+        appRouter.routerDelegate.currentConfiguration.matches.isNotEmpty;
+    if (customNavigate == null &&
+        contextRouter == null &&
+        !hasMountedAppRouter) {
+      return;
+    }
+
+    groupService.markResultAsShown(gid, endedSid);
+
+    final sessions = groupService.getLocalSessions(gid);
+    final matched =
+        sessions.where((s) => s.sessionId == endedSid).firstOrNull;
+    final budget =
+        (evt.payload['budget'] as num?)?.toInt() ?? matched?.budget ?? 0;
+    final totalSpent = (evt.payload['totalSpent'] as num?)?.toInt() ??
+        matched?.totalSpent ??
+        0;
+    final noteCount = (evt.payload['noteCount'] as num?)?.toInt() ??
+        groupService
+            .getLocalNotes(gid)
+            .where((n) => !n.deleted && n.sessionId == endedSid)
+            .length;
+
+    final uri = buildGroupDateResultUri(
+      groupName: groupName,
+      budget: budget,
+      totalSpent: totalSpent,
+      itemCount: noteCount,
+      groupId: gid,
+      sessionId: endedSid,
+      budgetByName:
+          evt.payload['budgetByName']?.toString() ?? matched?.budgetByName,
+      budgetGame: evt.payload['game']?.toString() ?? matched?.game,
+      endedByName: evt.payload['endedByName']?.toString() ?? evt.actorName,
+      endedByUid: evt.payload['endedByUid']?.toString() ?? evt.actorUid,
+      sessionDate: matched?.startedAt ?? evt.createdAt,
+      endedAt: evt.createdAt,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (customNavigate != null) {
+        customNavigate(uri.toString());
+        return;
+      }
+      final ctx = rootNavigatorKey.currentContext;
+      final router = ctx != null && ctx.mounted ? GoRouter.maybeOf(ctx) : null;
+      if (router != null) {
+        router.push(uri.toString());
+      } else if (ctx != null &&
+          ctx.mounted &&
+          appRouter.routerDelegate.currentConfiguration.matches.isNotEmpty) {
+        appRouter.push(uri.toString());
+      }
+    });
+  }
+
   ClockSyncService? _clockSyncService;
+  bool Function(String gid)? _boundGroupMutedGetter;
+  bool Function(NotificationCategory category)? _boundCategoryEnabledGetter;
 
   @override
   void initState() {
     super.initState();
     _listenerStartTime = DateTime.now();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    final coordinator = NotificationCoordinator.instance;
+    if (identical(coordinator.isGroupMutedGetter, _boundGroupMutedGetter)) {
+      coordinator.isGroupMutedGetter = null;
+    }
+    if (identical(
+      coordinator.isCategoryEnabledGetter,
+      _boundCategoryEnabledGetter,
+    )) {
+      coordinator.isCategoryEnabledGetter = null;
+    }
+    WidgetsBinding.instance.removeObserver(this);
     _clockSyncService?.stopPeriodicSync();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    NotificationCoordinator.instance.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      final gid = _currentListeningGid;
+      if (gid != null && gid.isNotEmpty) {
+        final gs = ref.read(groupServiceProvider);
+        gs.reconnectAndRefresh(gid);
+        unawaited(gs.updatePresence(gid));
+      }
+    }
   }
 
   void _loadSeenEventIdsSync(String gid, SharedPreferences prefs) {
@@ -101,7 +226,8 @@ class _GroupRealtimeNotificationListenerState
 
   Future<void> _saveSeenEventIds(String gid, SharedPreferences prefs) async {
     try {
-      final toSave = _seenEventIds.take(200).toList();
+      final list = _seenEventIds.toList();
+      final toSave = list.length > 200 ? list.sublist(list.length - 200) : list;
       await prefs.setStringList('seen_group_events_$gid', toSave);
     } catch (_) {}
   }
@@ -118,6 +244,9 @@ class _GroupRealtimeNotificationListenerState
       if (activeGid != null && activeGid.isNotEmpty) {
         _loadSeenEventIdsSync(activeGid, prefs);
         final gs = ref.read(groupServiceProvider);
+        gs.ensureRealtimeActive(activeGid);
+        unawaited(gs.updatePresence(activeGid));
+        unawaited(NotificationService.instance.ensureAndroidPermissionIfNeeded());
         _clockSyncService = ref.read(clockSyncServiceProvider);
         _clockSyncService!.startPeriodicSync(
           activeGid,
@@ -134,14 +263,18 @@ class _GroupRealtimeNotificationListenerState
     final coordinator = ref.read(notificationCoordinatorProvider);
     final auth = ref.watch(groupAuthServiceProvider);
     coordinator.currentUidGetter = () => auth.currentUid ?? auth.fallbackUid;
-    coordinator.isGroupMutedGetter = (gid) {
+    coordinator.isCurrentUserGetter = (uid) => auth.isCurrentUser(uid);
+    _boundGroupMutedGetter = (gid) {
+      if (!mounted) return false;
       if (activeGid != null && activeGid == gid) {
         final notifSettings = ref.read(groupNotificationSettingsProvider(activeGid));
         return notifSettings.isCurrentlyMuted;
       }
       return false;
     };
-    coordinator.isCategoryEnabledGetter = (cat) {
+    coordinator.isGroupMutedGetter = _boundGroupMutedGetter;
+    _boundCategoryEnabledGetter = (cat) {
+      if (!mounted) return true;
       if (activeGid != null) {
         final notifSettings = ref.read(groupNotificationSettingsProvider(activeGid));
         switch (cat) {
@@ -164,6 +297,7 @@ class _GroupRealtimeNotificationListenerState
       }
       return true;
     };
+    coordinator.isCategoryEnabledGetter = _boundCategoryEnabledGetter;
 
     // Pantau keanggotaan untuk dialog DIKELUARKAN (Notif3.dc.html)
     ref.listen<AsyncValue<List<GroupMemberModel>>>(
@@ -215,23 +349,27 @@ class _GroupRealtimeNotificationListenerState
         final events = next.valueOrNull;
         if (events == null || events.isEmpty) return;
 
-        // 1. Filter semua event lama yang terjadi sebelum listener berjalan
-        for (final evt in events) {
-          if (evt.createdAt.isBefore(_listenerStartTime.subtract(const Duration(seconds: 15)))) {
-            _seenEventIds.add(evt.eventId);
-          }
-        }
-
-        // 2. Snapshot pertama saat membuka/masuk grup: tandai event LAMA agar tidak memicu alert berulang,
-        // namun izinkan event baru (kurang dari 5 detik lalu, seperti baru gabung) untuk menampilkan banner
+        // 1. Snapshot pertama saat membuka/masuk grup: tandai event historis (>15 detik lalu) agar tidak spam ulang,
+        //    sedangkan snapshot realtime berikutnya mengizinkan event dengan clock skew ringan hingga 5 menit.
         if (_isFirstEventSnapshot) {
+          final initialCutoff = _listenerStartTime.subtract(const Duration(seconds: 15));
           for (final evt in events) {
-            if (evt.createdAt.isBefore(_listenerStartTime.subtract(const Duration(seconds: 5)))) {
+            if (evt.eventId.isNotEmpty && evt.createdAt.isBefore(initialCutoff)) {
               _seenEventIds.add(evt.eventId);
             }
           }
           _isFirstEventSnapshot = false;
           _saveSeenEventIds(activeGid, prefs);
+        } else {
+          final historyCutoff = _listenerStartTime.subtract(const Duration(minutes: 5));
+          for (final evt in events) {
+            if (evt.eventId.isNotEmpty && evt.createdAt.isBefore(historyCutoff)) {
+              _seenEventIds.add(evt.eventId);
+            }
+          }
+        }
+        while (_seenEventIds.length > 500) {
+          _seenEventIds.remove(_seenEventIds.first);
         }
 
         // 3. Cari event baru yang belum pernah diproses
@@ -255,6 +393,15 @@ class _GroupRealtimeNotificationListenerState
           if (evt.type == GroupEventType.memberLeave &&
               (evt.payload['kicked'] == true || (evt.summary != null && evt.summary!.contains('dikeluarkan'))) &&
               authService.isCurrentUser(evt.payload['kickedUid']?.toString() ?? evt.actorUid)) {
+            if (NotificationCoordinator.instance.currentLifecycleState !=
+                AppLifecycleState.resumed) {
+              await ref.read(notificationCoordinatorProvider).dispatch(
+                    NotificationIntent.kickedFromGroup(
+                      gid: activeGid,
+                      groupName: groupName,
+                    ),
+                  );
+            }
             // Pemilik grup tidak bisa dikeluarkan
             if (group == null || !authService.isCurrentUser(group.ownerUid)) {
               _evictUserFromGroup(groupName: groupName);
@@ -269,7 +416,11 @@ class _GroupRealtimeNotificationListenerState
 
           // Periksa filter jenis notifikasi berdasarkan sakelar di Layar 44 (untuk aksi anggota lain)
           if (!isMe) {
-            if (evt.type == GroupEventType.expense && !settings.notifyExpenses) continue;
+            if ((evt.type == GroupEventType.expense ||
+                    evt.type == GroupEventType.expenseDeleted) &&
+                !settings.notifyExpenses) {
+              continue;
+            }
             if (evt.type == GroupEventType.spin && !settings.notifySpin) continue;
             if (evt.type == GroupEventType.gameResult && !settings.notifySpin) continue;
             if (evt.type == GroupEventType.memberJoin && !settings.notifyMembers) continue;
@@ -424,11 +575,25 @@ class _GroupRealtimeNotificationListenerState
               category = InAppBannerCategory.sessionEnd;
               if (evt.type == GroupEventType.sessionEnd ||
                   evt.payload['action'] == 'end_session') {
+                _maybeOpenGroupResultScreen(
+                  gid: activeGid,
+                  groupName: groupName,
+                  evt: evt,
+                  isMe: isMe,
+                );
                 bannerTitle = isMe
-                    ? 'Kamu mengakhiri date grup'
-                    : '${evt.actorName} mengakhiri date grup';
-                bannerSubtitle = 'Sesi date selesai · Permainan grup kini terbuka';
-                systemMessage = '${evt.actorName} telah mengakhiri sesi date di grup $groupName.';
+                    ? 'Kamu menyelesaikan date grup'
+                    : '${evt.actorName} menyelesaikan date grup';
+                bannerSubtitle =
+                    'Sesi date selesai · Permainan grup kini terbuka';
+                systemMessage =
+                    '${evt.actorName} telah menyelesaikan sesi date di grup $groupName.';
+              } else if (evt.payload['action'] == 'session_result_updated') {
+                bannerTitle = 'Hasil date diperbarui';
+                bannerSubtitle = evt.summary ??
+                    'Catatan offline masuk, hasil date dihitung ulang.';
+                systemMessage =
+                    'Hasil date grup $groupName diperbarui setelah catatan offline tersinkron.';
               } else {
                 bannerTitle = isMe
                     ? 'Nominal roda diperbarui'
@@ -458,9 +623,10 @@ class _GroupRealtimeNotificationListenerState
           }
 
           // SATU PINTU: Kirim NotificationIntent ke NotificationCoordinator
-          // Untuk orang yang melakukan aksi (isMe == true): hanya muncul notifikasi di dalam aplikasi (InAppBanner).
-          // Untuk orang lain (anggota maupun owner yang tidak melakukan aksi, isMe == false):
-          // muncul notifikasi di dalam aplikasi (InAppBanner) MAUPUN di luar aplikasi (Status Bar Sistem Android)!
+          // - Pelaku aksi (isMe == true): hanya tampil info ringan di dalam aplikasi (saat resumed),
+          //   tidak pernah dikirim ke status bar HP maupun menaikkan angka badge.
+          // - Anggota lain (isMe == false): jika sedang di dalam aplikasi (resumed) -> banner saja (+ badge);
+          //   jika di luar aplikasi (paused/ditutup) -> notifikasi sistem di luar aplikasi beserta suara (+ badge).
           if (isMe) {
             if (NotificationCoordinator.instance.currentLifecycleState == AppLifecycleState.resumed) {
               final selfIntent = NotificationIntent.groupEvent(
@@ -505,14 +671,7 @@ class _GroupRealtimeNotificationListenerState
               },
             );
 
-            final decision = await ref.read(notificationCoordinatorProvider).dispatch(intent);
-            // Jika orang lain tersebut sedang membuka aplikasi (surface == banner),
-            // tetap kirimkan juga notifikasi sistem di luar aplikasi (status bar Android)
-            // sehingga mereka menerima notifikasi baik di dalam maupun di luar aplikasi!
-            if (decision.surface == NotificationSurface.banner &&
-                decision.reason == NotificationDropReason.none) {
-              await NotificationCoordinator.instance.onRenderSystem?.call(intent);
-            }
+            await ref.read(notificationCoordinatorProvider).dispatch(intent);
           }
         }
 

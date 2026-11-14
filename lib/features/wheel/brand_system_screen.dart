@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/widgets/sticker_card.dart';
 import '../../core/painters/logo_painter.dart';
 import '../../core/painters/nav_icons_painter.dart';
@@ -20,19 +19,32 @@ class BrandSystemScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = [
-      {'name': 'Tomat', 'hex': '#FF6B5A', 'color': AppColors.tomat},
-      {'name': 'Jeruk', 'hex': '#FF9F1C', 'color': AppColors.jeruk},
-      {'name': 'Matahari', 'hex': '#FFD23F', 'color': AppColors.matahari},
-      {'name': 'Mint', 'hex': '#3DDBB0', 'color': AppColors.mint},
-      {'name': 'Langit', 'hex': '#6FB1FF', 'color': AppColors.langit},
-      {'name': 'Lavender', 'hex': '#B8A4FF', 'color': AppColors.lavender},
-      {'name': 'Permen', 'hex': '#FF8FC0', 'color': AppColors.permen},
-      {'name': 'Lemon', 'hex': '#B8E986', 'color': AppColors.lemon},
-    ];
+    final t = context.putarTheme;
+    final isKucing = t.id == PutarTheme.kucingManis.id;
+    final colors = isKucing
+        ? [
+            {'name': 'Sakura', 'hex': '#FF8FB1', 'color': t.accentCoral},
+            {'name': 'Persik', 'hex': '#FFB997', 'color': t.accentOrange},
+            {'name': 'Mentega', 'hex': '#FFE27A', 'color': t.accentYellow},
+            {'name': 'Mint', 'hex': '#9BE8D0', 'color': t.accentMint},
+            {'name': 'Langit', 'hex': '#A8D8FF', 'color': t.accentBlue},
+            {'name': 'Lavender', 'hex': '#CDB4FF', 'color': t.accentPurple},
+            {'name': 'Permen', 'hex': '#FFC8DD', 'color': t.accentPink},
+            {'name': 'Pistachio', 'hex': '#C8F0A8', 'color': t.accentGreen},
+          ]
+        : [
+            {'name': 'Tomat', 'hex': '#FF6B5A', 'color': t.accentCoral},
+            {'name': 'Jeruk', 'hex': '#FF9F1C', 'color': t.accentOrange},
+            {'name': 'Matahari', 'hex': '#FFD23F', 'color': t.accentYellow},
+            {'name': 'Mint', 'hex': '#3DDBB0', 'color': t.accentMint},
+            {'name': 'Langit', 'hex': '#6FB1FF', 'color': t.accentBlue},
+            {'name': 'Lavender', 'hex': '#B8A4FF', 'color': t.accentPurple},
+            {'name': 'Permen', 'hex': '#FF8FC0', 'color': t.accentPink},
+            {'name': 'Lemon', 'hex': '#B8E986', 'color': t.accentGreen},
+          ];
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -55,16 +67,16 @@ class BrandSystemScreen extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: t.surface,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.ink, width: 2.8),
+                      border: Border.all(color: t.ink, width: 2.8),
                     ),
                     alignment: Alignment.center,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 22,
                       height: 22,
                       child: CustomPaint(
-                        painter: CustomBackIconPainter(color: AppColors.ink),
+                        painter: CustomBackIconPainter(color: t.ink),
                       ),
                     ),
                   ),
@@ -74,10 +86,10 @@ class BrandSystemScreen extends StatelessWidget {
 
               // Logo Utama dalam Card Kuning Matahari
               StickerCard(
-                backgroundColor: AppColors.matahari,
+                backgroundColor: t.secondary,
                 borderRadius: 28,
-                borderWidth: 3.5,
-                shadowOffset: const Offset(6, 6),
+                borderWidth: t.heroBorderWidth,
+                shadowOffset: t.heroShadowOffset,
                 padding: const EdgeInsets.all(24),
                 child: const LogoWidget(size: 130, strokeWidthRatio: 4.0),
               ),
@@ -86,20 +98,22 @@ class BrandSystemScreen extends StatelessWidget {
               // Wordmark "putar jajan"
               Text(
                 'putar jajan',
-                style: AppTypography.displayLarge.copyWith(
+                style: t.displayLarge.copyWith(
                   fontSize: 38,
                   letterSpacing: -1.0,
-                  color: AppColors.ink,
+                  color: t.ink,
                 ),
               ),
               const SizedBox(height: 8),
 
               // Penjelasan Konsep Logo
               Text(
-                'Roda dengan satu irisan terlepas: bagian\nyang boleh kamu jajani.',
+                isKucing
+                    ? 'Mochi si kucing karamel penunggu jajan:\nteman imut yang ikut menjaga budgetmu.'
+                    : 'Roda dengan satu irisan terlepas: bagian\nyang boleh kamu jajani.',
                 textAlign: TextAlign.center,
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                style: t.bodyMedium.copyWith(
+                  color: t.textSecondary,
                   fontSize: 15,
                   height: 1.35,
                 ),
@@ -109,13 +123,36 @@ class BrandSystemScreen extends StatelessWidget {
               // 3 Variasi Ikon Aplikasi
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _IconVariantCard(bgColor: AppColors.tomat, sliceColor: AppColors.surface),
-                  const SizedBox(width: 14),
-                  _IconVariantCard(bgColor: AppColors.surface, sliceColor: AppColors.matahari),
-                  const SizedBox(width: 14),
-                  _IconVariantCard(bgColor: AppColors.lavender, sliceColor: AppColors.tomat),
-                ],
+                children: isKucing
+                    ? [
+                        _IconVariantCard(
+                          bgColor: t.mascotEarPink,
+                          sliceColor: t.surface,
+                          furColor: t.mascotFur,
+                          earPinkColor: t.mascotNose,
+                        ),
+                        const SizedBox(width: 14),
+                        _IconVariantCard(
+                          bgColor: t.surface,
+                          sliceColor: t.secondary,
+                          furColor: t.mascotFur,
+                          earPinkColor: t.mascotEarPink,
+                        ),
+                        const SizedBox(width: 14),
+                        _IconVariantCard(
+                          bgColor: t.accentBlue,
+                          sliceColor: t.danger,
+                          furColor: t.mascotMuzzle,
+                          earPinkColor: t.mascotNose,
+                        ),
+                      ]
+                    : [
+                        _IconVariantCard(bgColor: t.danger, sliceColor: t.surface),
+                        const SizedBox(width: 14),
+                        _IconVariantCard(bgColor: t.surface, sliceColor: t.secondary),
+                        const SizedBox(width: 14),
+                        _IconVariantCard(bgColor: t.accentPurple, sliceColor: t.danger),
+                      ],
               ),
               const SizedBox(height: 20),
 
@@ -123,18 +160,18 @@ class BrandSystemScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.ink, width: 3),
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(t.chipRadius),
+                  border: Border.all(color: t.ink, width: t.borderWidth),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(width: 24, height: 24, child: CustomPaint(painter: WheelNavPainter())),
-                    SizedBox(width: 20),
-                    SizedBox(width: 24, height: 24, child: CustomPaint(painter: ReceiptNavPainter())),
-                    SizedBox(width: 20),
-                    SizedBox(width: 24, height: 24, child: CustomPaint(painter: HistoryNavPainter())),
+                    SizedBox(width: 24, height: 24, child: CustomPaint(painter: WheelNavPainter(color: t.ink, hubColor: t.surface, style: t.navIconStyle))),
+                    const SizedBox(width: 20),
+                    SizedBox(width: 24, height: 24, child: CustomPaint(painter: ReceiptNavPainter(color: t.ink, cutoutColor: t.surface, style: t.navIconStyle))),
+                    const SizedBox(width: 20),
+                    SizedBox(width: 24, height: 24, child: CustomPaint(painter: HistoryNavPainter(color: t.ink, style: t.navIconStyle))),
                   ],
                 ),
               ),
@@ -157,15 +194,15 @@ class BrandSystemScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: c['color'] as Color,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.ink, width: 2.5),
+                            border: Border.all(color: t.ink, width: t.subtleBorderWidth),
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           c['name'] as String,
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                             fontSize: 12,
                           ),
                           textAlign: TextAlign.center,
@@ -174,8 +211,8 @@ class BrandSystemScreen extends StatelessWidget {
                         ),
                         Text(
                           c['hex'] as String,
-                          style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
+                          style: t.bodySmall.copyWith(
+                            color: t.textSecondary,
                             fontSize: 10,
                           ),
                           textAlign: TextAlign.center,
@@ -193,9 +230,9 @@ class BrandSystemScreen extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Uji Coba Notifikasi (Layar 3 & 9)',
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 18,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -206,10 +243,10 @@ class BrandSystemScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     text: 'Tes Toast Mint ("Roda siap diputar!")',
-                    backgroundColor: AppColors.mint,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.success,
+                    textColor: t.ink,
                     onPressed: () {
-                      InAppToast.show(context, message: 'Roda siap diputar!');
+                      InAppToast.show(context, message: t.text(PutarCopyKeys.wheelReady));
                     },
                   ),
                   const SizedBox(height: 10),
@@ -217,8 +254,8 @@ class BrandSystemScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     text: 'Tes Banner Atas (Peringatan 80%)',
-                    backgroundColor: AppColors.matahari,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.secondary,
+                    textColor: t.ink,
                     onPressed: () {
                       NotificationCoordinator.instance.dispatch(
                         NotificationIntent.budget80(
@@ -237,8 +274,8 @@ class BrandSystemScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     text: 'Tes Dialog Budget Lewat (100%+)',
-                    backgroundColor: AppColors.surface,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.surface,
+                    textColor: t.ink,
                     onPressed: () {
                       showOverbudgetDialog(context, excessAmount: 12000);
                     },
@@ -248,8 +285,8 @@ class BrandSystemScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     text: 'Tes Notifikasi Catat Jajan di HP Luar',
-                    backgroundColor: AppColors.permen,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.accentPink,
+                    textColor: t.ink,
                     onPressed: () async {
                       await NotificationService.instance.showExpenseLoggedNotification(
                         itemName: 'Seblak Pedas',
@@ -268,8 +305,8 @@ class BrandSystemScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     text: 'Kirim Notifikasi Status Bar (HP Luar)',
-                    backgroundColor: AppColors.lavender,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.accentPurple,
+                    textColor: t.ink,
                     onPressed: () async {
                       await NotificationService.instance.showOngoingDateNotification(
                         remainingBudget: 36000,
@@ -291,10 +328,12 @@ class BrandSystemScreen extends StatelessWidget {
 
               // Catatan Kaki Design System
               Text(
-                'Font Bricolage Grotesque 500/700/800. Garis tebal 3px dan bayangan keras 4px. Ikon aplikasi adaptif, monokrom untuk tema Android 13.',
+                isKucing
+                    ? 'Font Fredoka 400/500/600/700. Sudut membulat lembut dan bayangan vertikal 5px. Ikon Mochi adaptif ikut berganti saat tema aktif.'
+                    : 'Font Bricolage Grotesque 500/700/800. Garis tebal 3px dan bayangan keras 4px. Ikon aplikasi adaptif, monokrom untuk tema Android 13.',
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  color: t.textSecondary,
                   fontSize: 12,
                   height: 1.4,
                 ),
@@ -311,24 +350,38 @@ class BrandSystemScreen extends StatelessWidget {
 class _IconVariantCard extends StatelessWidget {
   final Color bgColor;
   final Color sliceColor;
+  final Color? furColor;
+  final Color? earPinkColor;
 
-  const _IconVariantCard({required this.bgColor, required this.sliceColor});
+  const _IconVariantCard({
+    required this.bgColor,
+    required this.sliceColor,
+    this.furColor,
+    this.earPinkColor,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       width: 62,
       height: 62,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
-          BoxShadow(color: AppColors.ink, offset: Offset(2, 2), blurRadius: 0),
+        borderRadius: BorderRadius.circular(t.smallCardRadius),
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
+          BoxShadow(color: t.ink, offset: t.miniShadowOffset, blurRadius: 0),
         ],
       ),
       alignment: Alignment.center,
-      child: LogoWidget(size: 38, sliceColor: sliceColor, strokeWidthRatio: 4),
+      child: LogoWidget(
+        size: 38,
+        sliceColor: sliceColor,
+        strokeWidthRatio: 4,
+        furColor: furColor,
+        earPinkColor: earPinkColor,
+      ),
     );
   }
 }

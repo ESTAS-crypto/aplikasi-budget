@@ -3,11 +3,63 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/notifications/models/notification_intent.dart';
+
+/// Slot fungsional channel notifikasi Android per tema.
+enum NotificationChannelSlot {
+  ongoing,
+  warning,
+  reminder,
+  expenseLogged,
+  groupActivity,
+}
+
+/// Konfigurasi channel Android & atribut visual notifikasi per tema.
+@immutable
+class NotificationChannelConfig {
+  final String channelId;
+  final String channelName;
+  final String description;
+  final Importance importance;
+  final Priority priority;
+  final bool playSound;
+  final String? soundResource;
+  final bool enableVibration;
+  final String smallIcon;
+  final Color accentColor;
+
+  const NotificationChannelConfig({
+    required this.channelId,
+    required this.channelName,
+    required this.description,
+    required this.importance,
+    required this.priority,
+    required this.playSound,
+    required this.soundResource,
+    required this.enableVibration,
+    required this.smallIcon,
+    required this.accentColor,
+  });
+
+  AndroidNotificationChannel toAndroidChannel() {
+    return AndroidNotificationChannel(
+      channelId,
+      channelName,
+      description: description,
+      importance: importance,
+      playSound: playSound,
+      sound: soundResource != null
+          ? RawResourceAndroidNotificationSound(soundResource!)
+          : null,
+      enableVibration: enableVibration,
+    );
+  }
+}
 
 /// Top-level background notification action handler
 @pragma('vm:entry-point')
@@ -26,7 +78,18 @@ class NotificationService {
   static const String channelWarningId = 'channel_warning_v2';
   static const String channelReminderId = 'channel_reminder_v2';
   static const String channelExpenseLoggedId = 'channel_expense_logged_v2';
-  static const String channelGroupActivityId = 'channel_group_activity';
+  static const String channelGroupActivityId = 'channel_group_activity_v2';
+
+  static const String channelOngoingKucingId = 'channel_ongoing_kucing_v1';
+  static const String channelWarningKucingId = 'channel_warning_kucing_v1';
+  static const String channelReminderKucingId = 'channel_reminder_kucing_v1';
+  static const String channelExpenseLoggedKucingId =
+      'channel_expense_logged_kucing_v1';
+  static const String channelGroupActivityKucingId =
+      'channel_group_activity_kucing_v1';
+
+  static const String smallIconDefault = 'ic_stat_notification';
+  static const String smallIconKucing = 'ic_stat_notification_kucing';
 
   static const int notificationOngoingId = 1001;
   static const int notificationWarningId = 1002;
@@ -43,13 +106,153 @@ class NotificationService {
   final Map<String, List<String>> _groupActivityBuffers = {};
   final Map<String, Timer> _groupActivityTimers = {};
 
-  Future<void> initialize() async {
+  PutarTheme _activeTheme = PutarTheme.pasarMalam;
+
+  @visibleForTesting
+  int applyThemeRescheduleCount = 0;
+
+  /// Tema yang sedang aktif digunakan oleh `NotificationService`.
+  PutarTheme get activeTheme => _activeTheme;
+
+  /// Mengembalikan konfigurasi channel & ikon Android sesuai tema dan slot.
+  static NotificationChannelConfig channelConfigForTheme(
+    PutarTheme theme,
+    NotificationChannelSlot slot,
+  ) {
+    final isKucing = theme.notificationChannelSuffix == 'kucing';
+    final icon = isKucing ? smallIconKucing : smallIconDefault;
+    final accent = isKucing ? theme.primary : PutarTheme.kPasarMalamTomat;
+
+    switch (slot) {
+      case NotificationChannelSlot.ongoing:
+        return NotificationChannelConfig(
+          channelId: isKucing ? channelOngoingKucingId : channelOngoingId,
+          channelName: isKucing
+              ? 'Lagi Ngedate (Kucing Manis)'
+              : 'Lagi Ngedate (Ongoing)',
+          description:
+              'Notifikasi persisten memantau sisa budget selama date berlangsung',
+          importance: Importance.low,
+          priority: Priority.low,
+          playSound: false,
+          soundResource: null,
+          enableVibration: false,
+          smallIcon: icon,
+          accentColor: accent,
+        );
+      case NotificationChannelSlot.warning:
+        return NotificationChannelConfig(
+          channelId: isKucing ? channelWarningKucingId : channelWarningId,
+          channelName: isKucing
+              ? 'Peringatan Budget (Kucing Manis)'
+              : 'Peringatan Budget',
+          description:
+              'Peringatan ketika budget jajan mencapai 80% atau lebih',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          soundResource: isKucing ? 'notif_warning_kucing' : 'notif_warning',
+          enableVibration: true,
+          smallIcon: icon,
+          accentColor: accent,
+        );
+      case NotificationChannelSlot.reminder:
+        return NotificationChannelConfig(
+          channelId: isKucing ? channelReminderKucingId : channelReminderId,
+          channelName: isKucing
+              ? 'Pengingat & Streak (Kucing Manis)'
+              : 'Pengingat & Streak',
+          description:
+              'Pengingat kencan mingguan Jumat 18:00 dan selebrasi streak lolos',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          playSound: true,
+          soundResource: isKucing ? 'notif_reminder_kucing' : 'notif_reminder',
+          enableVibration: true,
+          smallIcon: icon,
+          accentColor: accent,
+        );
+      case NotificationChannelSlot.expenseLogged:
+        return NotificationChannelConfig(
+          channelId:
+              isKucing ? channelExpenseLoggedKucingId : channelExpenseLoggedId,
+          channelName: isKucing
+              ? 'Pencatatan Jajan (Kucing Manis)'
+              : 'Pencatatan Jajan',
+          description: 'Notifikasi status bar setiap kali jajan baru dicatat',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          soundResource: isKucing ? 'notif_warning_kucing' : 'notif_warning',
+          enableVibration: true,
+          smallIcon: icon,
+          accentColor: accent,
+        );
+      case NotificationChannelSlot.groupActivity:
+        return NotificationChannelConfig(
+          channelId:
+              isKucing ? channelGroupActivityKucingId : channelGroupActivityId,
+          channelName: isKucing
+              ? 'Aktivitas Grup (Kucing Manis)'
+              : 'Aktivitas Grup',
+          description:
+              'Notifikasi aktivitas belanja dan putaran roda anggota grup',
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          soundResource: isKucing ? 'notif_reminder_kucing' : 'notif_reminder',
+          enableVibration: true,
+          smallIcon: icon,
+          accentColor: accent,
+        );
+    }
+  }
+
+  NotificationChannelConfig _configFor(NotificationChannelSlot slot) =>
+      channelConfigForTheme(_activeTheme, slot);
+
+  /// Mengganti tema aktif pada `NotificationService` dan menjadwalkan ulang
+  /// pengingat Jumat pada channel tema baru bila pengingat sedang aktif.
+  Future<void> applyTheme(
+    PutarTheme theme, {
+    bool reschedule = true,
+    SharedPreferences? prefs,
+  }) async {
+    final changed = _activeTheme.id != theme.id;
+    _activeTheme = theme;
+    if (!changed || !reschedule) return;
+
+    try {
+      final sp = prefs ?? await SharedPreferences.getInstance();
+      final enabled = sp.getBool('pj_friday_reminder_enabled') ?? true;
+      if (!enabled) return;
+
+      applyThemeRescheduleCount++;
+      await scheduleWeeklyFridayReminder(
+        reinitTimezone: tz.timeZoneDatabase.locations.isEmpty,
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] applyTheme reschedule warning: $e');
+    }
+  }
+
+  @visibleForTesting
+  void resetThemeForTest() {
+    _activeTheme = PutarTheme.pasarMalam;
+    applyThemeRescheduleCount = 0;
+  }
+
+  Future<void> initialize({PutarTheme? initialTheme}) async {
+    if (initialTheme != null) {
+      _activeTheme = initialTheme;
+    }
+
     // 1. Inisialisasi Timezone perangkat
     await updateTimezone();
 
     // 2. Inisialisasi Android Settings
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('ic_stat_notification');
+        AndroidInitializationSettings(smallIconDefault);
 
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
@@ -63,73 +266,17 @@ class NotificationService {
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
-    // 3. Daftarkan 3 Notification Channels di Android
+    // 3. Daftarkan Notification Channels untuk setiap tema resmi Android 8+
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null) {
-      // Channel 1: Ongoing (Importance.low) - Tidak bersuara setiap progress diupdate
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          channelOngoingId,
-          'Lagi Ngedate (Ongoing)',
-          description: 'Notifikasi persisten memantau sisa budget selama date berlangsung',
-          importance: Importance.low,
-          playSound: false,
-          enableVibration: false,
-        ),
-      );
-
-      // Channel 2: Peringatan (Importance.high) - Heads-up alert dengan suara custom dan getaran saat melewati 80%
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          channelWarningId,
-          'Peringatan Budget',
-          description: 'Peringatan ketika budget jajan mencapai 80% atau lebih',
-          importance: Importance.high,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound('notif_warning'),
-          enableVibration: true,
-        ),
-      );
-
-      // Channel 3: Pengingat Mingguan & Streak (Importance.defaultImportance)
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          channelReminderId,
-          'Pengingat & Streak',
-          description: 'Pengingat kencan mingguan Jumat 18:00 dan selebrasi streak lolos',
-          importance: Importance.defaultImportance,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound('notif_reminder'),
-          enableVibration: true,
-        ),
-      );
-
-      // Channel 4: Pencatatan Jajan (Importance.high) - Heads-up alert di status bar saat mencatat
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          channelExpenseLoggedId,
-          'Pencatatan Jajan',
-          description: 'Notifikasi status bar setiap kali jajan baru dicatat',
-          importance: Importance.high,
-          playSound: true,
-          sound: RawResourceAndroidNotificationSound('notif_warning'),
-          enableVibration: true,
-        ),
-      );
-
-      // Channel 5: Aktivitas Grup (Importance.defaultImportance)
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          channelGroupActivityId,
-          'Aktivitas Grup',
-          description: 'Notifikasi aktivitas belanja dan putaran roda anggota grup',
-          importance: Importance.defaultImportance,
-          playSound: true,
-          enableVibration: true,
-        ),
-      );
+      for (final theme in PutarTheme.allThemes) {
+        for (final slot in NotificationChannelSlot.values) {
+          final cfg = channelConfigForTheme(theme, slot);
+          await androidPlugin.createNotificationChannel(cfg.toAndroidChannel());
+        }
+      }
     }
 
     // 4. Periksa apakah cold start dipicu oleh tap notifikasi
@@ -166,6 +313,8 @@ class NotificationService {
     }
   }
 
+  bool _didAutoRequestAndroidPermission = false;
+
   /// Cek apakah izin notifikasi telah diberikan
   Future<bool> areNotificationsEnabled() async {
     if (!Platform.isAndroid) return true;
@@ -173,6 +322,25 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin == null) return false;
     return await androidPlugin.areNotificationsEnabled() ?? false;
+  }
+
+  /// Meminta izin runtime notifikasi Android 13+ sekali per sesi tanpa dialog tambahan
+  /// agar notifikasi aktivitas grup di luar aplikasi tidak terblokir OS.
+  Future<bool> ensureAndroidPermissionIfNeeded() async {
+    if (!Platform.isAndroid) return true;
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return false;
+
+    final enabled = await androidPlugin.areNotificationsEnabled() ?? false;
+    if (enabled) return true;
+    if (_didAutoRequestAndroidPermission) return false;
+    _didAutoRequestAndroidPermission = true;
+    try {
+      return await androidPlugin.requestNotificationsPermission() ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Minta izin notifikasi Android 13+ (POST_NOTIFICATIONS)
@@ -188,42 +356,43 @@ class NotificationService {
 
     // Tampilkan penjelasan ramah sebelum memunculkan prompt izin sistem
     if (context.mounted) {
+      final t = context.putarTheme;
       final userConsent = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: AppColors.ink, width: 3),
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            side: BorderSide(color: t.ink, width: t.borderWidth),
           ),
-          title: const Text(
+          title: Text(
             'Aktifkan Notifikasi?',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
               fontSize: 20,
             ),
           ),
-          content: const Text(
+          content: Text(
             'Putar Jajan butuh izin notifikasi agar kamu bisa memantau sisa budget langsung di status bar dan menerima pengingat putar roda setiap Jumat malam.',
-            style: TextStyle(color: AppColors.ink, fontSize: 14),
+            style: TextStyle(color: t.ink, fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Nanti Saja', style: TextStyle(color: AppColors.disabled)),
+              child: Text('Nanti Saja', style: TextStyle(color: t.textDisabled)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.tomat,
-                foregroundColor: AppColors.ink,
+                backgroundColor: t.danger,
+                foregroundColor: t.ink,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.ink, width: 2),
+                  side: BorderSide(color: t.ink, width: 2),
                 ),
               ),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Izinkan', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: Text('Izinkan', style: TextStyle(fontWeight: t.weightExtraBold)),
             ),
           ],
         ),
@@ -243,21 +412,22 @@ class NotificationService {
     required int totalBudget,
   }) async {
     final progress = totalBudget > 0 ? (spentAmount * 100 ~/ totalBudget).clamp(0, 100) : 0;
+    final cfg = _configFor(NotificationChannelSlot.ongoing);
 
     final androidDetails = AndroidNotificationDetails(
-      channelOngoingId,
-      'Lagi Ngedate (Ongoing)',
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Status sisa budget ngedate',
-      importance: Importance.low,
-      priority: Priority.low,
+      importance: cfg.importance,
+      priority: cfg.priority,
       ongoing: true,
       onlyAlertOnce: true,
       autoCancel: false,
       showProgress: true,
       maxProgress: 100,
       progress: progress,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
     );
 
     final details = NotificationDetails(android: androidDetails);
@@ -281,17 +451,20 @@ class NotificationService {
     required double spentPercentage,
   }) async {
     final percentInt = (spentPercentage * 100).toInt();
+    final cfg = _configFor(NotificationChannelSlot.warning);
 
     final androidDetails = AndroidNotificationDetails(
-      channelWarningId,
-      'Peringatan Budget',
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Peringatan batas budget 80%',
-      importance: Importance.high,
-      priority: Priority.high,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
-      sound: const RawResourceAndroidNotificationSound('notif_warning'),
-      playSound: true,
+      importance: cfg.importance,
+      priority: cfg.priority,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
+      sound: cfg.soundResource != null
+          ? RawResourceAndroidNotificationSound(cfg.soundResource!)
+          : null,
+      playSound: cfg.playSound,
       actions: const <AndroidNotificationAction>[
         AndroidNotificationAction(
           actionCatatJajan,
@@ -376,16 +549,26 @@ class NotificationService {
       }
     }
 
+    final cfg = _configFor(NotificationChannelSlot.reminder);
+    final isKucing = _activeTheme.notificationChannelSuffix == 'kucing';
+    final reminderTitle =
+        isKucing ? 'Mochi lagi nunggu kamu' : 'Roda lagi nunggu kamu';
+    final reminderBody = isKucing
+        ? 'Jumat malam waktunya putar roda sama Mochi. Siapa tau dapat 150k.'
+        : 'Jumat malam waktunya putar. Siapa tau dapat 150k.';
+
     final androidDetails = AndroidNotificationDetails(
-      channelReminderId,
-      'Pengingat Mingguan & Streak',
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Pengingat kencan Jumat malam',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
-      sound: const RawResourceAndroidNotificationSound('notif_reminder'),
-      playSound: true,
+      importance: cfg.importance,
+      priority: cfg.priority,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
+      sound: cfg.soundResource != null
+          ? RawResourceAndroidNotificationSound(cfg.soundResource!)
+          : null,
+      playSound: cfg.playSound,
     );
 
     final details = NotificationDetails(android: androidDetails);
@@ -396,8 +579,8 @@ class NotificationService {
     try {
       await _plugin.zonedSchedule(
         notificationReminderId,
-        'Roda lagi nunggu kamu',
-        'Jumat malam waktunya putar. Siapa tau dapat 150k.',
+        reminderTitle,
+        reminderBody,
         scheduledDate,
         details,
         androidScheduleMode: canExact
@@ -411,8 +594,8 @@ class NotificationService {
       // Fallback ke inexact jika ada kendala security
       await _plugin.zonedSchedule(
         notificationReminderId,
-        'Roda lagi nunggu kamu',
-        'Jumat malam waktunya putar. Siapa tau dapat 150k.',
+        reminderTitle,
+        reminderBody,
         scheduledDate,
         details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -442,16 +625,20 @@ class NotificationService {
 
   /// Tampilkan notifikasi selebrasi streak setelah date Lolos
   Future<void> showStreakNotification(int streakWeeks) async {
+    final cfg = _configFor(NotificationChannelSlot.reminder);
+
     final androidDetails = AndroidNotificationDetails(
-      channelReminderId,
-      'Pengingat Mingguan & Streak',
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Selebrasi streak',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
-      sound: const RawResourceAndroidNotificationSound('notif_reminder'),
-      playSound: true,
+      importance: cfg.importance,
+      priority: cfg.priority,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
+      sound: cfg.soundResource != null
+          ? RawResourceAndroidNotificationSound(cfg.soundResource!)
+          : null,
+      playSound: cfg.playSound,
     );
 
     final details = NotificationDetails(android: androidDetails);
@@ -472,17 +659,21 @@ class NotificationService {
     required int totalSpent,
     required int totalBudget,
   }) async {
+    final cfg = _configFor(NotificationChannelSlot.expenseLogged);
+
     final androidDetails = AndroidNotificationDetails(
-      channelExpenseLoggedId,
-      'Pencatatan Jajan',
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Notifikasi status bar setiap kali jajan dicatat',
-      importance: Importance.high,
-      priority: Priority.high,
-      playSound: true,
-      sound: const RawResourceAndroidNotificationSound('notif_warning'),
-      enableVibration: true,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
+      importance: cfg.importance,
+      priority: cfg.priority,
+      playSound: cfg.playSound,
+      sound: cfg.soundResource != null
+          ? RawResourceAndroidNotificationSound(cfg.soundResource!)
+          : null,
+      enableVibration: cfg.enableVibration,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
       autoCancel: true,
       styleInformation: BigTextStyleInformation(
         '${RupiahFormatter.format(itemPrice)} untuk $itemName berhasil dicatat.\nSisa budget ngedate: ${RupiahFormatter.format(remainingBudget)} (Terpakai ${RupiahFormatter.format(totalSpent)} dari ${RupiahFormatter.format(totalBudget)})',
@@ -551,14 +742,21 @@ class NotificationService {
       _groupActivityTimers.remove(gid);
     });
 
+    final cfg = _configFor(NotificationChannelSlot.groupActivity);
+
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      channelGroupActivityId,
-      'Aktivitas Grup',
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Notifikasi aktivitas belanja dan putaran roda anggota grup',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
+      importance: cfg.importance,
+      priority: cfg.priority,
+      playSound: cfg.playSound,
+      sound: cfg.soundResource != null
+          ? RawResourceAndroidNotificationSound(cfg.soundResource!)
+          : null,
+      enableVibration: cfg.enableVibration,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
       actions: isExpense && buffer.length == 1
           ? const [
               AndroidNotificationAction(
@@ -596,19 +794,24 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
-      channelGroupActivityId,
-      'Aktivitas Grup',
+    final cfg = _configFor(NotificationChannelSlot.groupActivity);
+
+    final androidDetails = AndroidNotificationDetails(
+      cfg.channelId,
+      cfg.channelName,
       channelDescription: 'Notifikasi grup dan aktivitas anggota',
-      importance: Importance.high,
-      priority: Priority.high,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
-      playSound: true,
-      enableVibration: true,
+      importance: cfg.importance,
+      priority: cfg.priority,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
+      sound: cfg.soundResource != null
+          ? RawResourceAndroidNotificationSound(cfg.soundResource!)
+          : null,
+      playSound: cfg.playSound,
+      enableVibration: cfg.enableVibration,
     );
 
-    const notificationDetails = NotificationDetails(
+    final notificationDetails = NotificationDetails(
       android: androidDetails,
     );
 
@@ -630,20 +833,13 @@ class NotificationService {
         ? (notificationGroupBaseId + (intent.gid!.hashCode.abs() % 90000))
         : intent.stableNotificationId;
 
-    String channelId = channelGroupActivityId;
-    String channelName = 'Aktivitas Grup';
-    Importance importance = Importance.defaultImportance;
-    Priority priority = Priority.defaultPriority;
-    String? soundResource;
+    NotificationChannelSlot slot = NotificationChannelSlot.groupActivity;
+    bool useCustomSound = true;
     List<AndroidNotificationAction>? actions;
 
     switch (intent.category) {
       case NotificationCategory.spin:
-        channelId = channelGroupActivityId;
-        channelName = 'Aktivitas Grup';
-        importance = Importance.high;
-        priority = Priority.high;
-        soundResource = 'notif_reminder';
+        slot = NotificationChannelSlot.groupActivity;
         actions = const [
           AndroidNotificationAction(
             actionCatatJajan,
@@ -660,11 +856,7 @@ class NotificationService {
 
       case NotificationCategory.budgetWarning80:
       case NotificationCategory.budgetOver:
-        channelId = channelWarningId;
-        channelName = 'Peringatan Budget';
-        importance = Importance.high;
-        priority = Priority.high;
-        soundResource = 'notif_warning';
+        slot = NotificationChannelSlot.warning;
         actions = const [
           AndroidNotificationAction(
             actionCatatJajan,
@@ -680,11 +872,7 @@ class NotificationService {
         break;
 
       case NotificationCategory.expense:
-        channelId = channelGroupActivityId;
-        channelName = 'Aktivitas Grup';
-        importance = Importance.high;
-        priority = Priority.high;
-        soundResource = 'notif_reminder';
+        slot = NotificationChannelSlot.groupActivity;
         actions = const [
           AndroidNotificationAction(
             actionCatatJajan,
@@ -701,18 +889,12 @@ class NotificationService {
 
       case NotificationCategory.weeklyReminder:
       case NotificationCategory.streakCelebration:
-        channelId = channelReminderId;
-        channelName = 'Pengingat & Streak';
-        importance = Importance.defaultImportance;
-        priority = Priority.defaultPriority;
-        soundResource = 'notif_reminder';
+        slot = NotificationChannelSlot.reminder;
         break;
 
       case NotificationCategory.syncFailed:
-        channelId = channelGroupActivityId;
-        channelName = 'Aktivitas Grup';
-        importance = Importance.high;
-        priority = Priority.high;
+        slot = NotificationChannelSlot.groupActivity;
+        useCustomSound = false;
         actions = const [
           AndroidNotificationAction(
             'action_coba_lagi',
@@ -723,25 +905,24 @@ class NotificationService {
         break;
 
       default:
-        channelId = channelGroupActivityId;
-        channelName = 'Aktivitas Grup';
-        importance = Importance.high;
-        priority = Priority.high;
-        soundResource = 'notif_reminder';
+        slot = NotificationChannelSlot.groupActivity;
         break;
     }
 
+    final cfg = _configFor(slot);
+    final soundResource = useCustomSound ? cfg.soundResource : null;
+
     final androidDetails = AndroidNotificationDetails(
-      channelId,
-      channelName,
-      importance: importance,
-      priority: priority,
-      color: AppColors.tomat,
-      icon: 'ic_stat_notification',
+      cfg.channelId,
+      cfg.channelName,
+      importance: cfg.importance,
+      priority: cfg.priority,
+      color: cfg.accentColor,
+      icon: cfg.smallIcon,
       sound: soundResource != null
           ? RawResourceAndroidNotificationSound(soundResource)
           : null,
-      playSound: true,
+      playSound: cfg.playSound,
       actions: actions,
       styleInformation: BigTextStyleInformation(
         intent.systemBody,

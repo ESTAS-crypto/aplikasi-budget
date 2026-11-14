@@ -180,14 +180,16 @@ class GroupGameService {
 
     // 4. Sukses: Buat sesi baru & event game_result yang valid
     final isLockActive = currentGroup.lockPolicy == 'lock';
+    final isSameSession =
+        existingSession != null && existingSession.sessionId == effectiveSessionId;
     final newSession = GroupSessionModel(
       sessionId: effectiveSessionId,
       gid: gid,
       budget: amount,
       game: game,
-      startedByUid: existingSession?.startedByUid ?? uid,
-      startedByName: existingSession?.startedByName ?? actorName,
-      startedAt: existingSession?.startedAt ?? now,
+      startedByUid: uid,
+      startedByName: actorName,
+      startedAt: isSameSession ? existingSession.startedAt : now,
       budgetByUid: uid,
       budgetByName: actorName,
       detail: detail,
@@ -366,8 +368,8 @@ class GroupGameService {
   }
 
   /// Mengakhiri sesi date grup aktif (membuka kembali kunci date dan permainan)
-  Future<void> endSession({required String gid}) async {
-    await groupService.endSession(gid: gid);
+  Future<GroupSessionModel?> endSession({required String gid}) async {
+    return groupService.endSession(gid: gid);
   }
 }
 

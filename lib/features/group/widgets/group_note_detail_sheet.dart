@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/indonesian_date_formatter.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/widgets/sticker_button.dart';
 import '../../../core/widgets/sticker_snackbar.dart';
+import '../../../core/widgets/sheet_inline_error_banner.dart';
 import '../../../core/group/models/group_model.dart';
 import '../../../core/group/models/group_note_model.dart';
 import '../../../core/group/models/group_history_models.dart';
@@ -31,6 +31,7 @@ Future<bool?> showGroupNoteDetailSheet({
   required String authorDisplayName,
   required Color authorAvatarColor,
 }) {
+  final t = context.putarTheme;
   final disableAnimations = MediaQuery.disableAnimationsOf(context);
 
   return Navigator.of(context).push<bool>(
@@ -38,7 +39,7 @@ Future<bool?> showGroupNoteDetailSheet({
       opaque: false,
       barrierDismissible: true,
       barrierLabel: 'Tutup latar',
-      barrierColor: AppColors.ink.withValues(alpha: 0.5),
+      barrierColor: t.ink.withValues(alpha: 0.5),
       transitionDuration: Duration(milliseconds: disableAnimations ? 100 : 450),
       reverseTransitionDuration: Duration(
         milliseconds: disableAnimations ? 100 : 250,
@@ -152,6 +153,7 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final groupService = ref.watch(groupServiceProvider);
     final authService = ref.watch(groupAuthServiceProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
@@ -224,8 +226,8 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
       effectiveSession.budget,
     );
     final remainingBarColor = currentItem.remainingAfter >= 0
-        ? AppColors.mint
-        : AppColors.tomat;
+        ? t.success
+        : t.danger;
 
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -249,13 +251,13 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                 22,
                 18 + (bottomPadding > 0 ? bottomPadding : 0),
               ),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(t.sheetRadius)),
                 border: Border(
-                  top: BorderSide(color: AppColors.ink, width: 3),
-                  left: BorderSide(color: AppColors.ink, width: 3),
-                  right: BorderSide(color: AppColors.ink, width: 3),
+                  top: BorderSide(color: t.ink, width: t.borderWidth),
+                  left: BorderSide(color: t.ink, width: t.borderWidth),
+                  right: BorderSide(color: t.ink, width: t.borderWidth),
                 ),
               ),
               child: SingleChildScrollView(
@@ -270,7 +272,7 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                         height: 5,
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.ink.withValues(alpha: 0.3),
+                          color: t.ink.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(3),
                         ),
                       ),
@@ -286,13 +288,13 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                           decoration: BoxDecoration(
                             color: widget.authorAvatarColor,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.ink, width: 3),
+                            border: Border.all(color: t.ink, width: t.borderWidth),
                           ),
                           alignment: Alignment.center,
-                          child: const CustomPaint(
-                            size: Size(16, 16),
+                          child: CustomPaint(
+                            size: const Size(16, 16),
                             painter: CustomReceiptPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.8,
                             ),
                           ),
@@ -307,11 +309,11 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                 note.title,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: AppTypography.titleMedium.copyWith(
+                                style: t.titleMedium.copyWith(
                                   fontSize: 20,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: t.weightExtraBold,
                                   height: 1.1,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -319,10 +321,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                 sequenceSubtitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: AppTypography.bodySmall.copyWith(
+                                style: t.bodySmall.copyWith(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF5B4B7A),
+                                  fontWeight: t.weightSemiBold,
+                                  color: t.textSecondary,
                                 ),
                               ),
                             ],
@@ -341,18 +343,18 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                               width: 38,
                               height: 38,
                               decoration: BoxDecoration(
-                                color: AppColors.surface,
+                                color: t.surface,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: AppColors.ink,
-                                  width: 3,
+                                  color: t.ink,
+                                  width: t.borderWidth,
                                 ),
                               ),
                               alignment: Alignment.center,
-                              child: const CustomPaint(
-                                size: Size(18, 18),
+                              child: CustomPaint(
+                                size: const Size(18, 18),
                                 painter: CustomCrossPainter(
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                   strokeWidth: 3.0,
                                 ),
                               ),
@@ -370,10 +372,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           RupiahFormatter.format(note.amount),
-                          style: AppTypography.displayLarge.copyWith(
+                          style: t.displayLarge.copyWith(
                             fontSize: 38,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                             height: 1.1,
                           ),
                         ),
@@ -386,7 +388,7 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                       decoration: BoxDecoration(
                         border: Border(
                           bottom: BorderSide(
-                            color: AppColors.ink.withValues(alpha: 0.133),
+                            color: t.ink.withValues(alpha: 0.133),
                             width: 2,
                           ),
                         ),
@@ -396,10 +398,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                         children: [
                           Text(
                             'Dicatat oleh',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF5B4B7A),
+                              fontWeight: t.weightBold,
+                              color: t.textSecondary,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -420,10 +422,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.right,
-                                    style: AppTypography.bodyMedium.copyWith(
+                                    style: t.bodyMedium.copyWith(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.ink,
+                                      fontWeight: t.weightExtraBold,
+                                      color: t.ink,
                                     ),
                                   ),
                                 ),
@@ -440,7 +442,7 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                       decoration: BoxDecoration(
                         border: Border(
                           bottom: BorderSide(
-                            color: AppColors.ink.withValues(alpha: 0.133),
+                            color: t.ink.withValues(alpha: 0.133),
                             width: 2,
                           ),
                         ),
@@ -450,10 +452,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                         children: [
                           Text(
                             'Waktu',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF5B4B7A),
+                              fontWeight: t.weightBold,
+                              color: t.textSecondary,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -463,10 +465,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.right,
-                              style: AppTypography.bodyMedium.copyWith(
+                              style: t.bodyMedium.copyWith(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                fontWeight: t.weightExtraBold,
+                                color: t.ink,
                               ),
                             ),
                           ),
@@ -480,7 +482,7 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                       decoration: BoxDecoration(
                         border: Border(
                           bottom: BorderSide(
-                            color: AppColors.ink.withValues(alpha: 0.133),
+                            color: t.ink.withValues(alpha: 0.133),
                             width: 2,
                           ),
                         ),
@@ -490,10 +492,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                         children: [
                           Text(
                             'Status',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF5B4B7A),
+                              fontWeight: t.weightBold,
+                              color: t.textSecondary,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -511,10 +513,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                   const SizedBox(width: 8),
                                   Text(
                                     statusSubtext,
-                                    style: AppTypography.bodySmall.copyWith(
+                                    style: t.bodySmall.copyWith(
                                       fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF5B4B7A),
+                                      fontWeight: t.weightSemiBold,
+                                      color: t.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -539,10 +541,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                   'Sisa budget setelahnya',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.bodySmall.copyWith(
+                                  style: t.bodySmall.copyWith(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF5B4B7A),
+                                    fontWeight: t.weightBold,
+                                    color: t.textSecondary,
                                   ),
                                 ),
                               ),
@@ -551,10 +553,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                 RupiahFormatter.format(
                                   currentItem.remainingAfter,
                                 ),
-                                style: AppTypography.bodySmall.copyWith(
+                                style: t.bodySmall.copyWith(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
+                                  fontWeight: t.weightExtraBold,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
@@ -563,11 +565,11 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                           Container(
                             height: 12,
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: t.surface,
                               borderRadius: BorderRadius.circular(7),
                               border: Border.all(
-                                color: AppColors.ink,
-                                width: 2.5,
+                                color: t.ink,
+                                width: t.subtleBorderWidth,
                               ),
                             ),
                             clipBehavior: Clip.antiAlias,
@@ -612,16 +614,16 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                 child: Container(
                                   height: 46,
                                   decoration: BoxDecoration(
-                                    color: AppColors.surface,
+                                    color: t.surface,
                                     borderRadius: BorderRadius.circular(23),
                                     border: Border.all(
-                                      color: AppColors.ink,
-                                      width: 3,
+                                      color: t.ink,
+                                      width: t.borderWidth,
                                     ),
-                                    boxShadow: const [
+                                    boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.ink,
-                                        offset: Offset(3, 3),
+                                        color: t.shadowColor,
+                                        offset: t.smallShadowOffset,
                                         blurRadius: 0,
                                       ),
                                     ],
@@ -629,10 +631,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                   alignment: Alignment.center,
                                   child: Text(
                                     'Ubah',
-                                    style: AppTypography.buttonSmall.copyWith(
+                                    style: t.buttonSmall.copyWith(
                                       fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.ink,
+                                      fontWeight: t.weightExtraBold,
+                                      color: t.ink,
                                     ),
                                   ),
                                 ),
@@ -652,16 +654,16 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                 child: Container(
                                   height: 46,
                                   decoration: BoxDecoration(
-                                    color: AppColors.tomat,
+                                    color: t.danger,
                                     borderRadius: BorderRadius.circular(23),
                                     border: Border.all(
-                                      color: AppColors.ink,
-                                      width: 3,
+                                      color: t.ink,
+                                      width: t.borderWidth,
                                     ),
-                                    boxShadow: const [
+                                    boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.ink,
-                                        offset: Offset(3, 3),
+                                        color: t.shadowColor,
+                                        offset: t.smallShadowOffset,
                                         blurRadius: 0,
                                       ),
                                     ],
@@ -669,10 +671,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                                   alignment: Alignment.center,
                                   child: Text(
                                     'Hapus',
-                                    style: AppTypography.buttonSmall.copyWith(
+                                    style: t.buttonSmall.copyWith(
                                       fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.ink,
+                                      fontWeight: t.weightExtraBold,
+                                      color: t.ink,
                                     ),
                                   ),
                                 ),
@@ -688,10 +690,10 @@ class _GroupNoteDetailSheetState extends ConsumerState<GroupNoteDetailSheet> {
                     Text(
                       'Hanya $captionAuthorName dan pemilik grup yang bisa mengubah atau menghapus.',
                       textAlign: TextAlign.center,
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF5B4B7A),
+                        fontWeight: t.weightSemiBold,
+                        color: t.textSecondary,
                       ),
                     ),
                   ],
@@ -727,7 +729,10 @@ class _EditGroupNoteBottomSheetState
     extends ConsumerState<EditGroupNoteBottomSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _amountController;
+  final FocusNode _titleFocusNode = FocusNode();
+  final FocusNode _amountFocusNode = FocusNode();
   bool _isSaving = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -742,10 +747,19 @@ class _EditGroupNoteBottomSheetState
   void dispose() {
     _titleController.dispose();
     _amountController.dispose();
+    _titleFocusNode.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
   }
 
+  void _clearError() {
+    if (_errorMessage != null) {
+      setState(() => _errorMessage = null);
+    }
+  }
+
   void _formatNominal(String val) {
+    _clearError();
     final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
     if (clean.isEmpty) {
       _amountController.value = const TextEditingValue(text: '');
@@ -760,23 +774,29 @@ class _EditGroupNoteBottomSheetState
   }
 
   Future<void> _handleSave() async {
+    if (_isSaving) return;
+
     final title = _titleController.text.trim();
     final rawAmount = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
     final amount = int.tryParse(rawAmount) ?? 0;
 
     if (title.isEmpty) {
-      showStickerSnackbar(context, message: 'Masukkan nama pengeluaran');
+      SoundService.instance.play(Sfx.uiTap);
+      setState(() => _errorMessage = 'Masukkan nama pengeluaran terlebih dahulu');
+      _titleFocusNode.requestFocus();
       return;
     }
     if (amount <= 0) {
-      showStickerSnackbar(
-        context,
-        message: 'Masukkan nominal belanja yang valid',
-      );
+      SoundService.instance.play(Sfx.uiTap);
+      setState(() => _errorMessage = 'Masukkan nominal belanja yang valid');
+      _amountFocusNode.requestFocus();
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
 
     try {
       final groupService = ref.read(groupServiceProvider);
@@ -794,9 +814,13 @@ class _EditGroupNoteBottomSheetState
       if (mounted) {
         Navigator.pop(context, true);
       }
-    } catch (e) {
+    } on StateError catch (e) {
       if (mounted) {
-        showStickerSnackbar(context, message: 'Gagal menyimpan perubahan');
+        setState(() => _errorMessage = e.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Gagal menyimpan perubahan. Coba lagi.');
       }
     } finally {
       if (mounted) {
@@ -807,132 +831,147 @@ class _EditGroupNoteBottomSheetState
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
-        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: AppColors.ink, width: 3),
+          border: Border.all(color: t.ink, width: t.borderWidth),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Text(
-                    'Ubah Catatan Grup',
-                    style: AppTypography.titleMedium.copyWith(fontSize: 18),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    SoundService.instance.play(Sfx.uiTap);
-                    Navigator.pop(context, false);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.cream,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.ink, width: 2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Ubah Catatan Grup',
+                        style: t.titleMedium.copyWith(fontSize: 18),
+                      ),
                     ),
-                    child: const CustomPaint(
-                      size: Size(16, 16),
-                      painter: CustomCrossPainter(
-                        color: AppColors.ink,
-                        strokeWidth: 2.2,
+                    GestureDetector(
+                      onTap: () {
+                        SoundService.instance.play(Sfx.uiTap);
+                        Navigator.pop(context, false);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: t.bg,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: t.ink, width: 2),
+                        ),
+                        child: CustomPaint(
+                          size: const Size(16, 16),
+                          painter: CustomCrossPainter(
+                            color: t.ink,
+                            strokeWidth: 2.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Nama Barang
+                TextField(
+                  key: const ValueKey('edit_group_note_title_field'),
+                  controller: _titleController,
+                  focusNode: _titleFocusNode,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => _clearError(),
+                  onSubmitted: (_) => _amountFocusNode.requestFocus(),
+                  decoration: InputDecoration(
+                    hintText: 'Nama barang / jajanan',
+                    filled: true,
+                    fillColor: t.bg,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.ink, width: 2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.ink, width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: t.ink,
+                        width: t.subtleBorderWidth,
                       ),
                     ),
                   ),
+                  style: t.bodyLargeBold.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 12),
+
+                // Nominal Rupiah
+                TextField(
+                  key: const ValueKey('edit_group_note_amount_field'),
+                  controller: _amountController,
+                  focusNode: _amountFocusNode,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onChanged: _formatNominal,
+                  onSubmitted: (_) => _handleSave(),
+                  decoration: InputDecoration(
+                    hintText: 'Rp 0',
+                    filled: true,
+                    fillColor: t.bg,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.ink, width: 2),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: t.ink, width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: t.ink,
+                        width: t.subtleBorderWidth,
+                      ),
+                    ),
+                  ),
+                  style: t.displayMedium.copyWith(
+                    fontSize: 24,
+                    color: t.ink,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                SheetInlineErrorBanner(message: _errorMessage),
+
+                StickerButton(
+                  text: _isSaving ? 'Menyimpan...' : 'Simpan Pengeluaran',
+                  backgroundColor: t.secondary,
+                  height: 50,
+                  onPressed: _isSaving ? null : _handleSave,
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // Nama Barang
-            TextField(
-              key: const ValueKey('edit_group_note_title_field'),
-              controller: _titleController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Nama barang / jajanan',
-                filled: true,
-                fillColor: AppColors.cream,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.ink,
-                    width: 2.5,
-                  ),
-                ),
-              ),
-              style: AppTypography.bodyLargeBold.copyWith(fontSize: 15),
-            ),
-            const SizedBox(height: 12),
-
-            // Nominal Rupiah
-            TextField(
-              key: const ValueKey('edit_group_note_amount_field'),
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              onChanged: _formatNominal,
-              decoration: InputDecoration(
-                hintText: 'Rp 0',
-                filled: true,
-                fillColor: AppColors.cream,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.ink, width: 2),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.ink,
-                    width: 2.5,
-                  ),
-                ),
-              ),
-              style: AppTypography.displayMedium.copyWith(
-                fontSize: 24,
-                color: AppColors.ink,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            StickerButton(
-              text: _isSaving ? 'Menyimpan...' : 'Simpan Pengeluaran',
-              backgroundColor: AppColors.matahari,
-              height: 50,
-              onPressed: _isSaving ? null : _handleSave,
-            ),
-          ],
+          ),
         ),
       ),
     );

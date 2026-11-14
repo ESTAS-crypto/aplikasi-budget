@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:putar_jajan/core/theme/app_colors.dart';
+import 'package:putar_jajan/core/group/widgets/in_app_banner.dart';
+
+import 'package:putar_jajan/core/theme/app_theme.dart';
+import 'package:putar_jajan/core/theme/theme_controller.dart';
 import 'package:putar_jajan/core/utils/sound_service.dart';
 import 'package:putar_jajan/core/group/services/group_auth_service.dart';
 import 'package:putar_jajan/core/group/services/group_service.dart';
 import 'package:putar_jajan/core/group/services/group_notification_settings_service.dart';
 import 'package:putar_jajan/core/group/widgets/setting_toggle.dart';
+import 'package:putar_jajan/features/notifications/notification_service.dart';
 import 'package:putar_jajan/features/settings/screens/settings_screen.dart';
+import 'package:putar_jajan/features/settings/screens/theme_selection_screen.dart';
 import 'package:putar_jajan/features/settings/widgets/bookmark_tab_bar.dart';
 
 void main() {
@@ -20,7 +27,29 @@ void main() {
   late GroupService testGroupService;
   late GroupNotificationSettingsService testSettingsService;
 
+  const notifChannel = MethodChannel('dexterous.com/flutter/local_notifications');
+  const tzChannel = MethodChannel('flutter_timezone');
+
   setUp(() async {
+    AndroidFlutterLocalNotificationsPlugin.registerWith();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(notifChannel, (MethodCall call) async {
+      switch (call.method) {
+        case 'initialize':
+        case 'canScheduleExactNotifications':
+        case 'cancel':
+        case 'zonedSchedule':
+        case 'show':
+          return true;
+        default:
+          return null;
+      }
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(tzChannel, (MethodCall call) async {
+      if (call.method == 'getLocalTimezone') return 'Asia/Jakarta';
+      return null;
+    });
     SharedPreferences.setMockInitialValues({
       'group_display_name': 'Evan Testing',
       'pj_sound_enabled': true,
@@ -36,21 +65,37 @@ void main() {
       prefs: testPrefs,
     );
     testSettingsService = GroupNotificationSettingsService(testPrefs);
+    await SoundService.instance.setSoundPack(SoundService.defaultSoundPackId);
+    NotificationService.instance.resetThemeForTest();
+  });
+
+  tearDown(() async {
+    InAppBanner.dismiss();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(notifChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(tzChannel, null);
+    await SoundService.instance.setSoundPack(SoundService.defaultSoundPackId);
+    NotificationService.instance.resetThemeForTest();
   });
 
   Widget createSettingsTestWidget({int initialTab = 0}) {
     return ProviderScope(
       overrides: [
+        sharedPreferencesProvider.overrideWithValue(testPrefs),
+        initialThemeProvider.overrideWithValue(PutarTheme.pasarMalam),
         groupAuthServiceProvider.overrideWithValue(testAuthService),
         groupServiceProvider.overrideWithValue(testGroupService),
         groupNotificationSettingsServiceProvider.overrideWithValue(testSettingsService),
       ],
-      child: MaterialApp(
-        theme: ThemeData(
-          fontFamily: 'BricolageGrotesque',
-          scaffoldBackgroundColor: AppColors.cream,
-        ),
-        home: SettingsScreen(initialTab: initialTab),
+      child: Consumer(
+        builder: (context, ref, _) {
+          final activeTheme = ref.watch(themeControllerProvider);
+          return MaterialApp(
+            theme: AppTheme.buildTheme(activeTheme),
+            home: SettingsScreen(initialTab: initialTab),
+          );
+        },
       ),
     );
   }
@@ -90,28 +135,38 @@ void main() {
       expect(find.text('Putar Jajan v1.0'), findsOneWidget);
     });
 
-    testWidgets('Tapping Kucing Manis triggers in-app banner for development', (tester) async {
+    testWidgets('Tapping Kucing Manis switches theme live and persists selection', (tester) async {
       await tester.pumpWidget(createSettingsTestWidget());
       await tester.pumpAndSettle();
 
       // Tap "Kucing Manis"
       await tester.tap(find.text('Kucing Manis'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('🚧 Sedang Dikembangkan'), findsOneWidget);
+      expect(find.text('Dipakai: Kucing Manis'), findsOneWidget);
+      expect(find.text('Tema Diganti'), findsOneWidget);
+      expect(
+        testPrefs.getString(kThemePreferenceKey),
+        equals(PutarTheme.kucingManis.id),
+      );
+      expect(SoundService.instance.activeSoundPack, equals('kucing'));
+      await tester.pump(const Duration(seconds: 5));
     });
 
-    testWidgets('Tapping Lihat semua tema triggers in-app banner for gallery', (tester) async {
+    testWidgets('Tapping Lihat semua tema opens ThemeSelectionScreen', (tester) async {
       await tester.pumpWidget(createSettingsTestWidget());
       await tester.pumpAndSettle();
 
       // Tap "Lihat semua tema"
       await tester.tap(find.text('Lihat semua tema'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('🎨 Galeri Tema'), findsOneWidget);
+      expect(find.byType(ThemeSelectionScreen), findsOneWidget);
+      expect(find.text('Tema aplikasi'), findsOneWidget);
+      expect(find.text('Yang ikut berubah'), findsOneWidget);
     });
 
     testWidgets('Suara and Getar toggles update soundSettingsProvider state', (tester) async {

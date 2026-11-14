@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/putar_theme.dart';
 import '../../utils/sound_service.dart';
 
-/// Neo-Brutalist SettingToggle (Layar 21)
-/// Sakelar saklar custom dengan border ink 3px dan transisi halus
+/// Sakelar kustom bertema dengan border tebal dan transisi halus
 class SettingToggle extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -19,6 +18,7 @@ class SettingToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Semantics(
       toggled: value,
       label: label.isNotEmpty ? label : 'Pengaturan sakelar',
@@ -34,13 +34,13 @@ class SettingToggle extends StatelessWidget {
           width: 48,
           height: 30,
           decoration: BoxDecoration(
-            color: value ? AppColors.mint : AppColors.surface,
+            color: value ? t.success : t.surface,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: AppColors.ink, width: 2.8),
-            boxShadow: const [
+            border: Border.all(color: t.borderColor, width: 2.8),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(2, 2),
+                color: t.shadowColor,
+                offset: t.miniShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -58,10 +58,10 @@ class SettingToggle extends StatelessWidget {
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: value ? AppColors.surface : AppColors.ink,
+                      color: value ? t.surface : t.ink,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.ink,
+                        color: t.borderColor,
                         width: 2.0,
                       ),
                     ),
@@ -75,4 +75,3 @@ class SettingToggle extends StatelessWidget {
     );
   }
 }
-

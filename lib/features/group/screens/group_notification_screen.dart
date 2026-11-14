@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/group/services/group_service.dart';
 import '../../../core/group/services/group_notification_settings_service.dart';
@@ -16,6 +15,7 @@ class GroupNotificationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.putarTheme;
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final group = activeGroupAsync.valueOrNull;
     final gid = group?.id ?? ref.read(groupServiceProvider).getActiveGroupId() ?? 'default_group';
@@ -25,7 +25,7 @@ class GroupNotificationScreen extends ConsumerWidget {
     final notifier = ref.read(groupNotificationSettingsProvider(gid).notifier);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
@@ -51,21 +51,24 @@ class GroupNotificationScreen extends ConsumerWidget {
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3.0),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: t.borderWidth),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.shadowColor,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const CustomPaint(
-                          size: Size(20, 20),
-                          painter: CustomBackIconPainter(strokeWidth: 3.0),
+                        child: CustomPaint(
+                          size: const Size(20, 20),
+                          painter: CustomBackIconPainter(
+                            color: t.ink,
+                            strokeWidth: 3.0,
+                          ),
                         ),
                       ),
                     ),
@@ -77,10 +80,10 @@ class GroupNotificationScreen extends ConsumerWidget {
                       children: [
                         Text(
                           'Notifikasi grup',
-                          style: AppTypography.displayMedium.copyWith(
+                          style: t.displayMedium.copyWith(
                             fontSize: 23,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                             height: 1.1,
                           ),
                           maxLines: 1,
@@ -89,10 +92,10 @@ class GroupNotificationScreen extends ConsumerWidget {
                         const SizedBox(height: 2),
                         Text(
                           groupName,
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF5B4B7A),
+                            fontWeight: t.weightSemiBold,
+                            color: t.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -108,13 +111,13 @@ class GroupNotificationScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppColors.ink, width: 3.0),
-                  boxShadow: const [
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(t.cardRadius),
+                  border: Border.all(color: t.ink, width: t.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(4, 4),
+                      color: t.shadowColor,
+                      offset: t.standardShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -130,19 +133,19 @@ class GroupNotificationScreen extends ConsumerWidget {
                             children: [
                               Text(
                                 'Bisukan grup',
-                                style: AppTypography.titleMedium.copyWith(
+                                style: t.titleMedium.copyWith(
                                   fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
+                                  fontWeight: t.weightExtraBold,
+                                  color: t.ink,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 'Matikan semua notifikasi grup ini sementara',
-                                style: AppTypography.bodySmall.copyWith(
+                                style: t.bodySmall.copyWith(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF5B4B7A),
+                                  fontWeight: t.weightMedium,
+                                  color: t.textSecondary,
                                 ),
                               ),
                             ],
@@ -161,10 +164,10 @@ class GroupNotificationScreen extends ConsumerWidget {
                     const SizedBox(height: 14),
                     Text(
                       'Bisukan selama',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -173,16 +176,19 @@ class GroupNotificationScreen extends ConsumerWidget {
                       runSpacing: 8,
                       children: [
                         _buildDurationChip(
+                          t: t,
                           label: '1 jam',
                           isSelected: settings.isCurrentlyMuted && settings.muteDuration == '1_jam',
                           onTap: () => notifier.setMuteDuration('1_jam'),
                         ),
                         _buildDurationChip(
+                          t: t,
                           label: '8 jam',
                           isSelected: settings.isCurrentlyMuted && settings.muteDuration == '8_jam',
                           onTap: () => notifier.setMuteDuration('8_jam'),
                         ),
                         _buildDurationChip(
+                          t: t,
                           label: 'Sampai kunyalakan',
                           isSelected: settings.isCurrentlyMuted && settings.muteDuration == 'sampai_kunyalakan',
                           onTap: () => notifier.setMuteDuration('sampai_kunyalakan'),
@@ -198,13 +204,13 @@ class GroupNotificationScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppColors.ink, width: 3.0),
-                  boxShadow: const [
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(t.cardRadius),
+                  border: Border.all(color: t.ink, width: t.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(4, 4),
+                      color: t.shadowColor,
+                      offset: t.standardShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -214,16 +220,17 @@ class GroupNotificationScreen extends ConsumerWidget {
                   children: [
                     Text(
                       'Jenis notifikasi',
-                      style: AppTypography.titleMedium.copyWith(
+                      style: t.titleMedium.copyWith(
                         fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 6),
 
                     // 1. Catatan Pengeluaran
                     _buildSwitchRow(
+                      t: t,
                       title: 'Catatan pengeluaran',
                       subtitle: 'Saat anggota lain mencatat jajan',
                       value: settings.notifyExpenses,
@@ -233,6 +240,7 @@ class GroupNotificationScreen extends ConsumerWidget {
 
                     // 2. Hasil Putaran Roda
                     _buildSwitchRow(
+                      t: t,
                       title: 'Hasil putaran roda',
                       subtitle: 'Saat anggota lain memutar roda',
                       value: settings.notifySpin,
@@ -242,6 +250,7 @@ class GroupNotificationScreen extends ConsumerWidget {
 
                     // 3. Peringatan Budget
                     _buildSwitchRow(
+                      t: t,
                       title: 'Peringatan budget',
                       subtitle: 'Saat sisa tinggal 20% atau budget terlewati',
                       value: settings.notifyWarning80,
@@ -251,6 +260,7 @@ class GroupNotificationScreen extends ConsumerWidget {
 
                     // 4. Hasil Date Selesai
                     _buildSwitchRow(
+                      t: t,
                       title: 'Hasil date selesai',
                       subtitle: 'Saat date grup selesai: Lolos atau Lewat',
                       value: settings.notifyDateComplete,
@@ -260,6 +270,7 @@ class GroupNotificationScreen extends ConsumerWidget {
 
                     // 5. Anggota Masuk atau Keluar
                     _buildSwitchRow(
+                      t: t,
                       title: 'Anggota masuk atau keluar',
                       subtitle: 'Saat ada yang bergabung atau pergi',
                       value: settings.notifyMembers,
@@ -270,10 +281,10 @@ class GroupNotificationScreen extends ConsumerWidget {
                     const SizedBox(height: 8),
                     Text(
                       'Selalu tampil: dikeluarkan dari grup, grup dihapus, gagal sinkron.',
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF5B4B7A),
+                        fontWeight: t.weightSemiBold,
+                        color: t.textSecondary,
                         height: 1.35,
                       ),
                     ),
@@ -286,13 +297,13 @@ class GroupNotificationScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppColors.ink, width: 3.0),
-                  boxShadow: const [
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(t.cardRadius),
+                  border: Border.all(color: t.ink, width: t.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(4, 4),
+                      color: t.shadowColor,
+                      offset: t.standardShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -302,19 +313,19 @@ class GroupNotificationScreen extends ConsumerWidget {
                   children: [
                     Text(
                       'Suara dan getar',
-                      style: AppTypography.titleMedium.copyWith(
+                      style: t.titleMedium.copyWith(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Diatur di pengaturan Android untuk channel "Aktivitas grup". Jika dimatikan di sana, sakelar di atas tidak berpengaruh.',
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF5B4B7A),
+                        fontWeight: t.weightMedium,
+                        color: t.textSecondary,
                         height: 1.35,
                       ),
                     ),
@@ -326,12 +337,12 @@ class GroupNotificationScreen extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              backgroundColor: AppColors.surface,
+                              backgroundColor: t.surface,
                               content: Text(
                                 granted
                                     ? 'Notifikasi channel "Aktivitas grup" aktif.'
                                     : 'Silakan aktifkan notifikasi di Pengaturan Android > Aplikasi > Putar Jajan.',
-                                style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700),
+                                style: TextStyle(color: t.ink, fontWeight: t.weightBold),
                               ),
                             ),
                           );
@@ -340,16 +351,16 @@ class GroupNotificationScreen extends ConsumerWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.lavender, // #B8A4FF
+                          color: t.accentPurple,
                           borderRadius: BorderRadius.circular(99),
-                          border: Border.all(color: AppColors.ink, width: 3.0),
+                          border: Border.all(color: t.ink, width: t.borderWidth),
                         ),
                         child: Text(
                           'Buka pengaturan Android',
-                          style: AppTypography.buttonSmall.copyWith(
+                          style: t.buttonSmall.copyWith(
                             fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ),
@@ -362,10 +373,10 @@ class GroupNotificationScreen extends ConsumerWidget {
               // Footer Keterangan
               Text(
                 'Aktivitas dalam 1 menit digabung jadi satu notifikasi. Kamu tidak menerima notifikasi untuk aksimu sendiri.',
-                style: AppTypography.bodySmall.copyWith(
+                style: t.bodySmall.copyWith(
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF5B4B7A),
+                  fontWeight: t.weightMedium,
+                  color: t.textSecondary,
                   height: 1.4,
                 ),
               ),
@@ -377,6 +388,7 @@ class GroupNotificationScreen extends ConsumerWidget {
   }
 
   Widget _buildDurationChip({
+    required PutarTheme t,
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
@@ -389,14 +401,14 @@ class GroupNotificationScreen extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.matahari : Colors.white,
+          color: isSelected ? t.secondary : t.surface,
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: AppColors.ink, width: 3.0),
+          border: Border.all(color: t.ink, width: t.borderWidth),
           boxShadow: isSelected
-              ? const [
+              ? [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(2, 2),
+                    color: t.shadowColor,
+                    offset: t.miniShadowOffset,
                     blurRadius: 0,
                   ),
                 ]
@@ -404,10 +416,10 @@ class GroupNotificationScreen extends ConsumerWidget {
         ),
         child: Text(
           label,
-          style: AppTypography.buttonSmall.copyWith(
+          style: t.buttonSmall.copyWith(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontWeight: t.weightExtraBold,
+            color: t.ink,
           ),
         ),
       ),
@@ -415,6 +427,7 @@ class GroupNotificationScreen extends ConsumerWidget {
   }
 
   Widget _buildSwitchRow({
+    required PutarTheme t,
     required String title,
     required String subtitle,
     required bool value,
@@ -433,19 +446,19 @@ class GroupNotificationScreen extends ConsumerWidget {
                   children: [
                     Text(
                       title,
-                      style: AppTypography.titleMedium.copyWith(
+                      style: t.titleMedium.copyWith(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
+                        fontWeight: t.weightBold,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 1),
                     Text(
                       subtitle,
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF5B4B7A),
+                        fontWeight: t.weightMedium,
+                        color: t.textSecondary,
                       ),
                     ),
                   ],
@@ -463,7 +476,7 @@ class GroupNotificationScreen extends ConsumerWidget {
         if (showDivider)
           Container(
             height: 1.5,
-            color: AppColors.ink.withValues(alpha: 0.12),
+            color: t.ink.withValues(alpha: 0.12),
           ),
       ],
     );

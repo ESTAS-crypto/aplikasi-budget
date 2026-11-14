@@ -177,7 +177,7 @@ void main() {
       expect(find.text('SISA BUDGET GRUP'), findsOneWidget);
       // 150.000 - 60.000 = 90.000
       expect(find.text('Rp90.000'), findsOneWidget);
-      expect(find.text('+ CATAT PENGELUARAN'), findsOneWidget);
+      expect(find.text('Catat jajan'), findsOneWidget);
       expect(find.text('Ayam Geprek'), findsOneWidget);
       expect(find.text('Bobba Tea'), findsOneWidget);
 

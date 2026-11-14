@@ -7,8 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/games/game_engine.dart';
 import '../../core/painters/sticker_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/pop_reveal.dart';
@@ -21,28 +20,28 @@ import '../notifications/notification_service.dart';
 class _CapsulePos {
   final double left;
   final double top;
-  final Color color;
+  final int colorIndex;
   final double delay;
 
   const _CapsulePos({
     required this.left,
     required this.top,
-    required this.color,
+    required this.colorIndex,
     required this.delay,
   });
 }
 
 /// 9 Posisi & Warna Kapsul Statis di dalam Kubah sesuai Kapsul.dc.html
 const List<_CapsulePos> _kDefaultDomeCapsules = [
-  _CapsulePos(left: 28, top: 130, color: AppColors.tomat, delay: 0.0),
-  _CapsulePos(left: 70, top: 140, color: AppColors.jeruk, delay: 0.1),
-  _CapsulePos(left: 114, top: 126, color: AppColors.matahari, delay: 0.2),
-  _CapsulePos(left: 150, top: 138, color: AppColors.mint, delay: 0.3),
-  _CapsulePos(left: 46, top: 92, color: AppColors.langit, delay: 0.4),
-  _CapsulePos(left: 92, top: 98, color: AppColors.lavender, delay: 0.0),
-  _CapsulePos(left: 136, top: 88, color: AppColors.permen, delay: 0.1),
-  _CapsulePos(left: 64, top: 52, color: AppColors.lemon, delay: 0.2),
-  _CapsulePos(left: 110, top: 56, color: AppColors.tomat, delay: 0.3),
+  _CapsulePos(left: 28, top: 130, colorIndex: 0, delay: 0.0),
+  _CapsulePos(left: 70, top: 140, colorIndex: 1, delay: 0.1),
+  _CapsulePos(left: 114, top: 126, colorIndex: 2, delay: 0.2),
+  _CapsulePos(left: 150, top: 138, colorIndex: 3, delay: 0.3),
+  _CapsulePos(left: 46, top: 92, colorIndex: 4, delay: 0.4),
+  _CapsulePos(left: 92, top: 98, colorIndex: 5, delay: 0.0),
+  _CapsulePos(left: 136, top: 88, colorIndex: 6, delay: 0.1),
+  _CapsulePos(left: 64, top: 52, colorIndex: 7, delay: 0.2),
+  _CapsulePos(left: 110, top: 56, colorIndex: 0, delay: 0.3),
 ];
 
 /// Layar 13: Gacha Kapsul
@@ -65,7 +64,7 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
   bool _hasPlayedDropSound = false;
   bool _hasPlayedOpenSound = false;
   int? _wonAmount;
-  Color _wonColor = AppColors.lavender;
+  Color _wonColor = PutarTheme.kPasarMalamLavender;
   List<int> _currentPool = GamePoolRepository.defaultCapsulePool;
 
   @override
@@ -203,27 +202,28 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
     final currentActive = await db.getActiveDate();
 
     if (currentActive != null && mounted) {
+      final t = context.putarTheme;
       SoundService.instance.play(Sfx.uiTap);
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: AppColors.ink, width: 3),
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            side: BorderSide(color: t.ink, width: t.borderWidth),
           ),
-          title: const Text(
+          title: Text(
             'Date Masih Aktif!',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
               fontSize: 20,
             ),
           ),
           content: Text(
             'Kamu masih memiliki date yang aktif dengan budget ${RupiahFormatter.format(currentActive.budget)}.\n\nSelesaikan date yang sedang aktif di menu Catatan terlebih dahulu sebelum memulai sesi baru.',
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: t.ink,
               fontSize: 14,
               height: 1.4,
             ),
@@ -231,30 +231,30 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'Tutup',
                 style: TextStyle(
-                  color: AppColors.disabled,
-                  fontWeight: FontWeight.w700,
+                  color: t.textDisabled,
+                  fontWeight: t.weightBold,
                 ),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.matahari,
-                foregroundColor: AppColors.ink,
+                backgroundColor: t.secondary,
+                foregroundColor: t.ink,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.ink, width: 2),
+                  side: BorderSide(color: t.ink, width: 2),
                 ),
               ),
               onPressed: () {
                 Navigator.pop(ctx);
                 context.go('/catatan');
               },
-              child: const Text(
+              child: Text(
                 'Buka Catatan',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: t.weightExtraBold),
               ),
             ),
           ],
@@ -280,11 +280,12 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeDateAsync = ref.watch(activeDateStreamProvider);
     final activeDate = activeDateAsync.value;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -307,24 +308,24 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.shadowColor,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 22,
                         height: 22,
                         child: CustomPaint(
                           painter: CustomBackIconPainter(
-                            color: AppColors.ink,
+                            color: t.ink,
                             strokeWidth: 3.0,
                           ),
                         ),
@@ -335,10 +336,10 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                   Expanded(
                     child: Text(
                       'Gacha Kapsul',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -352,13 +353,13 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppColors.matahari,
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        color: t.secondary,
+                        borderRadius: BorderRadius.circular(t.chipRadius),
+                        border: Border.all(color: t.ink, width: t.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.shadowColor,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
@@ -366,12 +367,12 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 16,
                             height: 16,
                             child: CustomPaint(
                               painter: CustomSettingsIconPainter(
-                                color: AppColors.ink,
+                                color: t.ink,
                                 strokeWidth: 2.8,
                               ),
                             ),
@@ -379,10 +380,10 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                           const SizedBox(width: 6),
                           Text(
                             'Atur Isi',
-                            style: AppTypography.chipLabel.copyWith(
+                            style: t.chipLabel.copyWith(
                               fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ],
@@ -404,25 +405,25 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.shadowColor,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 16,
                           height: 16,
                           child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.2,
                             ),
                           ),
@@ -431,9 +432,9 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                         Expanded(
                           child: Text(
                             'Date aktif: ${RupiahFormatter.format(activeDate.budget)} · Buka Catatan',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -448,22 +449,22 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    color: t.secondary,
+                    borderRadius: BorderRadius.circular(t.chipRadius),
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     'Isi kapsul rahasia, nominal acak',
-                    style: AppTypography.bodySmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                    style: t.bodySmall.copyWith(
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                       fontSize: 13,
                     ),
                   ),
@@ -480,13 +481,13 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                       width: 230,
                       height: 230,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 4),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: 4),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(5, 5),
+                            color: t.shadowColor,
+                            offset: t.dialogShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
@@ -516,9 +517,9 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                                     width: 46,
                                     height: 46,
                                     decoration: BoxDecoration(
-                                      color: pos.color,
+                                      color: t.getWheelColor(pos.colorIndex),
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: AppColors.ink, width: 3),
+                                      border: Border.all(color: t.ink, width: t.borderWidth),
                                     ),
                                   ),
                                 );
@@ -537,13 +538,13 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                         height: 128,
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         decoration: BoxDecoration(
-                          color: AppColors.tomat,
+                          color: t.danger,
                           borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: AppColors.ink, width: 4),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: 4),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(5, 5),
+                              color: t.shadowColor,
+                              offset: t.dialogShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
@@ -564,16 +565,16 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                                       width: 74,
                                       height: 74,
                                       decoration: BoxDecoration(
-                                        color: AppColors.matahari,
+                                        color: t.secondary,
                                         shape: BoxShape.circle,
-                                        border: Border.all(color: AppColors.ink, width: 4),
+                                        border: Border.all(color: t.ink, width: 4),
                                       ),
                                       alignment: Alignment.center,
                                       child: Container(
                                         width: 46,
                                         height: 10,
                                         decoration: BoxDecoration(
-                                          color: AppColors.ink,
+                                          color: t.ink,
                                           borderRadius: BorderRadius.circular(5),
                                         ),
                                       ),
@@ -587,15 +588,15 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                             Container(
                               width: 84,
                               height: 48,
-                              decoration: const BoxDecoration(
-                                color: AppColors.ink,
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(14), bottom: Radius.circular(4)),
+                              decoration: BoxDecoration(
+                                color: t.ink,
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(14), bottom: Radius.circular(4)),
                               ),
                               alignment: Alignment.center,
                               child: AnimatedBuilder(
                                 animation: _dropController,
                                 builder: (context, _) {
-                                  final t = _dropController.value;
+                                  final tDrop = _dropController.value;
                                   if (!_isCranking && _wonAmount == null) {
                                     return const SizedBox.shrink();
                                   }
@@ -611,26 +612,26 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                                   // 58% -> translateY(-8px) (pantul ke atas)
                                   // 62%,76% -> translateY(0), opacity: 1 (diam di tempat)
                                   // 84%,100% -> scale(1.8), opacity: 0 (terbuka & meletup)
-                                  if (t <= 0.36) {
+                                  if (tDrop <= 0.36) {
                                     translateY = -70.0;
                                     opacity = 0.0;
-                                  } else if (t <= 0.54) {
-                                    final u = (t - 0.36) / 0.18;
-                                    opacity = ((t - 0.36) / 0.04).clamp(0.0, 1.0);
+                                  } else if (tDrop <= 0.54) {
+                                    final u = (tDrop - 0.36) / 0.18;
+                                    opacity = ((tDrop - 0.36) / 0.04).clamp(0.0, 1.0);
                                     translateY = -70.0 + 80.0 * (u * u);
-                                  } else if (t <= 0.58) {
-                                    final u = (t - 0.54) / 0.04;
+                                  } else if (tDrop <= 0.58) {
+                                    final u = (tDrop - 0.54) / 0.04;
                                     final sinVal = math.sin(u * math.pi);
                                     translateY = 10.0 - 18.0 * sinVal;
-                                  } else if (t <= 0.62) {
-                                    final u = (t - 0.58) / 0.04;
+                                  } else if (tDrop <= 0.62) {
+                                    final u = (tDrop - 0.58) / 0.04;
                                     translateY = -8.0 * (1.0 - u);
-                                  } else if (t <= 0.76) {
+                                  } else if (tDrop <= 0.76) {
                                     translateY = 0.0;
                                     scale = 1.0;
                                     opacity = 1.0;
                                   } else {
-                                    final u = (t - 0.76) / 0.24;
+                                    final u = (tDrop - 0.76) / 0.24;
                                     scale = 1.0 + 0.8 * Curves.easeOutBack.transform(u);
                                     opacity = (1.0 - u * 1.2).clamp(0.0, 1.0);
                                   }
@@ -647,7 +648,7 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                                           decoration: BoxDecoration(
                                             color: _wonColor,
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: AppColors.surface, width: 3),
+                                            border: Border.all(color: t.surface, width: t.borderWidth),
                                           ),
                                         ),
                                       ),
@@ -669,26 +670,26 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
               if (_wonAmount != null && !_isCranking) ...[
                 PopReveal(
                   child: StickerCard(
-                    backgroundColor: AppColors.surface,
-                    borderRadius: 22,
-                    borderWidth: 3,
+                    backgroundColor: t.surface,
+                    borderRadius: t.cardRadius,
+                    borderWidth: t.borderWidth,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: Column(
                       children: [
                         Text(
                           'Isi kapsul kamu',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightBold,
+                            color: t.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           RupiahFormatter.format(_wonAmount!),
-                          style: AppTypography.displayLarge.copyWith(
+                          style: t.displayLarge.copyWith(
                             fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ],
@@ -702,8 +703,8 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
               if (_wonAmount != null && !_isCranking) ...[
                 StickerButton.large(
                   text: 'Ambil Budget ${RupiahFormatter.format(_wonAmount!)}',
-                  backgroundColor: AppColors.matahari,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.secondary,
+                  textColor: t.ink,
                   onPressed: () => _startActiveDate(_wonAmount!),
                 ),
                 const SizedBox(height: 12),
@@ -711,8 +712,8 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
 
               StickerButton.large(
                 text: _isCranking ? 'MEMUTAR...' : 'PUTAR TUAS',
-                backgroundColor: AppColors.permen,
-                textColor: AppColors.ink,
+                backgroundColor: t.accentPink,
+                textColor: t.ink,
                 onPressed: _isCranking ? () {} : _triggerGacha,
               ),
               const SizedBox(height: 14),
@@ -721,8 +722,8 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
               StickerButton(
                 height: 50,
                 borderRadius: 25,
-                backgroundColor: AppColors.surface,
-                textColor: AppColors.ink,
+                backgroundColor: t.surface,
+                textColor: t.ink,
                 onPressed: () async {
                   SoundService.instance.play(Sfx.uiTap);
                   await context.push('/custom-wheel?game=capsule');
@@ -732,12 +733,12 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 18,
                       height: 18,
                       child: CustomPaint(
                         painter: CustomSettingsIconPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 2.6,
                         ),
                       ),
@@ -748,9 +749,9 @@ class _CapsuleScreenState extends ConsumerState<CapsuleScreen>
                         fit: BoxFit.scaleDown,
                         child: Text(
                           'Atur Isi Kapsul (${_currentPool.length} Nominal)',
-                          style: AppTypography.buttonSmall.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
+                          style: t.buttonSmall.copyWith(
+                            color: t.ink,
+                            fontWeight: t.weightExtraBold,
                             fontSize: 14,
                           ),
                         ),

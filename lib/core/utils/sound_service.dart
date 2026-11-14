@@ -34,6 +34,15 @@ enum Sfx {
 
   final String assetPath;
   const Sfx(this.assetPath);
+
+  /// Nama berkas WAV dasar (misalnya `splash_jingle.wav`).
+  String get fileName => assetPath.split('/').last;
+
+  /// Jalur aset relatif berdasarkan paket suara aktif (`pasar_malam` atau `kucing`).
+  String assetPathForPack(String soundPackId) {
+    final normalized = SoundService.normalizeSoundPackId(soundPackId);
+    return 'audio/$normalized/$fileName';
+  }
 }
 
 /// Model Pengaturan Suara & Getaran
@@ -113,13 +122,56 @@ class SoundService {
   final math.Random _rng = math.Random();
   int _lastTickIndex = -1;
   int _lastTickTime = 0;
+  static const String defaultSoundPackId = 'pasar_malam';
+  static const String kucingSoundPackId = 'kucing';
+  static const List<String> _kucingExtraAssets = [
+    'audio/kucing/meow_1.wav',
+    'audio/kucing/meow_2.wav',
+    'audio/kucing/meow_3.wav',
+    'audio/kucing/purr.wav',
+  ];
+
+  /// Menormalkan id paket suara ke nilai resmi (`pasar_malam` atau `kucing`).
+  static String normalizeSoundPackId(String? soundPackId) =>
+      soundPackId == kucingSoundPackId ? kucingSoundPackId : defaultSoundPackId;
+
+  String _activeSoundPack = defaultSoundPackId;
+  String? _loadedSoundPack;
+  Future<void>? _activePackSwitch;
+
+  DateTime? _lastMeowAt;
+  static const Duration meowThrottle = Duration(milliseconds: 600);
+  @visibleForTesting
+  int meowTriggerCount = 0;
+
+  DateTime? _lastPurrAt;
+  static const Duration purrThrottle = Duration(milliseconds: 800);
+  @visibleForTesting
+  int purrTriggerCount = 0;
+
   bool _initialized = false;
+  Future<void>? _initFuture;
+  AudioPlayer? _splashMediaPlayer;
+  AudioPlayer? _meowPlayer;
+  AudioPlayer? _purrPlayer;
+  Future<void>? _splashPrepareFuture;
+  bool _splashPrepared = false;
+  bool _splashPlayed = false;
+  bool _globalAudioContextSet = false;
+
+  /// Paket suara tema yang sedang aktif (`pasar_malam` atau `kucing`).
+  String get activeSoundPack => _activeSoundPack;
+
+  /// Jalur aset efektif untuk `sfx` pada paket suara aktif saat ini.
+  @visibleForTesting
+  String resolveAssetPath(Sfx sfx) => sfx.assetPathForPack(_activeSoundPack);
 
   SoundSettings get settings => settingsNotifier.value;
   bool get isSoundEnabled => settingsNotifier.value.soundEnabled;
   bool get isVibrationEnabled => settingsNotifier.value.vibrationEnabled;
   bool get isMuted => !settingsNotifier.value.soundEnabled;
   double get masterVolume => settingsNotifier.value.volume;
+  bool get isSplashJinglePrepared => _splashPrepared;
 
   AudioPlayer _createPlayerInstance(String id) {
     final p = AudioPlayer(playerId: id);
@@ -129,8 +181,125 @@ class SoundService {
     return p;
   }
 
-  /// Inisialisasi dan pra-decode semua 23 suara ke Android SoundPool RAM C++ saat splash
-  Future<void> initialize() async {
+  /// Pra-muat jingle splash menggunakan Android MediaPlayer sebelum runApp
+  /// agar audio siap 100% tanpa race condition SoundPool saat cold start.
+  Future<void> prepareSplashJingle({
+    SharedPreferences? prefs,
+    String? soundPackId,
+  }) {
+    if (soundPackId != null) {
+      final normalized = normalizeSoundPackId(soundPackId);
+      if (normalized != _activeSoundPack) {
+        _activeSoundPack = normalized;
+        _splashPrepared = false;
+        _splashPrepareFuture = null;
+        _splashMediaPlayer?.dispose().catchError((_) {});
+        _splashMediaPlayer = null;
+      }
+    }
+    if (_splashPrepared) return Future.value();
+    return _splashPrepareFuture ??= _prepareSplashJingleInternal(prefs: prefs);
+  }
+
+  Future<void> _prepareSplashJingleInternal({SharedPreferences? prefs}) async {
+    try {
+      double effectiveVolume = 1.0;
+      bool vibration = settingsNotifier.value.vibrationEnabled;
+      try {
+        final sp = prefs ?? await SharedPreferences.getInstance();
+        vibration = sp.getBool(_keyVibration) ?? true;
+        final savedVolume = sp.getDouble(_keyVolume) ?? 1.0;
+        effectiveVolume = savedVolume <= 0.05 ? 1.0 : savedVolume;
+        await sp.setBool(_keySound, true);
+        if (savedVolume <= 0.05) {
+          await sp.setDouble(_keyVolume, 1.0);
+        }
+      } catch (_) {}
+
+      settingsNotifier.value = SoundSettings(
+        soundEnabled: true,
+        vibrationEnabled: vibration,
+        volume: effectiveVolume,
+      );
+      isMutedNotifier.value = false;
+
+      if (!_globalAudioContextSet) {
+        try {
+          await AudioPlayer.global.setAudioContext(_audioContext);
+          _globalAudioContextSet = true;
+        } catch (e) {
+          debugPrint('[SoundService] Global AudioContext warning: $e');
+        }
+      }
+
+      final ap = AudioPlayer(playerId: 'pj_splash_media');
+      _splashMediaPlayer = ap;
+      await ap.setPlayerMode(PlayerMode.mediaPlayer);
+      await ap.setAudioContext(_audioContext);
+      await ap.setReleaseMode(ReleaseMode.stop);
+      await ap.setVolume(effectiveVolume);
+      await ap.setSource(
+        AssetSource(Sfx.splashJingle.assetPathForPack(_activeSoundPack)),
+      );
+      _splashPrepared = true;
+    } catch (e) {
+      _splashPrepared = false;
+      debugPrint('[SoundService] prepareSplashJingle warning: $e');
+    }
+  }
+
+  /// Putar jingle splash yang sudah di-prepare pada frame awal animasi splash
+  Future<void> playPreparedSplashJingle({double volume = 1.0}) async {
+    if (_splashPlayed) return;
+    _splashPlayed = true;
+    try {
+      if (!_splashPrepared || _splashMediaPlayer == null) {
+        await prepareSplashJingle();
+      }
+      if (!isSoundEnabled) return;
+
+      final playVol = (volume * settingsNotifier.value.volume).clamp(0.0, 1.0);
+      final ap = _splashMediaPlayer;
+      if (ap != null && _splashPrepared) {
+        try {
+          await ap.setVolume(playVol);
+          await ap.resume();
+          return;
+        } catch (_) {}
+      }
+
+      final fallback = ap ?? AudioPlayer(playerId: 'pj_splash_media');
+      _splashMediaPlayer = fallback;
+      await fallback.setReleaseMode(ReleaseMode.stop);
+      await fallback.play(
+        AssetSource(Sfx.splashJingle.assetPathForPack(_activeSoundPack)),
+        volume: playVol,
+        mode: PlayerMode.mediaPlayer,
+      );
+    } catch (e) {
+      debugPrint('[SoundService] playPreparedSplashJingle fallback: $e');
+    }
+  }
+
+  /// Alias kompatibilitas untuk memutar jingle splash seketika
+  Future<void> prepareAndPlaySplashJingle({double volume = 1.0}) =>
+      playPreparedSplashJingle(volume: volume);
+
+  /// Inisialisasi dan pra-decode semua 23 suara ke Android SoundPool RAM C++ saat splash.
+  Future<void> initialize({String? soundPackId}) {
+    if (soundPackId != null) {
+      _activeSoundPack = normalizeSoundPackId(soundPackId);
+    }
+    if (_initialized) {
+      if (_loadedSoundPack != _activeSoundPack) {
+        return setSoundPack(_activeSoundPack);
+      }
+      return Future.value();
+    }
+    return _initFuture ??= _doInitialize();
+  }
+
+  Future<void> _doInitialize() async {
     if (_initialized) return;
 
     try {
@@ -158,62 +327,138 @@ class SoundService {
       );
       isMutedNotifier.value = false;
 
-      try {
-        await AudioPlayer.global.setAudioContext(_audioContext);
-      } catch (e) {
-        debugPrint('[SoundService] Global AudioContext warning: $e');
-      }
-
-      // Pre-cache semua 23 file WAV ke local asset cache
-      try {
-        await AudioCache.instance.loadAll(
-          Sfx.values.map((s) => s.assetPath).toList(),
-        );
-      } catch (e) {
-        debugPrint('[SoundService] AudioCache loadAll warning: $e');
-      }
-
-      // Buat dedicated pre-buffered player untuk setiap SFX dengan ReleaseMode.stop
-      // ReleaseMode.stop WAJIB agar soundId tetap tersimpan permanen di RAM SoundPool C++
-      // dan TIDAK pernah di-unload saat stop() dipanggil.
-      for (final sfx in Sfx.values) {
-        final count = (sfx == Sfx.wheelTick1 ||
-                sfx == Sfx.wheelTick2 ||
-                sfx == Sfx.wheelTick3 ||
-                sfx == Sfx.diceRoll ||
-                sfx == Sfx.diceLand ||
-                sfx == Sfx.capsuleCrank ||
-                sfx == Sfx.capsuleDrop ||
-                sfx == Sfx.envelopeShuffle ||
-                sfx == Sfx.envelopeOpen ||
-                sfx == Sfx.coinFlip ||
-                sfx == Sfx.coinLand ||
-                sfx == Sfx.uiTap)
-            ? 2
-            : 1;
-        final list = <_DedicatedPlayer>[];
-        for (int i = 0; i < count; i++) {
-          final id = 'pj_${sfx.name}_$i';
-          final ap = AudioPlayer(playerId: id);
-          try {
-            await ap.setPlayerMode(PlayerMode.lowLatency);
-            await ap.setAudioContext(_audioContext);
-            await ap.setReleaseMode(ReleaseMode.stop);
-            await ap.setSource(AssetSource(sfx.assetPath));
-          } catch (e) {
-            debugPrint('[SoundService] Error setting up player $id: $e');
-          }
-          list.add(_DedicatedPlayer(id: id, sfx: sfx, player: ap));
+      if (!_globalAudioContextSet) {
+        try {
+          await AudioPlayer.global.setAudioContext(_audioContext);
+          _globalAudioContextSet = true;
+        } catch (e) {
+          debugPrint('[SoundService] Global AudioContext warning: $e');
         }
-        _players[sfx] = list;
-        _playerIndices[sfx] = 0;
       }
 
+      await _cacheAndDecodePack(_activeSoundPack);
       _initialized = true;
-      debugPrint('[SoundService] Berhasil pra-decode 23 suara resmi ke RAM SoundPool (suara=aktif, volume=$effectiveVolume)');
+      debugPrint(
+        '[SoundService] Berhasil pra-decode 23 suara resmi ($_activeSoundPack) ke RAM SoundPool (suara=aktif, volume=$effectiveVolume)',
+      );
     } catch (e) {
       debugPrint('[SoundService] Init fallback error: $e');
     }
+  }
+
+  /// Mengganti paket suara aktif (`pasar_malam` atau `kucing`) secara langsung,
+  /// melepaskan buffer paket lama dan memuat ulang buffer paket baru secara seri.
+  Future<void> setSoundPack(String soundPackId) async {
+    final target = normalizeSoundPackId(soundPackId);
+    while (_activePackSwitch != null) {
+      try {
+        await _activePackSwitch;
+      } catch (_) {
+        break;
+      }
+    }
+
+    final packChanged = _activeSoundPack != target;
+    final alreadyLoaded = !_initialized || _loadedSoundPack == target;
+    if (!packChanged && alreadyLoaded) {
+      return;
+    }
+
+    final switchFuture = _performSoundPackSwitch(target);
+    _activePackSwitch = switchFuture;
+    try {
+      await switchFuture;
+    } finally {
+      if (identical(_activePackSwitch, switchFuture)) {
+        _activePackSwitch = null;
+      }
+    }
+  }
+
+  Future<void> _performSoundPackSwitch(String target) async {
+    _activeSoundPack = target;
+    _splashPrepared = false;
+    _splashPrepareFuture = null;
+    _splashMediaPlayer?.dispose().catchError((_) {});
+    _splashMediaPlayer = null;
+
+    if (_players.isNotEmpty || _loadedSoundPack != null) {
+      await _disposeSfxPlayers();
+    }
+    if (target != kucingSoundPackId) {
+      _meowPlayer?.dispose().catchError((_) {});
+      _meowPlayer = null;
+      _purrPlayer?.dispose().catchError((_) {});
+      _purrPlayer = null;
+    }
+
+    if (_initialized) {
+      await _cacheAndDecodePack(target);
+    }
+  }
+
+  Future<void> _cacheAndDecodePack(String packId) async {
+    final normalized = normalizeSoundPackId(packId);
+    final paths = <String>[
+      ...Sfx.values.map((s) => s.assetPathForPack(normalized)),
+      if (normalized == kucingSoundPackId) ..._kucingExtraAssets,
+    ];
+
+    try {
+      await AudioCache.instance.loadAll(paths);
+    } catch (e) {
+      debugPrint('[SoundService] AudioCache loadAll ($normalized) warning: $e');
+    }
+
+    for (final sfx in Sfx.values) {
+      if (_players[sfx] != null && _players[sfx]!.isNotEmpty) {
+        continue;
+      }
+      final count = (sfx == Sfx.wheelTick1 ||
+              sfx == Sfx.wheelTick2 ||
+              sfx == Sfx.wheelTick3 ||
+              sfx == Sfx.diceRoll ||
+              sfx == Sfx.diceLand ||
+              sfx == Sfx.capsuleCrank ||
+              sfx == Sfx.capsuleDrop ||
+              sfx == Sfx.envelopeShuffle ||
+              sfx == Sfx.envelopeOpen ||
+              sfx == Sfx.coinFlip ||
+              sfx == Sfx.coinLand ||
+              sfx == Sfx.uiTap)
+          ? 2
+          : 1;
+      final list = <_DedicatedPlayer>[];
+      for (int i = 0; i < count; i++) {
+        final id = 'pj_${normalized}_${sfx.name}_$i';
+        final ap = AudioPlayer(playerId: id);
+        try {
+          await ap.setPlayerMode(PlayerMode.lowLatency);
+          await ap.setAudioContext(_audioContext);
+          await ap.setReleaseMode(ReleaseMode.stop);
+          await ap.setSource(AssetSource(sfx.assetPathForPack(normalized)));
+        } catch (e) {
+          debugPrint('[SoundService] Error setting up player $id: $e');
+        }
+        list.add(_DedicatedPlayer(id: id, sfx: sfx, player: ap));
+      }
+      _players[sfx] = list;
+      _playerIndices[sfx] = 0;
+    }
+
+    _loadedSoundPack = normalized;
+  }
+
+  Future<void> _disposeSfxPlayers() async {
+    for (final list in _players.values) {
+      for (final dp in list) {
+        dp.autoStopTimer?.cancel();
+        dp.player.dispose().catchError((_) {});
+      }
+    }
+    _players.clear();
+    _playerIndices.clear();
+    _loadedSoundPack = null;
   }
 
   /// Durasi aman tiap SFX untuk auto-reset status player di Android SoundPool
@@ -340,7 +585,7 @@ class SoundService {
       try {
         await player.setReleaseMode(ReleaseMode.stop);
         await player.play(
-          AssetSource(dedicated.sfx.assetPath),
+          AssetSource(dedicated.sfx.assetPathForPack(_activeSoundPack)),
           volume: volume,
           mode: PlayerMode.lowLatency,
         );
@@ -360,7 +605,7 @@ class SoundService {
       final p = _createPlayerInstance('pj_fallback_${sfx.name}');
       final effectiveVolume = (volume * masterVolume).clamp(0.0, 1.0);
       await p.play(
-        AssetSource(sfx.assetPath),
+        AssetSource(sfx.assetPathForPack(_activeSoundPack)),
         volume: effectiveVolume,
         mode: PlayerMode.lowLatency,
       );
@@ -480,15 +725,135 @@ class SoundService {
     } catch (_) {}
   }
 
-  void dispose() {
-    for (final list in _players.values) {
-      for (final dp in list) {
-        dp.autoStopTimer?.cancel();
-        dp.player.dispose().catchError((_) {});
-      }
+  /// Penyedia waktu untuk kalkulasi throttle agar pengujian di `FakeAsync` deterministik.
+  @visibleForTesting
+  DateTime Function() clockNowProvider = DateTime.now;
+
+  DateTime _resolveNow(DateTime? explicitNow) => explicitNow ?? clockNowProvider();
+
+  /// Memutar suara meong lembut saat maskot Mochi diketuk, di-throttle 600ms
+  /// agar ketukan cepat tidak memicu spam audio. Mengembalikan `true` bila dipicu.
+  bool playMeow({
+    DateTime? now,
+    double volume = 0.85,
+    bool haptic = true,
+  }) {
+    final timestamp = _resolveNow(now);
+    if (_lastMeowAt != null &&
+        timestamp.difference(_lastMeowAt!) < meowThrottle) {
+      return false;
     }
-    _players.clear();
-    _playerIndices.clear();
+    _lastMeowAt = timestamp;
+    meowTriggerCount++;
+
+    if (haptic && isVibrationEnabled) {
+      try {
+        HapticFeedback.lightImpact().catchError((_) {});
+      } catch (_) {}
+    }
+
+    if (!isSoundEnabled || !_initialized) {
+      return true;
+    }
+
+    _playMeowAssetOrFallback(volume);
+    return true;
+  }
+
+  /// Mengatur ulang pengunci throttle meong (khusus unit test).
+  @visibleForTesting
+  void resetMeowThrottle() {
+    _lastMeowAt = null;
+    meowTriggerCount = 0;
+    clockNowProvider = DateTime.now;
+  }
+
+  /// Memutar suara dengkuran (purr) halus saat Mochi ditahan agak lama (~1 detik).
+  /// Di-throttle 800ms agar tidak memicu spam audio.
+  bool playPurr({
+    DateTime? now,
+    double volume = 0.85,
+    bool haptic = true,
+  }) {
+    final timestamp = _resolveNow(now);
+    if (_lastPurrAt != null &&
+        timestamp.difference(_lastPurrAt!) < purrThrottle) {
+      return false;
+    }
+    _lastPurrAt = timestamp;
+    purrTriggerCount++;
+
+    if (haptic && isVibrationEnabled) {
+      try {
+        HapticFeedback.mediumImpact().catchError((_) {});
+      } catch (_) {}
+    }
+
+    if (!isSoundEnabled || !_initialized) {
+      return true;
+    }
+
+    _playPurrAsset(volume);
+    return true;
+  }
+
+  /// Mengatur ulang pengunci throttle dengkuran (khusus unit test).
+  @visibleForTesting
+  void resetPurrThrottle() {
+    _lastPurrAt = null;
+    purrTriggerCount = 0;
+  }
+
+  Future<void> _playMeowAssetOrFallback(double volume) async {
+    final variant = _rng.nextInt(3) + 1;
+    final relPath = 'audio/kucing/meow_$variant.wav';
+    try {
+      await rootBundle.load('assets/$relPath');
+      final p = _meowPlayer ??= _createPlayerInstance('pj_meow');
+      final effectiveVolume = (volume * masterVolume).clamp(0.0, 1.0);
+      await p.stop().catchError((_) {});
+      await p.play(
+        AssetSource(relPath),
+        volume: effectiveVolume,
+        mode: PlayerMode.lowLatency,
+      );
+    } catch (_) {
+      play(
+        Sfx.uiTap,
+        volume: volume * 0.85,
+        pitch: 1.35,
+        haptic: false,
+      );
+    }
+  }
+
+  Future<void> _playPurrAsset(double volume) async {
+    const relPath = 'audio/kucing/purr.wav';
+    try {
+      await rootBundle.load('assets/$relPath');
+      final p = _purrPlayer ??= _createPlayerInstance('pj_purr');
+      final effectiveVolume = (volume * masterVolume).clamp(0.0, 1.0);
+      await p.stop().catchError((_) {});
+      await p.play(
+        AssetSource(relPath),
+        volume: effectiveVolume,
+        mode: PlayerMode.lowLatency,
+      );
+    } catch (e) {
+      debugPrint('[SoundService] playPurr fallback: $e');
+    }
+  }
+
+  void dispose() {
+    _splashMediaPlayer?.dispose().catchError((_) {});
+    _splashMediaPlayer = null;
+    _meowPlayer?.dispose().catchError((_) {});
+    _meowPlayer = null;
+    _purrPlayer?.dispose().catchError((_) {});
+    _purrPlayer = null;
+    _disposeSfxPlayers();
+    _initialized = false;
+    _initFuture = null;
   }
 }
 

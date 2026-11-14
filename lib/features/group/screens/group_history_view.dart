@@ -15,8 +15,7 @@ import '../../../core/group/sync/sync_state.dart';
 import '../../../core/group/widgets/scope_switcher.dart';
 import '../../../core/group/widgets/sync_strip.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/indonesian_date_formatter.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
@@ -70,6 +69,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final horizontalPad = screenWidth < 340 ? 16.0 : 24.0;
     final unreadCount = ref.watch(unreadActivityCountProvider);
@@ -83,7 +83,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
             : null);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: group == null
             ? _buildNoGroupView(context, horizontalPad, unreadCount)
@@ -97,6 +97,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
     double horizontalPad,
     int unreadCount,
   ) {
+    final t = context.putarTheme;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(horizontalPad, 20, horizontalPad, 24),
       child: Column(
@@ -117,13 +118,13 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.ink, width: 3),
-              boxShadow: const [
+              color: t.surface,
+              borderRadius: BorderRadius.circular(t.cardRadius),
+              border: Border.all(color: t.ink, width: t.borderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(4, 4),
+                  color: t.ink,
+                  offset: t.standardShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -134,22 +135,22 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                   width: 68,
                   height: 68,
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
+                    color: t.secondary,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.ink,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const CustomPaint(
-                    size: Size(32, 32),
+                  child: CustomPaint(
+                    size: const Size(32, 32),
                     painter: CustomCrownPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: 2.8,
                     ),
                   ),
@@ -157,18 +158,18 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                 const SizedBox(height: 16),
                 Text(
                   'Belum Bergabung Grup',
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Buat atau gabung grup terlebih dahulu untuk melihat riwayat date bersama teman.',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
+                  style: t.bodySmall.copyWith(
+                    color: t.textSecondary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -177,7 +178,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                 const SizedBox(height: 20),
                 StickerButton.large(
                   text: 'BUAT ATAU GABUNG GRUP',
-                  backgroundColor: AppColors.matahari,
+                  backgroundColor: t.secondary,
                   onPressed: () => context.push('/group/join-or-create'),
                 ),
               ],
@@ -194,6 +195,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
     double horizontalPad,
     int unreadCount,
   ) {
+    final t = context.putarTheme;
     final sessionsAsync = ref.watch(activeGroupSessionsStreamProvider);
     final selectedFilter = ref.watch(groupHistoryFilterProvider);
     final displayLimit = ref.watch(groupHistoryDisplayLimitProvider);
@@ -248,11 +250,11 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                 const SizedBox(height: 10),
 
                 // 2. Pemilih Pribadi / Grup (ScopeSwitcher + Nama Grup sesuai Rgrup1.dc.html)
-                _buildScopePillSelector(group),
+                _buildScopePillSelector(t, group),
                 const SizedBox(height: 10),
 
                 // 3. Kartu Ringkasan Matahari ("Date Jumat · 4 date", "2 lolos, 2 lewat", "Rata-rata budget")
-                _buildSummaryCard(group, summary, hasPendingOrOffline),
+                _buildSummaryCard(t, group, summary, hasPendingOrOffline),
                 const SizedBox(height: 10),
 
                 // 4. Baris Chip Filter ("Semua · N", "Lolos", "Lewat") - Bisa digeser horizontal
@@ -294,9 +296,9 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
 
                 // 5. Daftar Kartu Date / Loading Skeleton / Kosong
                 if (isLoadingInitial)
-                  _buildLoadingSkeletonList()
+                  _buildLoadingSkeletonList(t)
                 else if (visibleSessions.isEmpty)
-                  _buildEmptyStateCard()
+                  _buildEmptyStateCard(t)
                 else ...[
                   ...List.generate(visibleSessions.length, (index) {
                     final session = visibleSessions[index];
@@ -342,23 +344,26 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.surface,
+                            color: t.surface,
                             borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: AppColors.ink, width: 2.5),
-                            boxShadow: const [
+                            border: Border.all(
+                              color: t.ink,
+                              width: t.subtleBorderWidth,
+                            ),
+                            boxShadow: [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(2, 2),
+                                color: t.ink,
+                                offset: t.miniShadowOffset,
                                 blurRadius: 0,
                               ),
                             ],
                           ),
                           child: Text(
                             'Muat lebih banyak (${filteredSessions.length - visibleSessions.length} lagi)',
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: t.buttonSmall.copyWith(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -375,16 +380,17 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
   }
 
   Widget _buildTopHeader(BuildContext context, int unreadCount) {
+    final t = context.putarTheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
           child: Text(
             'Riwayat',
-            style: AppTypography.displayMedium.copyWith(
+            style: t.displayMedium.copyWith(
               fontSize: 28,
               fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              color: t.ink,
             ),
           ),
         ),
@@ -410,22 +416,22 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.ink,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const CustomPaint(
-                        size: Size(21, 21),
+                      child: CustomPaint(
+                        size: const Size(21, 21),
                         painter: CustomBellPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 2.8,
                         ),
                       ),
@@ -439,16 +445,16 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                           height: 19,
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.tomat,
+                            color: t.danger,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.ink, width: 2),
+                            border: Border.all(color: t.ink, width: 2),
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            '$unreadCount',
-                            style: AppTypography.buttonSmall.copyWith(
+                            unreadCount > 99 ? '99+' : '$unreadCount',
+                            style: t.buttonSmall.copyWith(
                               fontSize: 11,
-                              color: AppColors.ink,
+                              color: t.surface,
                               fontWeight: FontWeight.w800,
                               height: 1.0,
                             ),
@@ -473,22 +479,22 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: t.surface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.ink,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const CustomPaint(
-                    size: Size(21, 21),
+                  child: CustomPaint(
+                    size: const Size(21, 21),
                     painter: CustomGearPainter(
-                      color: AppColors.ink,
+                      color: t.ink,
                       strokeWidth: 2.8,
                     ),
                   ),
@@ -503,17 +509,17 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
 
   /// Pemilih Pribadi / Grup sesuai Rgrup1.dc.html ("Pribadi" | "Grup · Date Jumat")
   /// dan mendukung ketuk untuk beralih ke Pribadi
-  Widget _buildScopePillSelector(GroupModel group) {
+  Widget _buildScopePillSelector(PutarTheme t, GroupModel group) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.ink,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -544,10 +550,10 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                     'Pribadi',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -564,19 +570,19 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
+                  color: t.secondary,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: AppColors.ink, width: 2),
+                  border: Border.all(color: t.ink, width: 2),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   'Grup · ${group.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
               ),
@@ -589,6 +595,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
 
   /// Kartu Ringkasan Matahari sesuai Rgrup1.dc.html
   Widget _buildSummaryCard(
+    PutarTheme t,
     GroupModel group,
     GroupHistoryOverviewSummary summary,
     bool hasPendingWrites,
@@ -606,13 +613,13 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.matahari,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.secondary,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.ink, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(5, 5),
+                color: t.ink,
+                offset: t.dialogShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -631,10 +638,10 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                           '${group.name} · ${summary.totalDates} date',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
+                            color: t.ink,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -643,11 +650,11 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                           alignment: Alignment.centerLeft,
                           child: Text(
                             '${summary.lolosCount} lolos, ${summary.lewatCount} lewat',
-                            style: AppTypography.displayMedium.copyWith(
+                            style: t.displayMedium.copyWith(
                               fontSize: 30,
                               fontWeight: FontWeight.w800,
                               height: 1.1,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -665,21 +672,21 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                         children: [
                           Text(
                             'Rata-rata budget',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               height: 1.35,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                             textAlign: TextAlign.right,
                           ),
                           Text(
                             RupiahFormatter.format(summary.averageBudget),
-                            style: AppTypography.bodyLargeBold.copyWith(
+                            style: t.bodyLargeBold.copyWith(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                               height: 1.35,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                             textAlign: TextAlign.right,
                           ),
@@ -693,10 +700,10 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                 const SizedBox(height: 6),
                 Text(
                   'Belum termasuk catatan terbaru anggota lain',
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
               ],
@@ -707,17 +714,17 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
     );
   }
 
-  Widget _buildEmptyStateCard() {
+  Widget _buildEmptyStateCard(PutarTheme t) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        color: t.surface,
+        borderRadius: BorderRadius.circular(t.cardRadius),
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.ink,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -726,16 +733,16 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
       child: Text(
         'Belum ada date selesai',
         textAlign: TextAlign.center,
-        style: AppTypography.titleMedium.copyWith(
+        style: t.titleMedium.copyWith(
           fontSize: 16,
           fontWeight: FontWeight.w800,
-          color: AppColors.textSecondary,
+          color: t.textSecondary,
         ),
       ),
     );
   }
 
-  Widget _buildLoadingSkeletonList() {
+  Widget _buildLoadingSkeletonList(PutarTheme t) {
     return Column(
       children: List.generate(3, (index) {
         return Container(
@@ -743,13 +750,13 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
           height: 82,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            color: t.surface,
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            border: Border.all(color: t.ink, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(3, 3),
+                color: t.ink,
+                offset: t.smallShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -760,9 +767,9 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                 width: 50,
                 height: 54,
                 decoration: BoxDecoration(
-                  color: AppColors.cream,
+                  color: t.bg,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.ink, width: 3),
+                  border: Border.all(color: t.ink, width: t.borderWidth),
                 ),
               ),
               const SizedBox(width: 12),
@@ -775,7 +782,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                       width: 110,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: AppColors.cream,
+                        color: t.bg,
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
@@ -784,7 +791,7 @@ class _GroupHistoryViewState extends ConsumerState<GroupHistoryView> {
                       width: 150,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: AppColors.cream,
+                        color: t.bg,
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
@@ -854,6 +861,7 @@ class _FilterChipButtonState extends State<_FilterChipButton>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final disableAnim = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     return Semantics(
@@ -874,14 +882,14 @@ class _FilterChipButtonState extends State<_FilterChipButton>
             duration: Duration(milliseconds: disableAnim ? 100 : 180),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: widget.isSelected ? AppColors.matahari : AppColors.surface,
+              color: widget.isSelected ? t.secondary : t.surface,
               borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: AppColors.ink, width: 3),
+              border: Border.all(color: t.ink, width: t.borderWidth),
               boxShadow: widget.isSelected
-                  ? const [
+                  ? [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.ink,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ]
@@ -889,10 +897,10 @@ class _FilterChipButtonState extends State<_FilterChipButton>
             ),
             child: Text(
               widget.label,
-              style: AppTypography.buttonSmall.copyWith(
+              style: t.buttonSmall.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                color: t.ink,
               ),
             ),
           ),
@@ -972,6 +980,7 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     final session = widget.session;
     final isLolos = session.isLolos;
     final dateTitle = IndonesianDateFormatter.fullDayAndDate(session.startedAt);
@@ -1009,13 +1018,13 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: theme.surface,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.ink, width: 3),
-                boxShadow: const [
+                border: Border.all(color: theme.ink, width: theme.borderWidth),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: theme.ink,
+                    offset: theme.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
@@ -1029,9 +1038,9 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                     constraints: const BoxConstraints(minHeight: 54),
                     padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isLolos ? AppColors.mint : AppColors.tomat,
+                      color: isLolos ? theme.accentMint : theme.danger,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.ink, width: 3),
+                      border: Border.all(color: theme.ink, width: theme.borderWidth),
                     ),
                     alignment: Alignment.center,
                     child: FittedBox(
@@ -1042,21 +1051,21 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                         children: [
                           Text(
                             '${session.startedAt.day}',
-                            style: AppTypography.titleLarge.copyWith(
+                            style: theme.titleLarge.copyWith(
                               fontSize: 21,
                               fontWeight: FontWeight.w800,
                               height: 1.0,
-                              color: AppColors.ink,
+                              color: theme.ink,
                             ),
                           ),
                           const SizedBox(height: 1),
                           Text(
                             _monthShortUpper(session.startedAt),
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: theme.buttonSmall.copyWith(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               height: 1.0,
-                              color: AppColors.ink,
+                              color: theme.ink,
                             ),
                           ),
                         ],
@@ -1075,10 +1084,10 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                           dateTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyLargeBold.copyWith(
+                          style: theme.bodyLargeBold.copyWith(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            color: theme.ink,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1094,10 +1103,10 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                                 '${widget.actorDisplayName} · $gameLabel',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: AppTypography.bodySmall.copyWith(
+                                style: theme.bodySmall.copyWith(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF5B4B7A),
+                                  color: theme.textSecondary,
                                 ),
                               ),
                             ),
@@ -1109,12 +1118,14 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                           runSpacing: 4,
                           children: [
                             _buildMiniMetricPill(
+                              theme,
                               text: budgetText,
-                              backgroundColor: AppColors.surface,
+                              backgroundColor: theme.surface,
                             ),
                             _buildMiniMetricPill(
+                              theme,
                               text: spentText,
-                              backgroundColor: AppColors.matahari,
+                              backgroundColor: theme.secondary,
                             ),
                           ],
                         ),
@@ -1139,18 +1150,18 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: isLolos ? AppColors.mint : AppColors.tomat,
+                              color: isLolos ? theme.accentMint : theme.danger,
                               borderRadius: BorderRadius.circular(99),
-                              border: Border.all(color: AppColors.ink, width: 2),
+                              border: Border.all(color: theme.ink, width: 2),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (isLolos) ...[
-                                  const CustomPaint(
-                                    size: Size(13, 13),
+                                  CustomPaint(
+                                    size: const Size(13, 13),
                                     painter: CustomCheckIconPainter(
-                                      color: AppColors.ink,
+                                      color: theme.ink,
                                       strokeWidth: 3.2,
                                     ),
                                   ),
@@ -1158,10 +1169,10 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                                 ],
                                 Text(
                                   statusBadgeText,
-                                  style: AppTypography.buttonSmall.copyWith(
+                                  style: theme.buttonSmall.copyWith(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
-                                    color: AppColors.ink,
+                                    color: theme.ink,
                                   ),
                                 ),
                               ],
@@ -1169,10 +1180,10 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const CustomPaint(
-                          size: Size(18, 18),
+                        CustomPaint(
+                          size: const Size(18, 18),
                           painter: CustomChevronRightPainter(
-                            color: AppColors.ink,
+                            color: theme.ink,
                             strokeWidth: 3.0,
                           ),
                         ),
@@ -1188,7 +1199,8 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
     );
   }
 
-  Widget _buildMiniMetricPill({
+  Widget _buildMiniMetricPill(
+    PutarTheme t, {
     required String text,
     required Color backgroundColor,
   }) {
@@ -1197,17 +1209,17 @@ class _GroupDateHistoryCardState extends State<GroupDateHistoryCard>
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.ink, width: 2),
+        border: Border.all(color: t.ink, width: 2),
       ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Text(
           text,
           maxLines: 1,
-          style: AppTypography.buttonSmall.copyWith(
+          style: t.buttonSmall.copyWith(
             fontSize: 11,
             fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            color: t.ink,
           ),
         ),
       ),
@@ -1228,11 +1240,12 @@ class GroupHistoryMiniGameIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _MiniGameIconPainter(game: game),
+        painter: _MiniGameIconPainter(game: game, theme: t),
       ),
     );
   }
@@ -1240,8 +1253,12 @@ class GroupHistoryMiniGameIcon extends StatelessWidget {
 
 class _MiniGameIconPainter extends CustomPainter {
   final String game;
+  final PutarTheme theme;
 
-  const _MiniGameIconPainter({required this.game});
+  const _MiniGameIconPainter({
+    required this.game,
+    this.theme = PutarTheme.pasarMalam,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1250,7 +1267,7 @@ class _MiniGameIconPainter extends CustomPainter {
     canvas.scale(scale, scale);
 
     final strokePaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round
@@ -1267,12 +1284,12 @@ class _MiniGameIconPainter extends CustomPainter {
         canvas.drawRRect(
           rrect,
           Paint()
-            ..color = AppColors.langit
+            ..color = theme.accentBlue
             ..style = PaintingStyle.fill,
         );
         canvas.drawRRect(rrect, strokePaint);
         final dotPaint = Paint()
-          ..color = AppColors.ink
+          ..color = theme.ink
           ..style = PaintingStyle.fill;
         canvas.drawCircle(const Offset(9, 9), 1.5, dotPaint);
         canvas.drawCircle(const Offset(12, 12), 1.5, dotPaint);
@@ -1292,7 +1309,7 @@ class _MiniGameIconPainter extends CustomPainter {
         canvas.drawRRect(
           fullRRect,
           Paint()
-            ..color = AppColors.surface
+            ..color = theme.surface
             ..style = PaintingStyle.fill,
         );
         final topPath = Path()
@@ -1304,7 +1321,7 @@ class _MiniGameIconPainter extends CustomPainter {
         canvas.drawPath(
           topPath,
           Paint()
-            ..color = AppColors.permen
+            ..color = theme.accentPink
             ..style = PaintingStyle.fill,
         );
         canvas.drawPath(topPath, strokePaint);
@@ -1321,7 +1338,7 @@ class _MiniGameIconPainter extends CustomPainter {
         canvas.drawRRect(
           envRect,
           Paint()
-            ..color = AppColors.mint
+            ..color = theme.accentMint
             ..style = PaintingStyle.fill,
         );
         canvas.drawRRect(envRect, strokePaint);
@@ -1338,7 +1355,7 @@ class _MiniGameIconPainter extends CustomPainter {
           const Offset(12, 12),
           8.5,
           Paint()
-            ..color = AppColors.jeruk
+            ..color = theme.accentOrange
             ..style = PaintingStyle.fill,
         );
         canvas.drawCircle(const Offset(12, 12), 8.5, strokePaint);
@@ -1354,7 +1371,7 @@ class _MiniGameIconPainter extends CustomPainter {
         canvas.drawRRect(
           rect,
           Paint()
-            ..color = AppColors.mint
+            ..color = theme.accentMint
             ..style = PaintingStyle.fill,
         );
         canvas.drawRRect(rect, strokePaint);
@@ -1370,7 +1387,7 @@ class _MiniGameIconPainter extends CustomPainter {
           const Offset(12, 12),
           8.5,
           Paint()
-            ..color = AppColors.matahari
+            ..color = theme.secondary
             ..style = PaintingStyle.fill,
         );
         canvas.drawCircle(const Offset(12, 12), 8.5, strokePaint);
@@ -1393,6 +1410,6 @@ class _MiniGameIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MiniGameIconPainter oldDelegate) =>
-      oldDelegate.game != game;
+      oldDelegate.game != game || oldDelegate.theme != theme;
 }
 

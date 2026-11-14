@@ -1,280 +1,250 @@
-# Putar Jajan 🎯
+# Putar Jajan
 
-Aplikasi Android penentu budget saat ngedate dengan estetika **Neo-Brutalist Playful** (garis tebal 3px ink, bayangan keras tanpa blur, palet warna stiker ceria, 19 efek suara kalimba kayu pentatonik C resmi, dan tipografi Bricolage Grotesque).
+Aplikasi Android penentu budget saat ngedate dengan sistem multi-tema dinamis: tema default **Pasar Malam** (*Neo-Brutalist Playful*) dan tema **Kucing Manis** (pastel lembut bersama maskot **Mochi**).
 
-Dibuat dari nol (*from scratch*) mengikuti seluruh panduan `AGENT_PROMPT.md`, tanpa emoji, tanpa Material/Cupertino/FontAwesome icons bawaan, dan tanpa aset grafis stok — **100% ikon, ilustrasi, logo, dan simbol digambar secara presisi menggunakan `CustomPainter` dan `Path`**.
+Dibuat dari nol (*from scratch*) tanpa emoji dan tanpa ikon bawaan Material/Cupertino/FontAwesome — **100% ikon, ilustrasi, logo, maskot, pointer, dan konfeti digambar secara presisi menggunakan `CustomPainter` dan `Path`**.
 
 ---
 
-## 🎨 Design System & Token
+## Design System & Token Multi-Tema
 
-- **Ink**: `#22163A` (Teks utama, border 3px, bayangan keras tanpa blur offset `(4,4)` dan `(6,6)` untuk kartu hero)
-- **Krim**: `#FFF3D6` (Latar belakang utama aplikasi)
-- **Surface**: `#FFFFFF` (Permukaan kartu, dialog, modal bottom sheet)
+Seluruh token visual dipusatkan dalam [`PutarTheme`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/putar_theme.dart) (`ThemeExtension<PutarTheme>`).
+
+### 1. Tema Default: Pasar Malam (`pasar_malam`)
+- **Ink**: `#22163A` (teks utama, border 3px, bayangan keras tanpa blur offset `(4, 4)` dan `(6, 6)` untuk kartu hero)
+- **Krim**: `#FFF3D6` (latar belakang utama aplikasi)
+- **Surface**: `#FFFFFF` (permukaan kartu, dialog, modal bottom sheet)
 - **8 Warna Irisan Roda, Permainan & Aksen**:
-  1. **Tomat** `#FF6B5A` (Aksen utama / tombol / pointer)
-  2. **Jeruk** `#FF9F1C` (Aksen kartu / status)
-  3. **Matahari** `#FFD23F` (Highlight / kartu hero / tab aktif)
-  4. **Mint** `#3DDBB0` (Aman / lolos budget / irisan target)
-  5. **Langit** `#6FB1FF` (Kartu permainan Dadu)
-  6. **Lavender** `#B8A4FF` (Chip tanggal / kartu amplop)
-  7. **Permen** `#FF8FC0` (Kartu permainan Kapsul)
-  8. **Lemon** `#B8E986` (Aksen highlight teks / irisan roda)
-- **Font**: Bricolage Grotesque (500 Medium, 700 Bold, 800 ExtraBold) di-bundle lokal di `assets/fonts/`.
+  1. **Tomat** `#FF6B5A` (aksen utama / tombol / pointer)
+  2. **Jeruk** `#FF9F1C` (aksen kartu / status)
+  3. **Matahari** `#FFD23F` (highlight / kartu hero / tab aktif)
+  4. **Mint** `#3DDBB0` (aman / lolos budget / irisan target)
+  5. **Langit** `#6FB1FF` (kartu permainan Dadu)
+  6. **Lavender** `#B8A4FF` (chip tanggal / kartu amplop)
+  7. **Permen** `#FF8FC0` (kartu permainan Kapsul)
+  8. **Lemon** `#B8E986` (aksen highlight teks / irisan roda)
+- **Font**: `Bricolage Grotesque` (`400`, `500`, `700`, `800`) di-bundle lokal di `assets/fonts/`.
+- **Geometri**: Radius kartu `22.0`, garis border `3.0`, efek tekan tombol mengikuti `Offset(4, 4)`.
+
+### 2. Tema Kedua: Kucing Manis (`kucing_manis`)
+- **Ink**: `#3A2E4F`, **Latar**: `#FFF0F5`, **Surface**: `#FFFFFF`, **Text Secondary**: `#6E5C86`, **Text Disabled**: `#74648C`
+- **8 Warna Roda Berurutan**:
+  1. **Sakura** `#FF8FB1`
+  2. **Persik** `#FFB997`
+  3. **Mentega** `#FFE27A`
+  4. **Mint** `#9BE8D0`
+  5. **Langit** `#A8D8FF`
+  6. **Lavender** `#CDB4FF`
+  7. **Permen** `#FFC8DD`
+  8. **Pistachio** `#C8F0A8`
+- **Palet Maskot Mochi**: `mascotFur` `#FFB066`, `mascotEarPink` `#FF8FB1`, `mascotBlush` `#FF9FB8`, `mascotNose` `#FF7A9C`, `mascotBell` `#FFD23F`, `mascotMuzzle` `#FFF3E0`.
+- **Font**: `Fredoka` (`400`, `500`, `600`, `700`, lisensi OFL di `assets/fonts/`).
+- **Geometri**: Radius kartu `26.0`, radius kartu kecil `22.0`, radius tombol `26.0`, bayangan keras bawah `Offset(0, 5)` tanpa blur, dan efek tekan tombol `Offset(0, 5)`.
 
 ---
 
-## 📱 14 Layar Sesuai Desain & Spesifikasi
+## 14 Layar Inti Solo Sesuai Desain & Spesifikasi
 
-1. **Layar 10: Splash Screen** (`Splash.dc.html`):
-   - Timeline animasi 3600ms (faktor 0.6 dari 6000ms CSS) dengan `SoundService.play(Sfx.splashJingle)`.
-   - Sinar matahari berputar bergantian `#FFD23F` & `#FFDE66` tiap 7.5° per 40 detik.
-   - Roda 300x300 dengan bingkai r130, 16 bohlam berkedip genap-ganjil 300ms, dan 8 irisan meluncur masuk dengan jeda 70ms.
-   - Putaran 922.5° presisi mendarat dengan irisan Mint (indeks 3) tepat di bawah pointer jam 12.
-   - Mendukung aksesibilitas `MediaQuery.disableAnimations` (tampilan frame akhir 600ms).
+1. **Layar 10: Splash Screen** ([`splash_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/splash/splash_screen.dart)):
+   - Timeline animasi dengan pemutaran jingle via [`SoundService`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/utils/sound_service.dart).
+   - Pada tema Pasar Malam: sinar matahari bergantian & putaran roda mendarat di irisan Mint di bawah pointer jam 12.
+   - Pada tema Kucing Manis: `MochiPainter` animasi pembuka, lonceng, partikel hati, jejak telapak, dan suara `meow`.
+   - Mendukung aksesibilitas `MediaQuery.disableAnimations`.
 
-2. **Layar 06: Onboarding** (`Onboarding.dc.html`):
-   - 4 koin warna-warni mengorbit logo roda (12 detik per putaran).
-   - Logo melayang naik-turun halus (2200ms `easeInOut`).
-   - Tombol "Mulai putar" menyimpan status ke `SharedPreferences` dan masuk ke Games Hub.
+2. **Layar 06: Onboarding** ([`onboarding_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/onboarding/onboarding_screen.dart)):
+   - 4 koin warna-warni mengorbit logo aplikasi dengan tombol "Mulai putar" yang menyimpan status onboarding ke `SharedPreferences`.
 
-3. **Layar 11: Pilih Permainan / Games Hub** (`Games.dc.html`):
-   - Hero card Matahari "Roda Putar" dengan mini rotating wheel 12 detik dan lencana "Favorit".
-   - Grid 2x2 permainan aktif: **Kocok Dadu** (Langit), **Gacha Kapsul** (Permen), **Pilih Amplop** (Mint), dan **Lempar Koin** (Jeruk, redup 0.6 dengan badge "Segera").
-   - Tombol "Acak aja, serahkan ke aplikasi" untuk memilih permainan aktif secara acak.
-   - Header tombol Pengaturan Suara & Getaran.
+3. **Layar 11: Pilih Permainan / Games Hub** ([`games_hub_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/games_hub_screen.dart)):
+   - Hero card "Roda Putar" dengan mini rotating wheel dan lencana "Favorit".
+   - Grid 2x2 permainan: **Kocok Dadu**, **Gacha Kapsul**, **Pilih Amplop**, dan **Lempar Koin**.
+   - Tombol "Acak aja, serahkan ke aplikasi" serta akses header ke Pengaturan.
 
-4. **Layar 01: Putar Roda** (`Main.dc.html`):
-   - Roda 300dp CustomPainter, border 5px ink, pointer jam 12.
-   - Algoritma putar acak aman (`Random.secure`), durasi 6 detik `Cubic(0.12, 0.7, 0.1, 1.0)`.
-   - `SoundService.playWheelTick` per irisan tanpa pengulangan suara berturut-turut.
-   - Gesture putar jari manual (`GestureDetector` + kalkulasi sudut & inersia).
+4. **Layar 01: Putar Roda** ([`wheel_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/wheel/wheel_screen.dart)):
+   - Roda CustomPainter border tebal dengan pointer jam 12 (`WheelEarPainter` + `PawPainter` saat tema Kucing Manis).
+   - Algoritma putar acak (`Random.secure`), `SoundService.playWheelTick` per irisan tanpa pengulangan suara berturut-turut, dan gesture putar manual.
 
-5. **Layar 12: Kocok Dadu** (`Dadu.dc.html`):
-   - Fisika jatuh dari $Y=-170$ dengan rotasi $-420^\circ$, memantul dua kali ($-46$ dan $-14$).
-   - Dadu kedua tertunda 120ms; titik dadu 1–6 digambar dengan `CustomPainter`.
-   - Pilihan jumlah dadu (1–3) dan kelipatan preset (Rp5.000, Rp10.000, Rp20.000, atau input bebas).
+5. **Layar 12: Kocok Dadu** ([`dice_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/dice_screen.dart)):
+   - Animasi jatuh dan pantulan dadu `CustomPainter`, pilihan jumlah dadu (1–3) dan kelipatan preset atau input bebas.
 
-6. **Layar 13: Gacha Kapsul** (`Kapsul.dc.html`):
-   - Kubah transparan dengan kapsul mengambang dan berguncang.
-   - Tuas knob berputar $540^\circ$ saat diputar, kapsul jatuh dari $-70$ ke baki dan membesar $1.8\times$.
+6. **Layar 13: Gacha Kapsul** ([`capsule_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/capsule_screen.dart)):
+   - Kubah transparan dengan kapsul berguncang, putaran tuas knob, dan kapsul jatuh membuka nominal budget.
 
-7. **Layar 14: Pilih Amplop** (`Amplop.dc.html`):
-   - 3 amplop berdampingan dengan animasi kartu berguncang dan shuffle acak.
-   - Amplop terpilih membuka penutup (skala Y $1$ ke $-1$), kertas naik 66px, dan dua amplop lainnya meredup (opacity 0.4, scale 0.92).
+7. **Layar 14: Pilih Amplop** ([`envelope_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/envelope_screen.dart)):
+   - 3 amplop berdampingan dengan animasi shuffle acak dan animasi membuka amplop terpilih.
 
-8. **Layar 07: Editor Isi / Pool Editor** (`Editor.dc.html`):
-   - Digunakan bersama untuk Roda, Kapsul, dan Amplop.
-   - Preview visual berputar, indikator kapasitas (2–12 slot), pil nominal berwarna dengan tombol hapus.
-   - Input format titik ribuan otomatis (`ThousandsSeparatorInputFormatter`), validasi Rp1.000 – Rp10.000.000.
+8. **Layar 07: Editor Isi / Pool Editor** ([`custom_wheel_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/wheel/custom_wheel_screen.dart)):
+   - Digunakan untuk menyesuaikan slot Roda, Kapsul, dan Amplop (2–12 slot, validasi Rp1.000 – Rp10.000.000, format titik ribuan otomatis).
 
-9. **Layar 02: Lagi Ngedate / Catatan** (`Tracker.dc.html`):
-   - Hero card Matahari dengan progress bar beranimasi 600ms, indikator warna dinamis:
-     - Hijau Mint: `< 70%` (Aman)
-     - Kuning Matahari: `70% - 90%` (Waspada)
-     - Merah Tomat: `> 90%` (Bahaya)
-   - Bottom sheet catat jajan dengan format titik ribuan otomatis, `Sfx.coinRecord`, dan snackbar "Urungkan".
+9. **Layar 02: Lagi Ngedate / Catatan** ([`active_date_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/date/active_date_screen.dart)):
+   - Hero card progress bar dengan indikator status dinamis (`< 70%` aman, `70% - 90%` waspada, `> 90%` bahaya), bottom sheet catat jajan, serta maskot Mochi yang mengintip saat tema Kucing Manis aktif.
 
-10. **Layar 03: Notifikasi Dalam Aplikasi** (`Notif.dc.html`):
-    - Banner atas peringatan 80% (turun dari atas dengan kurva `easeOutBack`).
-    - Dialog overbudget (pop keyframe 0.8 -> 1.04 -> 1.0, opsi "Catat tetap" dan "Hapus item").
-    - In-app toast Mint melayang tanpa library pihak ketiga.
+10. **Layar 03: Notifikasi Dalam Aplikasi** ([`in_app_toast.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/widgets/in_app_toast.dart), [`in_app_banner.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/group/widgets/in_app_banner.dart)):
+    - Banner peringatan 80%, dialog konfirmasi overbudget ("Catat tetap" / "Hapus item"), dan toast melayang kustom tanpa library eksternal.
 
-11. **Layar 04: Hasil Akhir** (`Hasil.dc.html`):
-    - Latar Mint dengan konfeti 60fps & stempel centang untuk Lolos budget.
-    - Latar Tomat dengan stempel silang untuk Lewat budget.
-    - Ringkasan 3 kolom (Budget, Terpakai, Item) dan tombol bagikan hasil.
+11. **Layar 04: Hasil Akhir** ([`date_result_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/date/date_result_screen.dart)):
+    - Tampilan Lolos (konfeti/hati berjatuhan + stempel centang + selebrasi) vs Lewat (stempel peringatan + Mochi sedih pada tema Kucing Manis) dan tombol bagikan hasil.
 
-12. **Layar 08: Riwayat Date** (`Riwayat.dc.html`):
-    - Kartu beruntun lolos budget (streak hitungan minggu).
-    - 7 diagram batang mingguan responsif bertumbuh dari bawah secara staggered.
-    - Riwayat sesi date sebelumnya dengan sticker chip Lolos/Lewat.
+12. **Layar 08: Riwayat Date** ([`history_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/history/history_screen.dart)):
+    - Kartu streak mingguan, diagram batang 7 hari responsif, dan riwayat sesi date dengan chip Lolos/Lewat.
 
-13. **Layar 05: Sistem Brand & Desain** (`Brand.dc.html`):
-    - Geometri logo roda beririsan terlepas, ikon navigasi, dan katalog swatch palet warna stiker.
+13. **Layar 05: Sistem Brand & Desain** ([`brand_system_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/wheel/brand_system_screen.dart)):
+    - Katalog swatch palet aktif, ikon navigasi bertema, logo, dan tampilan maskot saat aktif.
 
-14. **Layar 09: Notifikasi Sistem Android** (`Push.dc.html`):
-    - Ongoing notification dengan progress bar sisa budget.
-    - Peringatan 80% dengan aksi langsung "Catat jajan" dan "Lihat sisa".
-    - Pengingat mingguan Jumat 18:00 WIB dan selebrasi streak lolos budget.
+14. **Layar 09: Notifikasi Sistem Android** ([`notification_service.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/notifications/notification_service.dart)):
+    - Ongoing notification sisa budget, peringatan 80% dengan aksi langsung, serta pengingat mingguan Jumat 18:00 WIB dengan channel terpisah per tema.
 
 ---
 
-## 🔊 Suara Custom (19 File Kalimba Kayu Resmi Pentatonik C)
+## Suara Custom & Pengaturan Audio
 
-1. `splash_jingle.wav`: Jingle pembuka pada splash screen
-2. `wheel_tick_1.wav`, `wheel_tick_2.wav`, `wheel_tick_3.wav`: Tick putaran roda (acak tanpa pengulangan berurutan)
-3. `wheel_spin.wav`: Efek putaran roda tombol 6 detik
-4. `wheel_land.wav`: Mendarat pada irisan target
-5. `dice_roll.wav`, `dice_land.wav`: Lemparan dan pendaratan dadu
-6. `capsule_crank.wav`, `capsule_drop.wav`, `capsule_open.wav`: Putaran tuas, jatuh, dan terbukanya kapsul
-7. `envelope_shuffle.wav`, `envelope_open.wav`: Kocok amplop dan buka penutup
-8. `win_lolos.wav`: Selebrasi lolos budget date
-9. `over_budget.wav`: Peringatan lembut dialog budget lewat
-10. `coin_record.wav`: Koin tersimpan saat mencatat jajan
-11. `notif_warning.wav`: Notifikasi peringatan batas 80%
-12. `notif_reminder.wav`: Pengingat mingguan Jumat 18:00 WIB & selebrasi streak
-13. `ui_tap.wav`: Ketukan tombol utama dan navigasi
+### 1. Dua Paket Audio per Tema
+- **Pasar Malam (`assets/audio/pasar_malam/`)**: 23 file WAV efek suara standar (kalimba/marimba).
+- **Kucing Manis (`assets/audio/kucing/`)**: 27 file WAV lengkap:
+  - 23 efek permainan & UI (`capsule_crank.wav`, `capsule_drop.wav`, `capsule_open.wav`, `coin_double.wav`, `coin_flip.wav`, `coin_halve.wav`, `coin_land.wav`, `coin_record.wav`, `dice_land.wav`, `dice_roll.wav`, `envelope_open.wav`, `envelope_shuffle.wav`, `notif_reminder.wav`, `notif_warning.wav`, `over_budget.wav`, `splash_jingle.wav`, `ui_tap.wav`, `wheel_land.wav`, `wheel_spin.wav`, `wheel_tick_1.wav`, `wheel_tick_2.wav`, `wheel_tick_3.wav`, `win_lolos.wav`).
+  - 4 efek khusus maskot (`meow_1.wav`, `meow_2.wav`, `meow_3.wav`, `purr.wav`).
+
+### 2. Pengaturan Audio & Getaran
+- Terintegrasi via Riverpod (`soundSettingsProvider` di [`sound_service.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/utils/sound_service.dart)) dengan penyimpanan persisten di `SharedPreferences`:
+  - Sakelar **Suara (SFX)**
+  - Slider **Volume Master** (`0%` – `100%`)
+  - Sakelar **Getaran (Haptik)**
 
 ---
 
-## ⚙️ Pengaturan Audio & Getaran
+## UPDATE 2 & 3: Mode Grup Bersama, Sinkronisasi & Notifikasi
 
-- Modal bottom sheet terintegrasi via Riverpod (`soundSettingsProvider`):
-  - **Sakelar Suara (SFX)**: Menyalakan/mematikan pemutaran audio dengan seketika.
-  - **Slider Volume Master**: Mengatur volume dari 0% hingga 100% dengan preview suara interaktif.
-  - **Sakelar Getaran (Haptik)**: Mengatur getaran sinkron haptik pada perangkat.
-  - Tersimpan persisten melalui `SharedPreferences`.
+Fitur mode grup bersama memungkinkan pasangan atau teman kencan menentukan budget date dan mencatat jajan bersama dalam satu sesi realtime, dengan dukungan penuh saat offline tanpa mengubah mode pribadi lokal.
 
----
+### Layar Mode Grup (Layar 16 – 21 & Pengaturan Grup)
+1. **Layar 16: Buat atau Gabung Grup** (`JoinOrCreateGroupScreen`): Form pembuatan grup (1–20 karakter), input 6 kotak kode undangan auto-kapitalisasi, serta deteksi status koneksi ramah pengguna.
+2. **Layar 17: Kode Undangan & Kelola Anggota** (`GroupInviteScreen`): Tampilan kode 6 huruf alfabet aman tanpa ambigu (`0, O, 1, I, L`), aksi Salin & Bagikan, daftar anggota realtime dengan role Pemilik Grup, slot putus-putus (*dashed member slot*), ganti kode, keluar/keluarkan anggota.
+3. **Layar 18: Roda Bersama** (`GroupWheelView`): Terintegrasi di layar Roda via `ScopeSwitcher` (Pribadi vs Grup), presence `lastSeenAt`, kartu putaran terakhir, progress bar sisa budget grup, dan badge lonceng unread.
+4. **Layar 19: Catatan Grup & Status Sinkronisasi** (`GroupNotesView`): Daftar pengeluaran bersama dengan avatar pencatat, `SyncBadge` (*Menunggu* / *Terkirim*), `SyncStrip` debounce 1,5 detik + fade out 300ms, disclaimer offline, serta aksi akhiri sesi (`Selesaikan date`).
+5. **Layar 20: Aktivitas Grup & Kamus Sinkronisasi** (`GroupActivityScreen`): Log kronologis dengan filter Semua/Roda/Catatan, pemisahan bagian **BARU** vs **SEBELUMNYA**, auto-update `lastReadAt`, dan `SyncLegend`.
+6. **Layar 21: Notifikasi & Pengaturan Grup** (`GroupNotificationScreen`): Simulasi perbandingan HP Pelaku vs Anggota Lain dan 4 sakelar persisten per grup (`SharedPreferences`).
+7. **Layar 53 & 54: Pengaturan Budget & Permainan Grup** (`GroupBudgetSettingsScreen`): Mode "Dari Permainan" (termasuk kebijakan `spinPolicy` & editor isi roda grup 2–12 slot) dan Mode "Angka Tetap" (nominal langsung `MULAI DATE`).
 
-## 👥 UPDATE 2: Mode Grup Bersama, Sinkronisasi & Notifikasi
-
-Fitur mode grup bersama memungkinkan pasangan atau teman kencan menentukan budget date dan mencatat jajan bersama dalam satu sesi realtime, dengan dukungan penuh saat offline tanpa mengubah atau mengganggu mode pribadi lokal.
-
-### 1. 6 Layar Baru Mode Grup (Layar 16 – 21)
-1. **Layar 16: Buat atau Gabung Grup** (`JoinOrCreateGroupScreen`):
-   - Form pembuatan grup dengan nama 1–20 karakter.
-   - Input 6 kotak kode undangan responsif dengan kursor berkedip dan auto-kapitalisasi.
-   - Deteksi koneksi internet ramah pengguna (tombol dinonaktifkan dengan pesan informatif saat offline tanpa error kasar).
-2. **Layar 17: Kode Undangan & Kelola Anggota** (`GroupInviteScreen`):
-   - Tampilan kode undangan besar 6 huruf dari alfabet aman tanpa ambigu (`0, O, 1, I, L`).
-   - Aksi Salin (clipboard) dan Bagikan via native share sheet.
-   - Daftar anggota realtime dengan role Pemilik Grup, avatar inisial berwarna, dan slot putus-putus (*dashed member slot*).
-   - Pengelolaan grup sederhana: Keluar grup (anggota biasa) dan Ganti kode / Keluarkan anggota (pemilik).
-3. **Layar 18: Roda Bersama** (`GroupWheelView`):
-   - Terintegrasi langsung di layar Roda via `ScopeSwitcher` (Pribadi vs Grup) tanpa menambah tab bottom nav.
-   - Presence online sederhana via `lastSeenAt` (hemat baterai).
-   - Kartu putaran terakhir (siapa, kapan, nominal) dan progress bar sisa budget grup.
-   - Ikon lonceng notifikasi dengan titik indikator belum dibaca (*unread activity count*).
-4. **Layar 19: Catatan Grup & Status Sinkronisasi** (`GroupNotesView`):
-   - Daftar catatan pengeluaran bersama dengan avatar pencatat, nominal rupiah, dan `SyncBadge` inline (*Menunggu* / *Terkirim*).
-   - `SyncStrip` status koneksi anti-kedip (debounce 1,5 detik, fade out 300ms saat tersinkron).
-   - Kartu sisa budget grup offline disclaimer: *"Berdasarkan data di HP ini. Belum termasuk catatan terbaru anggota lain."*
-5. **Layar 20: Aktivitas Grup & Kamus Sinkronisasi** (`GroupActivityScreen`):
-   - Log aktivitas grup berurutan waktu (siapa mencatat apa, siapa memutar roda).
-   - Filter cepat: Semua, Roda, Catatan.
-   - Pembagian jelas antara aktivitas **BARU** (titik merah tomat) dan **SEBELUMNYA**. Membuka layar otomatis memperbarui `lastReadAt`.
-   - Kamus status `SyncLegend` di bagian bawah sebagai referensi visual status sinkronisasi.
-6. **Layar 21: Notifikasi & Pengaturan Grup** (`GroupNotificationScreen`):
-   - Visualisasi perbandingan simulasi dua pengalaman: HP Pelaku (hanya konfirmasi lokal tanpa banner) vs HP Anggota Lain (banner meluncur + notifikasi sistem).
-   - 4 sakelar pengaturan notifikasi neo-brutalist (`SettingToggle`) tersimpan persisten per grup di `SharedPreferences`:
-     - Catatan pengeluaran anggota
-     - Hasil putaran roda bersama
-     - Peringatan budget mencapai 80%
-     - Anggota masuk atau keluar grup
-
----
-
-## 🏛️ Keputusan Arsitektur, Privasi Data & Model Konsistensi
-
+### Keputusan Arsitektur, Privasi Data & Model Konsistensi
 1. **Pemisahan Tegas Data Pribadi vs Data Grup**:
-   - **Data Pribadi**: 100% tersimpan lokal di SQLite Drift; **tidak pernah** dikirim ke server cloud mana pun dan selalu berfungsi penuh secara offline.
-   - **Data Grup (Supabase PostgreSQL / Cloud Firestore)**:
-     - **Supabase (Rekomendasi Utama & Free Tier Tanpa Modal)**: Menggunakan Supabase PostgreSQL dengan Realtime Replication aktif dan Row Level Security (RLS). Tidak memerlukan kartu kredit dan 100% gratis pada free tier (500 MB database, 50.000 user aktif bulanan, 200 koneksi realtime bersamaan).
-     - Skrip SQL DDL tabel lengkap tersedia di [`supabase_schema.sql`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/supabase_schema.sql) dan tinggal di-*run* di SQL Editor Supabase Web Console.
-     - Terkonfigurasi di [`supabase_config.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/supabase/supabase_config.dart) menggunakan `publishableKey` resmi Supabase.
-2. **Model Data Bersifat Append-Only & Idempoten**:
-   - Catatan pengeluaran (`group_notes`) dibuat dengan client-side UUID.
-   - Menghapus catatan menggunakan penanda *tombstone* (`deleted = true`), bukan menghapus baris fisik.
-   - Sisa budget **tidak pernah disimpan sebagai counter mutable yang di-update bersama**. Sisa budget dihitung secara deterministik (*derived remaining budget*) dari budget sesi dikurangi seluruh catatan yang tidak deleted. Dengan demikian, dua HP yang mencatat pengeluaran secara bersamaan saat offline tidak akan saling menimpa data dan menghasilkan sisa budget yang identik ketika kembali online.
+   - **Data Pribadi**: 100% lokal di SQLite Drift; tidak dikirim ke server cloud mana pun.
+   - **Data Grup (Supabase PostgreSQL + Realtime + RLS)**: Skrip DDL tersedia di [`supabase_schema.sql`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/supabase_schema.sql) dan dikonfigurasi di [`supabase_config.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/supabase/supabase_config.dart).
+2. **Model Data Append-Only & Idempoten**:
+   - Catatan pengeluaran dibuat dengan client-side UUID, dihapus via *tombstone* (`deleted = true`), dan sisa budget dihitung secara deterministik dari total catatan aktif agar sinkronisasi offline antar perangkat tidak saling menimpa.
+
+### Keputusan Biaya & Keterbatasan Notifikasi Background
+- **Mode Supabase Realtime Listener (Default, Rp0 Gratis)**: Notifikasi sistem Android dan `InAppBanner` berjalan penuh selama proses aplikasi aktif (*foreground* maupun *background* selama soket OS belum dibekukan).
+- **Opsi Cloud Functions + FCM Data-Only**: Tersedia template di direktori [`functions/`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/functions) untuk skenario push *data-only* saat proses aplikasi dimatikan total (*terminated* / *cold state*).
+- `NotificationCoordinator` menjaga filter `actorUid == currentUid` (*ownAction*), penyaluran `InAppBanner` saat *resumed* vs notifikasi sistem saat di luar layar, dan kunci deduplikasi deterministik `evt:{gid}:{eventId}`.
 
 ---
 
-## 💰 Keputusan Biaya & Keterbatasan Notifikasi
+## UPDATE 4: Sistem Multi-Tema & Tema "Kucing Manis"
 
-### Keterbatasan Sistem Notifikasi
-- **Mode Supabase Realtime Listener (Default)**:
-  - Notifikasi sistem Android dan `InAppBanner` berfungsi penuh selama aplikasi berada di layar (*foreground*) atau diminimalkan di latar belakang (*background* / recent apps).
-  - Berjalan 100% di **Paket Gratis Supabase (Rp0 / Tanpa Modal / Tanpa Kartu Kredit)**.
-- **Dengan FCM + Cloud Functions (Tahap G6 - Opsional)**:
-  - Mengirim pesan *data-only* via trigger `onCreate` pada path `groups/{gid}/events/{eventId}` ke topik `group_{gid}_{type}`.
-  - Memungkinkan notifikasi sistem tetap muncul meskipun aplikasi telah dimatikan total (*cold state*).
-  - Klien memfilter pesan berdasarkan `actorUid` (mengabaikan aksi sendiri) dan mengagregasi beberapa event dalam jendela 60 detik menjadi satu notifikasi ringkasan.
+### 1. Arsitektur Tema & Live Switching Tanpa Restart
+- **Model Token Tunggal** ([`putar_theme.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/putar_theme.dart)): `PutarTheme` menampung warna, tipografi, radius, border, offset bayangan keras, `PutarIconStyle` (`iconStyle`, `navIconStyle`, `pointerStyle`, `logoStyle`), `PutarMascotKind?`, `PutarCelebrationStyle`, `PutarWheelDecor`, `PutarSplashStyle`, `soundPackId`, `notificationChannelSuffix`, dan peta teks [`PutarCopyKeys`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/putar_theme.dart).
+- **Registrasi Dinamis**: `PutarTheme.allThemes` dan `PutarTheme.byId(...)` memungkinkan penambahan tema ketiga cukup dengan mendaftarkan satu `PutarTheme` baru beserta paket asetnya tanpa mengubah kode UI layar.
+- **Controller & Pre-`runApp` Init** ([`theme_controller.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/theme_controller.dart) & [`main.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/main.dart)):
+  - `readInitialThemeFromPrefs()` membaca kunci `kThemePreferenceKey = 'pj_theme_id'` dari `SharedPreferences` **sebelum `runApp`** dan meneruskannya ke `initialThemeProvider` serta `SoundService.instance.prepareSplashJingle(soundPackId: initialTheme.soundPackId)` agar `SplashScreen` langsung memakai tema tersimpan.
+  - `ThemeController.setTheme` / `setThemeById` mengganti tema secara **live tanpa restart** (`themeAnimationDuration: const Duration(milliseconds: 580)` dengan `Curves.easeInOutCubic` di `PutarJajanApp`), memancarkan gelombang radial halus dari titik ketuk via [`ThemeTransitionOverlay`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/theme_transition_overlay.dart), melakukan morphing halus pada [`LogoWidget`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/painters/logo_painter.dart) dan ikon [`BottomNavBar`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/navigation/bottom_nav_bar.dart), serta memicu `applyThemeSideEffects` (pindah paket audio, jadwalkan ulang notifikasi Android, dan sinkronisasi ikon aplikasi via [`AppIconService`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/app_icon_service.dart)).
 
-### Layar 52, 53 & 54: Kelola Grup & Pengaturan Budget Bersama
-- **Layar 52 (Kelola Grup)**:
-  - Hub pengaturan grup untuk pemilik dan anggota dengan kartu kode undangan, ganti kode, dan daftar anggota.
-  - Kartu menu: **Budget & Permainan** (menampilkan status mode aktif: "Dari Permainan" atau "Angka Tetap Rp...") dan **Notifikasi Grup** (Layar 44).
-  - Aksi pemilik: Ganti kode undangan (menulis event `code_changed`), Keluarkan anggota (dialog konfirmasi + event `member_removed`), dan Hapus grup (konfirmasi 2 langkah + event `group_deleted`). Anggota biasa memiliki tombol Keluar grup (event `member_leave`).
-- **Layar 53 (Mode Budget: Dari Permainan)**:
-  - Selector mode dengan chip interaktif bergaya Neo-Brutalist.
-  - Kebijakan putar roda `spinPolicy`: "Hanya Pemilik Grup" vs "Semua Anggota". Jika hanya pemilik, tombol PUTAR RODA pada anggota biasa otomatis dinonaktifkan dengan feedback ramah.
-  - Editor nominal isi roda grup (2–12 slot pilihan, chip berwarna dengan tombol hapus, validasi Rp1.000 – Rp10.000.000).
-- **Layar 54 (Mode Budget: Angka Tetap)**:
-  - Input nominal besar berformat titik ribuan (`Rp 200.000`) dengan keyboard angka dan `ThousandsSeparatorInputFormatter`.
-  - Chip Pilih Cepat (`Rp100.000`, `Rp150.000`, `Rp200.000`, `Rp300.000`) dan Chip Tambah Cepat (`+10rb`, `+50rb`, `+100rb`).
-  - Catatan resmi: *"Berlaku untuk date berikutnya; date yang sedang berjalan tidak berubah."*
-  - Di Layar 18 (Roda Bersama), tombol PUTAR RODA otomatis berubah menjadi **MULAI DATE (Rp...)** yang membuat sesi date baru secara instan tanpa memutar roda (menulis event `session_start`).
+### 2. Komponen Kustom Maskot & Pratinjau
+- **`MochiPainter`** ([`mochi_painter.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/painters/mochi_painter.dart)): CustomPainter untuk 5 `MochiExpression` (`normal`, `happy`, `wow`, `sad`, `sleepy`), dilengkapi animasi kedipan, ketukan interaktif (`meow_1`–`meow_3`), serta efek membal/dengkuran (`purr.wav`).
+- **`PawPainter` & `WheelEarPainter`** ([`paw_painter.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/painters/paw_painter.dart)): Pointer telapak kaki, kuping di atas roda, serta ikon telapak baris catatan.
+- **`ConfettiField` / `ConfettiPainter`** ([`confetti_painter.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/painters/confetti_painter.dart)): Merender konfeti persegi pada Pasar Malam atau partikel hati warna-warni pada Kucing Manis saat hasil Lolos.
 
-### Analisis Biaya Free Tier Supabase vs Firebase Blaze
-- **Supabase Free Tier (Paket Aktif Saat Ini)**:
-  - **Biaya: Rp0 (100% Gratis Tanpa Kartu Kredit)**.
-  - Database PostgreSQL: 500 MB (cukup untuk ratusan ribu catatan pengeluaran & event kencan).
-  - Realtime: 200 concurrent connections, 2 juta pesan realtime per bulan.
-- **Firebase Blaze (Opsional jika butuh FCM background killed)**:
-  - Membutuhkan kartu kredit, namun memiliki kuota gratis 2.000.000 pemanggilan fungsi per bulan.
-- Template fungsi siap deploy tersedia di direktori [`functions/`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/functions).
+### 3. Layar Pilih Tema (Layar 22) & Pengaturan (Layar 50–51)
+- **[`SettingsScreen`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/settings/screens/settings_screen.dart)** (route `/settings`): Menampilkan **KARTU 1: TEMA** berisi mini-pratinjau dinamis sesuai `PutarTheme.allThemes` dan tautan **"Lihat semua tema"** menuju Layar 22.
+- **[`ThemeSelectionScreen`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/settings/screens/theme_selection_screen.dart)** (route `/themes`): Merender daftar kartu tema dengan pratinjau token komposisional ([`theme_preview_painters.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/settings/widgets/theme_preview_painters.dart)), daftar elemen yang ikut berubah, tombol konfirmasi dinamis (`"Pakai ..."`), serta dukungan aksesibilitas TalkBack penuh.
+
+### 4. Audio & Notifikasi Per Tema
+- **Audio**: `SoundService.setSoundPack(soundPackId)` memindahkan direktori aset aktif antara `assets/audio/pasar_malam/` dan `assets/audio/kucing/` dan me-release instance player paket sebelumnya.
+- **Notifikasi Android 8+ (5 + 5 Channel Terpisah)**:
+  - **Pasar Malam** (`ic_stat_notification`): `channel_ongoing`, `channel_warning_v2`, `channel_reminder_v2`, `channel_expense_logged_v2`, `channel_group_activity_v2`.
+  - **Kucing Manis** (`ic_stat_notification_kucing`): `channel_ongoing_kucing_v1`, `channel_warning_kucing_v1`, `channel_reminder_kucing_v1`, `channel_expense_logged_kucing_v1`, `channel_group_activity_kucing_v1` dengan suara raw `notif_warning_kucing.wav` dan `notif_reminder_kucing.wav`.
+  - Pergantian tema memanggil `NotificationService.instance.applyTheme(...)` dan menjadwalkan ulang pengingat mingguan (`scheduleWeeklyFridayReminder`).
+
+### 5. Ikon Launcher Dinamis & Splash Native Per Tema
+Aplikasi menyelaraskan **ikon launcher Android, ikon & warna `TaskDescription` di Recent Apps, serta splash native** saat pengguna berpindah antara **Pasar Malam** dan **Kucing Manis**:
+- **Komponen Launcher Ganda** ([`AndroidManifest.xml`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/android/app/src/main/AndroidManifest.xml)): `.MainActivity` (`@mipmap/ic_launcher`, `@style/LaunchTheme` `#FFD23F`) dan [`KucingLauncherActivity`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/android/app/src/main/kotlin/com/putarjajan/putar_jajan/KucingLauncherActivity.kt) (`@mipmap/ic_launcher_kucing`, `@style/LaunchThemeKucing` `#FFF0F5` + `@drawable/android12splash_kucing`).
+- **Perpindahan Aman Tanpa Force-Close** ([`MainActivity.kt`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/android/app/src/main/kotlin/com/putarjajan/putar_jajan/MainActivity.kt) & [`AppIconService`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/core/theme/app_icon_service.dart)): `TaskDescription` diperbarui seketika di latar depan via `MethodChannel`, sementara pengaktifan komponen launcher tujuan (`setComponentEnabledSetting` dengan `DONT_KILL_APP`) dijalankan saat `onStop()` agar transisi di dalam aplikasi tetap mulus.
+- Di dalam app frame pertama, [`SplashScreen`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/splash/splash_screen.dart) membaca `readInitialThemeFromPrefs()` sehingga visual splash, animasi, dan audio langsung selaras dengan tema aktif.
+
+### 6. Audit Cakupan Layar & Status Implementasi (Bagian 9–11 `UPDATE_4_TEMA_KUCING.md`)
+Prinsip implementasi menggunakan **satu kode layar untuk seluruh tema** pada `38` berkas fitur di `lib/features/`.
+
+- **Layar Khusus Tema (komponen dekoratif dipilih via token `PutarTheme`)**:
+  - Layar `22` Pilih Tema: [`theme_selection_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/settings/screens/theme_selection_screen.dart)
+  - Layar `23` Putar Roda: [`wheel_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/wheel/wheel_screen.dart) & [`group_wheel_view.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_wheel_view.dart)
+  - Layar `24` Lagi Ngedate: [`active_date_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/date/active_date_screen.dart) & [`group_notes_view.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_notes_view.dart)
+  - Layar `25` Hasil Akhir Solo: [`date_result_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/date/date_result_screen.dart)
+  - Layar `26` Maskot, Ikon & Palet: [`brand_system_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/wheel/brand_system_screen.dart)
+  - Layar `27` Splash: [`splash_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/splash/splash_screen.dart)
+  - Layar `50` & `51` Pengaturan: [`settings_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/settings/screens/settings_screen.dart)
+  - Layar `68` & `69` Hasil Akhir Grup (Lolos & Lewat): [`group_date_result_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_date_result_screen.dart)
+
+- **Layar Token-Saja (Seluruh Fitur Terpasang di `lib/features/`)**:
+  - Solo (`28`–`37`): [`onboarding_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/onboarding/onboarding_screen.dart), [`custom_wheel_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/wheel/custom_wheel_screen.dart), [`history_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/history/history_screen.dart), in-app banner/toast & [`notification_service.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/notifications/notification_service.dart) + [`notification_debug_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/notifications/screens/notification_debug_screen.dart), [`games_hub_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/games_hub_screen.dart), [`dice_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/dice_screen.dart), [`capsule_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/capsule_screen.dart), [`envelope_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/envelope_screen.dart), [`coin_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/games/coin_screen.dart).
+  - Grup (`38`–`67`): [`join_or_create_group_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/join_or_create_group_screen.dart), [`group_invite_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_invite_screen.dart), [`group_wheel_view.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_wheel_view.dart), [`group_notes_view.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_notes_view.dart), [`group_activity_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_activity_screen.dart), [`group_notification_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_notification_screen.dart), [`group_budget_settings_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_budget_settings_screen.dart), [`group_games_hub_view.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_games_hub_view.dart), [`group_dice_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_dice_screen.dart), [`group_capsule_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_capsule_screen.dart), [`group_envelope_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_envelope_screen.dart), [`group_coin_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_coin_screen.dart), [`group_history_view.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_history_view.dart), [`group_date_detail_screen.dart`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/lib/features/group/screens/group_date_detail_screen.dart).
+  - **Catatan Integrasi Layar**: Fitur **Layar 52 (Kelola Grup)** terintegrasi pada aksi `"Kelola"` di `GroupWheelView`, `SettingsScreen`, dan `GroupInviteScreen`; fitur **Layar 67 (Selesaikan Date)** terintegrasi pada alur `"Selesaikan date"` di `GroupNotesView` dan `GroupDateDetailScreen`. Seluruh fitur Solo maupun Grup sudah terpasang di codebase sehingga tidak ada layar bertema yang tertunda menunggu update lain.
 
 ---
 
-## 🧪 Pengujian Otomatis (84 Tests Lolos 100%)
+## Pengujian Otomatis & Analisis Statis
 
-Jalankan seluruh suite pengujian unit, integrasi, dan widget:
+Jalankan analisis statis dan seluruh suite pengujian (`test/`) menggunakan perintah:
 ```bash
-flutter test
+flutter analyze --no-pub
+flutter test --no-pub
 ```
 
-Rincian verifikasi:
-- **`widget_test.dart` & `unit_tests.dart` (34 tests)**: Logika matematika roda, 4 game engine, UI neo-brutalist layar 01–15, responsive layout 320dp/390dp, dan custom vector painters.
-- **`group_stage_g1_test.dart` (7 tests)**: Generator kode undangan 6 karakter unik alfabet aman, sinkronisasi state machine (`SyncStateResolver`), dan kalkulasi sisa budget deterministik.
-- **`group_stage_g2_test.dart` (6 tests)**: Unit test pembuatan dan bergabung grup, widget test `InviteCodeBoxes`, `MemberAvatar`, `DashedMemberSlot`, serta responsivitas Layar 16 & 17.
-- **`group_stage_g3_test.dart` (3 tests)**: Widget test `GroupNotesView`, status `SyncBadge` (*Menunggu* / *Terkirim*), dan ketahanan offline catatan grup.
-- **`group_stage_g4_test.dart` (6 tests)**: Unit test `GroupEventModel`, `ActivityTile`, widget test `GroupWheelView`, mode live spin spectator, Layar 53 & 54 Budget Settings & Mode Angka Tetap.
-- **`group_stage_g5_test.dart` (6 tests)**: Sakelar `SettingToggle`, persistensi preferensi notifikasi per grup, filter pengabaian aksi sendiri di HP pelaku, agregasi banner 3 detik, dan Layar 21.
-- **`group_stage_g7_test.dart` (6 tests)**: Audit aksesibilitas Semantics & TalkBack (pembacaan status sinkron, kotak kode, aktivitas baru), ketahanan append-only offline, dan verifikasi seluruh layar grup pada 320dp & 390dp dengan skala font `textScale: 1.3` tanpa overflow.
-- **`settings_screen_test.dart` (16 tests)**: Pengujian lengkap Layar 15/44 BookmarkTabBar (tab Aplikasi vs tab Grup), preferensi suara & getar, dialog ubah nama, navigasi otomatis notifikasi grup.
-- **Analisis Statis**: `flutter analyze` bersih dengan **0 issues found**.
+Cakupan suite pengujian pada direktori `test/`:
+- **Tema & Golden (`test/theme/`)**:
+  - `pasar_malam_golden_test.dart` (baseline visual Pasar Malam)
+  - `theme_controller_test.dart` (persistensi `pj_theme_id`, `readInitialThemeFromPrefs`, switch live)
+  - `kucing_t2_test.dart` (palet, tipografi, radius, bayangan, ikon & painter Kucing Manis)
+  - `kucing_t3_test.dart` (`MochiPainter`, ekspresi, `ConfettiField` hati, `SplashScreen` & `GroupDateResultScreen`)
+  - `kucing_t4_test.dart` (paket audio `pasar_malam`/`kucing` & 5+5 channel notifikasi per tema)
+  - `kucing_t5_test.dart` (kelengkapan kunci `PutarCopyKeys`, rasio kontras WCAG AA, audit zero Material `Icons.*`, TalkBack `Semantics`, golden dual-theme `320dp` & `390dp` dengan `textScale: 1.3` tanpa overflow)
+- **Pengaturan (`test/settings_screen_test.dart`)**: `BookmarkTabBar`, `KARTU 1: TEMA`, preferensi audio & getar, dan navigasi ke `/themes`.
+- **Inti Solo & Notifikasi (`test/`)**: `unit_tests.dart`, `widget_test.dart`, `notification_coordinator_test.dart`, `notification_aggregation_watermark_test.dart`, `notification_call_guard_test.dart`, `notification_settings_observability_test.dart`, `scheduled_reminder_idempotent_test.dart`, `member_kick_leave_eviction_test.dart`.
+- **Mode Grup (`test/` & `test/group/`)**: `group_stage_g1_test.dart`–`group_stage_g5_test.dart`, `group_stage_g7_test.dart`, `group_activity_notification_test.dart`, `group_d3_test.dart`–`group_d5_test.dart`, `group_end_session_test.dart`, `group_f1_owner_unlocked_test.dart`–`group_f3_notification_test.dart`, `group_fixes_test.dart`, `group_game_service_test.dart`, `group_games_hub_test.dart`, serta `group_h1_history_calc_test.dart`–`group_h6_end_result_and_sync_test.dart`.
 
 ---
 
-## 🚀 Panduan Build Rilis Android
+## Panduan Build Rilis Android
 
 ### 1. Prasyarat Keystore & Signing
-Untuk build produksi, pastikan konfigurasi signing di `android/app/build.gradle.kts` menggunakan keystore rilis Anda.
+Pastikan konfigurasi signing di `android/app/build.gradle.kts` menggunakan keystore rilis produksi Anda.
 
 ### 2. Konfigurasi R8 & ProGuard
-Aturan ProGuard telah dikonfigurasi di `android/app/proguard-rules.pro` untuk menjaga kelas-kelas krusial (Flutter engine, Drift/SQLite native libraries, Flutter Local Notifications, dan Java 8+ core library desugaring).
+Aturan ProGuard telah dikonfigurasi di `android/app/proguard-rules.pro` untuk menjaga kelas krusial (Flutter engine, Drift/SQLite native libraries, Flutter Local Notifications, dan Java 8+ core library desugaring).
 
 ### 3. Build APK Rilis
 ```bash
 flutter build apk --release
 ```
-Berkas keluaran: `build/app/outputs/flutter-apk/app-release.apk` (Telah diverifikasi lolos build).
+Berkas keluaran: `build/app/outputs/flutter-apk/app-release.apk`.
 
 ### 4. Build Android App Bundle (AAB)
 ```bash
 .\android\gradlew.bat -p android bundleRelease
 ```
-Berkas keluaran: `build/app/outputs/bundle/release/app-release.aab` (Telah diverifikasi lolos build).
-#   a p l i k a s i - b u d g e t 
- 
- 
+Berkas keluaran: `build/app/outputs/bundle/release/app-release.aab`.
 
 ---
 
-## 🔔 Penjelasan Teknis Notifikasi Luar Aplikasi (Background Push)
+## Penjelasan Teknis Notifikasi Luar Aplikasi (Background Push)
 
 ### 1. Fakta Teknis
-Listener database realtime (Cloud Firestore snapshot / Supabase WebSocket channel) **hanya hidup selama proses aplikasi aktif di memori**. Ketika aplikasi berada di latar belakang (*background*) dalam waktu lama atau dimatikan/ditutup oleh pengguna (*terminated* / *killed* dari recent apps), sistem operasi Android membekukan koneksi soket sehingga tidak ada yang mendengarkan event baru. Oleh karena itu, notifikasi sistem untuk aktivitas **anggota lain** tidak bisa muncul tanpa adanya pemicu dari sisi server (*push notification*).
+Listener database realtime hanya aktif selama proses aplikasi berjalan di memori. Ketika aplikasi berada di latar belakang dalam waktu lama atau dimatikan oleh pengguna (*terminated* / *killed*), sistem operasi Android membekukan koneksi soket sehingga notifikasi aktivitas anggota lain membutuhkan pemicu push dari sisi server.
 
-### 2. Solusi Rekomendasi: Cloud Functions + FCM Data-Only
-Kode Cloud Function pemicu telah disediakan di folder `functions/index.js`:
-- **Pemicu Otomatis**: Fungsi `onGroupEventCreated` aktif pada dokumen baru di `groups/{gid}/events/{eventId}`.
-- **Pesan Data-Only**: Dikirim tanpa blok `notification` standar, melainkan data JSON berprioritas tinggi (`priority: "high"`). Hal ini memastikan notifikasi dibangun dan disaring secara aman oleh `NotificationCoordinator` di perangkat penerima.
+### 2. Opsi Server Push: Cloud Functions + FCM Data-Only
+Template Cloud Function pemicu tersedia di [`functions/index.js`](file:///c:/Users/MyBook%20Hype%20AMD/OneDrive/Documents/coding/aplikasi%20budget/functions/index.js):
+- **Pemicu Otomatis**: Fungsi `onGroupEventCreated` aktif pada event baru di grup.
+- **Pesan Data-Only**: Dikirim tanpa blok `notification` standar agar payload diproses oleh `NotificationCoordinator` di perangkat penerima.
 - **Filter & Deduplikasi Satu Pintu**:
-  - Jika `actorUid == currentUid` (aksi diri sendiri), pesan langsung dibuang tanpa notifikasi (`ownAction`).
-  - Jika aplikasi sedang terbuka di depan (*resumed*), hanya menampilkan `InAppBanner`.
-  - Jika aplikasi di latar atau tertutup, menampilkan notifikasi sistem Android.
-  - Kunci deduplikasi atomik deterministik `evt:{gid}:{eventId}` menjamin setiap kejadian tepat dinotifikasikan satu kali tanpa duplikasi susulan saat aplikasi dibuka kembali.
-- **Estimasi Biaya**: Kuota gratis bulanan Firebase Cloud Functions adalah 2.000.000 panggilan/bulan (gratis Rp0 untuk penggunaan normal grup ngedate), membutuhkan upgrade proyek Firebase ke paket Blaze (*pay-as-you-go*).
+  - Jika `actorUid == currentUid` (aksi sendiri), event diabaikan (`ownAction`).
+  - Jika aplikasi berada di latar depan (*resumed*), menampilkan `InAppBanner`.
+  - Jika aplikasi di latar belakang atau tertutup, menampilkan notifikasi sistem Android sesuai channel tema aktif.
+  - Kunci deduplikasi deterministik `evt:{gid}:{eventId}` mencegah duplikasi notifikasi susulan saat aplikasi dibuka kembali.
+

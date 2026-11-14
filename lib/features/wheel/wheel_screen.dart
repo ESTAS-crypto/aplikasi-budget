@@ -5,13 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/games/game_engine.dart';
 import '../../core/widgets/sticker_card.dart';
 import '../../core/widgets/sticker_button.dart';
 import '../../core/widgets/sticker_chip.dart';
 import '../../core/painters/logo_painter.dart';
+import '../../core/painters/mochi_painter.dart';
+import '../../core/painters/paw_painter.dart';
 import '../../core/painters/sticker_icons.dart';
 import '../../core/widgets/in_app_toast.dart';
 import '../../core/utils/rupiah_formatter.dart';
@@ -48,6 +49,7 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
   // Cache TextPainters untuk performa 60fps tanpa alokasi saat render
   Map<int, TextPainter> _textPaintersCache = {};
   List<int> _currentSlots = [];
+  String? _builtThemeId;
 
   // Pan gesture tracking
   double _panStartAngle = 0.0;
@@ -94,7 +96,10 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
         NotificationService.instance.requestNotificationPermission(context);
         if (!_hasShownInitialToast) {
           _hasShownInitialToast = true;
-          InAppToast.show(context, message: 'Roda siap diputar!');
+          InAppToast.show(
+            context,
+            message: context.putarTheme.text(PutarCopyKeys.wheelReady),
+          );
         }
       }
     });
@@ -281,27 +286,28 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
 
     // Jika sudah ada sesi date yang aktif, blokir dan arahkan ke Catatan
     if (currentActive != null && mounted) {
+      final t = context.putarTheme;
       SoundService.instance.play(Sfx.uiTap);
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: AppColors.ink, width: 3),
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            side: BorderSide(color: t.ink, width: t.borderWidth),
           ),
-          title: const Text(
+          title: Text(
             'Date Masih Aktif!',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
               fontSize: 20,
             ),
           ),
           content: Text(
             'Kamu masih memiliki date yang aktif dengan budget ${RupiahFormatter.format(currentActive.budget)}.\n\nSelesaikan date yang sedang aktif di menu Catatan terlebih dahulu sebelum memulai sesi baru.',
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: t.ink,
               fontSize: 14,
               height: 1.4,
             ),
@@ -309,30 +315,30 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'Tutup',
                 style: TextStyle(
-                  color: AppColors.disabled,
-                  fontWeight: FontWeight.w700,
+                  color: t.textDisabled,
+                  fontWeight: t.weightBold,
                 ),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.matahari,
-                foregroundColor: AppColors.ink,
+                backgroundColor: t.secondary,
+                foregroundColor: t.ink,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.ink, width: 2),
+                  side: BorderSide(color: t.ink, width: 2),
                 ),
               ),
               onPressed: () {
                 Navigator.pop(ctx);
                 context.go('/catatan');
               },
-              child: const Text(
+              child: Text(
                 'Buka Catatan',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: t.weightExtraBold),
               ),
             ),
           ],
@@ -364,6 +370,7 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
       return const GroupWheelView();
     }
 
+    final t = context.putarTheme;
     final slotsAsync = ref.watch(wheelSlotsStreamProvider);
     final dateCountAsync = ref.watch(currentRoundNumberProvider);
     final activeDateAsync = ref.watch(activeDateStreamProvider);
@@ -372,23 +379,21 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
     final slots = slotsAsync.value?.map((s) => s.amount).toList() ??
         [20000, 40000, 60000, 100000, 30000, 150000, 50000, 80000];
 
-    // Rebuild text cache jika slot berubah
-    if (_currentSlots.toString() != slots.toString()) {
+    // Rebuild text cache jika slot atau tema berubah
+    if (_currentSlots.toString() != slots.toString() || _builtThemeId != t.id) {
       _currentSlots = slots;
+      _builtThemeId = t.id;
       for (final tp in _textPaintersCache.values) {
         tp.dispose();
       }
-      _textPaintersCache = WheelPainter.buildTextCache(slots);
+      _textPaintersCache = WheelPainter.buildTextCache(slots, theme: t);
     }
 
     final roundNum = dateCountAsync.value ?? 1;
 
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
+    final mainScrollView = SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // 1. Top Header: Logo + "Putar Jajan" + Chip "Date ke-N"
@@ -415,52 +420,84 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                               height: 36,
                               margin: const EdgeInsets.only(right: 6),
                               decoration: BoxDecoration(
-                                color: AppColors.surface,
+                                color: t.surface,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.ink, width: 2.5),
-                                boxShadow: const [
+                                border: Border.all(color: t.ink, width: 2.5),
+                                boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.ink,
-                                    offset: Offset(2, 2),
+                                    color: t.ink,
+                                    offset: t.miniShadowOffset,
                                     blurRadius: 0,
                                   ),
                                 ],
                               ),
                               alignment: Alignment.center,
-                              child: const CustomPaint(
-                                size: Size(16, 16),
-                                painter: CustomBackIconPainter(strokeWidth: 2.8),
+                              child: CustomPaint(
+                                size: const Size(16, 16),
+                                painter: CustomBackIconPainter(
+                                  color: t.ink,
+                                  strokeWidth: 2.8,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                        Flexible(
-                          child: GestureDetector(
-                            onTap: () {
-                              SoundService.instance.play(Sfx.uiTap);
-                              context.push('/brand-system');
-                            },
-                            behavior: HitTestBehavior.opaque,
+                        if (t.mascot != null)
+                          Flexible(
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const LogoWidget(size: 30),
+                                const LogoWidget(size: 36),
                                 const SizedBox(width: 6),
                                 Flexible(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      'Putar Jajan',
-                                      style: AppTypography.titleLarge.copyWith(
-                                        fontSize: 18,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      SoundService.instance.play(Sfx.uiTap);
+                                      context.push('/brand-system');
+                                    },
+                                    behavior: HitTestBehavior.opaque,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'Putar Jajan',
+                                        style: t.titleLarge.copyWith(
+                                          fontSize: 18,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
+                          )
+                        else
+                          Flexible(
+                            child: GestureDetector(
+                              onTap: () {
+                                SoundService.instance.play(Sfx.uiTap);
+                                context.push('/brand-system');
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const LogoWidget(size: 30),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'Putar Jajan',
+                                        style: t.titleLarge.copyWith(
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -481,13 +518,13 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                                   width: 36,
                                   height: 36,
                                   decoration: BoxDecoration(
-                                    color: isMuted ? AppColors.surface : AppColors.matahari,
+                                    color: isMuted ? t.surface : t.secondary,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: AppColors.ink, width: 2.5),
-                                    boxShadow: const [
+                                    border: Border.all(color: t.ink, width: 2.5),
+                                    boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.ink,
-                                        offset: Offset(2, 2),
+                                        color: t.ink,
+                                        offset: t.miniShadowOffset,
                                         blurRadius: 0,
                                       ),
                                     ],
@@ -497,7 +534,7 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                                     size: const Size(18, 18),
                                     painter: CustomVolumeIconPainter(
                                       isMuted: isMuted,
-                                      color: AppColors.ink,
+                                      color: t.ink,
                                       strokeWidth: 2.4,
                                     ),
                                   ),
@@ -513,9 +550,9 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                             alignment: Alignment.centerRight,
                             child: StickerChip(
                               label: 'Date ke-$roundNum',
-                              backgroundColor: AppColors.lavender,
-                              borderColor: AppColors.ink,
-                              textColor: AppColors.ink,
+                              backgroundColor: t.accentPurple,
+                              borderColor: t.ink,
+                              textColor: t.ink,
                             ),
                           ),
                         ),
@@ -547,7 +584,7 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                 child: RichText(
                   textAlign: TextAlign.center,
                   text: TextSpan(
-                    style: AppTypography.displayMedium.copyWith(
+                    style: t.displayMedium.copyWith(
                       fontSize: 30,
                       height: 1.15,
                     ),
@@ -561,18 +598,18 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.matahari,
+                            color: t.secondary,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: AppColors.ink,
+                              color: t.ink,
                               width: 2.5,
                             ),
                           ),
                           child: Text(
                             'berapa?',
-                            style: AppTypography.displayMedium.copyWith(
+                            style: t.displayMedium.copyWith(
                               fontSize: 28,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -585,9 +622,9 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
 
               // Subtitle
               Text(
-                'Putar dulu, jajan di bawah angkanya.',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                t.text(PutarCopyKeys.wheelSubtitle),
+                style: t.bodyMedium.copyWith(
+                  color: t.textSecondary,
                   fontSize: 15,
                 ),
                 textAlign: TextAlign.center,
@@ -601,13 +638,13 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: 2.5),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.ink,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
@@ -615,12 +652,12 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 14,
                           height: 14,
                           child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.2,
                             ),
                           ),
@@ -628,9 +665,9 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                         const SizedBox(width: 8),
                         Text(
                           'Date aktif: ${RupiahFormatter.format(currentActive.budget)} · Buka Catatan →',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                             fontSize: 13,
                           ),
                         ),
@@ -642,7 +679,10 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
               ] else
                 const SizedBox(height: 8),
 
-              // 3. Roda Putar 300dp dengan pointer segitiga Tomat
+              if (t.wheelDecor == PutarWheelDecor.ears)
+                const SizedBox(height: 18),
+
+              // 3. Roda Putar 300dp dengan pointer & dekorasi bertema
               Center(
                 child: SizedBox(
                   width: 300,
@@ -669,12 +709,24 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                                     totalSlots: _currentSlots.length,
                                   ),
                                   cachedTextPainters: _textPaintersCache,
+                                  theme: t,
+                                  paintHubMascot: t.mascot == null,
+                                  mochiExpression: _isSpinning
+                                      ? MochiExpression.wow
+                                      : MochiExpression.normal,
                                 ),
                               );
                             },
                           ),
                         ),
                       ),
+                      if (t.mascot == PutarMascotKind.mochi)
+                        MochiWidget(
+                          size: 52,
+                          expression: _isSpinning
+                              ? MochiExpression.wow
+                              : MochiExpression.normal,
+                        ),
                     ],
                   ),
                 ),
@@ -685,7 +737,7 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
               if (_wonAmount != null && !_isSpinning) ...[
                 PopReveal(
                   child: StickerCard.hero(
-                    backgroundColor: AppColors.matahari,
+                    backgroundColor: t.secondary,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 16,
@@ -694,17 +746,17 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                       children: [
                         Text(
                           'Budget kamu malam ini:',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w700,
+                          style: t.bodyMedium.copyWith(
+                            color: t.ink,
+                            fontWeight: t.weightBold,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           RupiahFormatter.format(_wonAmount!),
-                          style: AppTypography.displayLarge.copyWith(
+                          style: t.displayLarge.copyWith(
                             fontSize: 34,
-                            color: AppColors.ink,
+                            color: t.ink,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -712,8 +764,8 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                           width: double.infinity,
                           height: 48,
                           text: 'Mulai Ngedate!',
-                          backgroundColor: AppColors.tomat,
-                          textColor: AppColors.ink,
+                          backgroundColor: t.danger,
+                          textColor: t.ink,
                           onPressed: () => _startActiveDate(_wonAmount!),
                         ),
                       ],
@@ -726,8 +778,8 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
               // 5. Tombol PUTAR RODA (Tomat, denyut otomatis tiap 2.6s)
               StickerButton.large(
                 text: _isSpinning ? 'MEMUTAR...' : 'PUTAR RODA',
-                backgroundColor: AppColors.tomat,
-                textColor: AppColors.ink,
+                backgroundColor: t.danger,
+                textColor: t.ink,
                 autoPulse: !_isSpinning && _wonAmount == null,
                 onPressed: _isSpinning ? null : () => _spinToTarget(),
               ),
@@ -745,16 +797,68 @@ class _WheelScreenState extends ConsumerState<WheelScreen>
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
                     'Isi roda sendiri',
-                    style: AppTypography.bodyLargeBold.copyWith(
-                      color: AppColors.textSecondary,
+                    style: t.bodyLargeBold.copyWith(
+                      color: t.textSecondary,
                       decoration: TextDecoration.underline,
-                      decorationColor: AppColors.textSecondary,
+                      decorationColor: t.textSecondary,
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
             ],
+          ),
+    );
+
+    return Scaffold(
+      backgroundColor: t.bg,
+      body: SafeArea(
+        child: t.pointerStyle == PutarIconStyle.kucing
+            ? Stack(
+                children: [
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 68,
+                              left: -6,
+                              child: _buildPawWatermark(t, 38, -0.35),
+                            ),
+                            Positioned(
+                              top: 220,
+                              right: 8,
+                              child: _buildPawWatermark(t, 34, 0.4),
+                            ),
+                            Positioned(
+                              bottom: 84,
+                              left: 16,
+                              child: _buildPawWatermark(t, 36, 0.25),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  mainScrollView,
+                ],
+              )
+            : mainScrollView,
+      ),
+    );
+  }
+
+  Widget _buildPawWatermark(PutarTheme t, double size, double angleRad) {
+    return Transform.rotate(
+      angle: angleRad,
+      child: Opacity(
+        opacity: 0.14,
+        child: CustomPaint(
+          size: Size(size, size),
+          painter: PawPainter(
+            fillColor: t.primary,
+            strokeColor: t.ink,
           ),
         ),
       ),

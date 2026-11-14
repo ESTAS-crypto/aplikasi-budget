@@ -1,19 +1,17 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/putar_theme.dart';
 
 /// Ikon Navigasi: Roda / Main (viewBox 24x24)
-/// Sesuai Brand.dc.html & Games.dc.html:
-/// `path d="M12 12L19.8 7.5A9 9 0 1 1 12 3Z"`
-/// `path d="M12.75 10.7V1.7A9 9 0 0 1 20.55 6.2Z"`
-/// `circle cx="12" cy="12" r="2.2" fill="#fff"`
 class WheelNavPainter extends CustomPainter {
   final Color color;
   final Color hubColor;
+  final PutarIconStyle style;
 
   const WheelNavPainter({
-    this.color = AppColors.ink,
-    this.hubColor = AppColors.surface,
+    this.color = PutarTheme.kPasarMalamInk,
+    this.hubColor = PutarTheme.kPasarMalamSurface,
+    this.style = PutarIconStyle.pasarMalam,
   });
 
   @override
@@ -29,6 +27,25 @@ class WheelNavPainter extends CustomPainter {
     final hubPaint = Paint()
       ..color = hubColor
       ..style = PaintingStyle.fill;
+
+    if (style == PutarIconStyle.kucing) {
+      // Kuping & roda tema Kucing Manis:
+      // path d="M4.5 9L5.5 2.5L10 5.5ZM19.5 9L18.5 2.5L14 5.5Z"
+      final earsPath = Path()
+        ..moveTo(4.5, 9)
+        ..lineTo(5.5, 2.5)
+        ..lineTo(10, 5.5)
+        ..close()
+        ..moveTo(19.5, 9)
+        ..lineTo(18.5, 2.5)
+        ..lineTo(14, 5.5)
+        ..close();
+      canvas.drawPath(earsPath, fillPaint);
+      canvas.drawCircle(const Offset(12, 14), 8.5, fillPaint);
+      canvas.drawCircle(const Offset(12, 14), 2.3, hubPaint);
+      canvas.restore();
+      return;
+    }
 
     // 1. Badan Roda: M12 12 L19.8 7.5 A9 9 0 1 1 12 3 Z
     final wheelPath = Path();
@@ -64,21 +81,21 @@ class WheelNavPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant WheelNavPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.hubColor != hubColor;
+      oldDelegate.color != color ||
+      oldDelegate.hubColor != hubColor ||
+      oldDelegate.style != style;
 }
 
 /// Ikon Navigasi: Catatan (viewBox 24x24)
-/// Sesuai Brand.dc.html & Games.dc.html:
-/// `path d="M5 2.5h14v18.5l-2.3-1.6-2.3 1.6-2.4-1.6-2.4 1.6-2.3-1.6L5 21Z"`
-/// `rect x="8" y="6.5" width="8" height="2" rx="1" fill="#fff"`
-/// `circle cx="12" cy="13.5" r="2.6" fill="#fff"`
 class ReceiptNavPainter extends CustomPainter {
   final Color color;
   final Color cutoutColor;
+  final PutarIconStyle style;
 
   const ReceiptNavPainter({
-    this.color = AppColors.ink,
-    this.cutoutColor = AppColors.surface,
+    this.color = PutarTheme.kPasarMalamInk,
+    this.cutoutColor = PutarTheme.kPasarMalamSurface,
+    this.style = PutarIconStyle.pasarMalam,
   });
 
   @override
@@ -94,6 +111,46 @@ class ReceiptNavPainter extends CustomPainter {
     final cutoutPaint = Paint()
       ..color = cutoutColor
       ..style = PaintingStyle.fill;
+
+    if (style == PutarIconStyle.kucing) {
+      // Struk berkuping tema Kucing Manis:
+      // M5 4.5L6 .5L9.5 3ZM19 4.5L18 .5L14.5 3Z
+      final earsPath = Path()
+        ..moveTo(5, 4.5)
+        ..lineTo(6, 0.5)
+        ..lineTo(9.5, 3)
+        ..close()
+        ..moveTo(19, 4.5)
+        ..lineTo(18, 0.5)
+        ..lineTo(14.5, 3)
+        ..close();
+      canvas.drawPath(earsPath, fillPaint);
+
+      // M5 4h14v17l-2.3-1.6-2.3 1.6-2.4-1.6-2.4 1.6-2.3-1.6L5 21Z
+      final bodyPath = Path()
+        ..moveTo(5, 4)
+        ..lineTo(19, 4)
+        ..lineTo(19, 21)
+        ..lineTo(19 - 2.3, 21 - 1.6)
+        ..lineTo(19 - 4.6, 21)
+        ..lineTo(19 - 7.0, 21 - 1.6)
+        ..lineTo(19 - 9.4, 21)
+        ..lineTo(19 - 11.7, 21 - 1.6)
+        ..lineTo(5, 21)
+        ..close();
+      canvas.drawPath(bodyPath, fillPaint);
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(8, 8, 8, 2),
+          const Radius.circular(1),
+        ),
+        cutoutPaint,
+      );
+      canvas.drawCircle(const Offset(12, 14.5), 2.4, cutoutPaint);
+      canvas.restore();
+      return;
+    }
 
     // 1. Badan Struk bergerigi bawah:
     // M5 2.5 h14 v18.5 l-2.3-1.6 -2.3 1.6 -2.4-1.6 -2.4 1.6 -2.3-1.6 L5 21 Z
@@ -125,19 +182,23 @@ class ReceiptNavPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ReceiptNavPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.cutoutColor != cutoutColor;
+      oldDelegate.color != color ||
+      oldDelegate.cutoutColor != cutoutColor ||
+      oldDelegate.style != style;
 }
 
 /// Ikon Navigasi: Riwayat (viewBox 24x24)
-/// Sesuai Brand.dc.html & Games.dc.html:
+/// Sesuai Brand.dc.html & Tema2.dc.html:
 /// `rect x="3.5" y="13" width="4.5" height="8" rx="2.2"`
 /// `rect x="9.8" y="8.5" width="4.5" height="12.5" rx="2.2"`
 /// `rect x="16" y="3" width="4.5" height="18" rx="2.2"`
 class HistoryNavPainter extends CustomPainter {
   final Color color;
+  final PutarIconStyle style;
 
   const HistoryNavPainter({
-    this.color = AppColors.ink,
+    this.color = PutarTheme.kPasarMalamInk,
+    this.style = PutarIconStyle.pasarMalam,
   });
 
   @override
@@ -182,5 +243,5 @@ class HistoryNavPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant HistoryNavPainter oldDelegate) =>
-      oldDelegate.color != color;
+      oldDelegate.color != color || oldDelegate.style != style;
 }

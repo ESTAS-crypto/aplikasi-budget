@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../theme/putar_theme.dart';
 import '../painters/sticker_icons.dart';
 
-/// Toast custom neo-brutalist warna Mint menggunakan Overlay Flutter
+/// Toast custom bertema menggunakan Overlay Flutter
 class InAppToast {
   static OverlayEntry? _entry;
 
@@ -19,7 +18,7 @@ class InAppToast {
     if (overlay == null) return;
 
     _entry = OverlayEntry(
-      builder: (context) => _ToastWidget(
+      builder: (ctx) => _ToastWidget(
         message: message,
         onDismiss: () => dismiss(),
         duration: duration,
@@ -88,6 +87,8 @@ class _ToastWidgetState extends State<_ToastWidget>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
+
     return Positioned(
       bottom: 100,
       left: 32,
@@ -102,16 +103,16 @@ class _ToastWidgetState extends State<_ToastWidget>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.mint,
-                  borderRadius: BorderRadius.circular(999), // Pill shape
+                  color: t.success,
+                  borderRadius: BorderRadius.circular(t.chipRadius), // Pill shape
                   border: Border.all(
-                    color: AppColors.ink,
-                    width: 2.5,
+                    color: t.borderColor,
+                    width: t.subtleBorderWidth,
                   ),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(3, 3),
+                      color: t.shadowColor,
+                      offset: t.smallShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -119,12 +120,12 @@ class _ToastWidgetState extends State<_ToastWidget>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 18,
                       height: 18,
                       child: CustomPaint(
                         painter: CustomCheckIconPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 3.0,
                         ),
                       ),
@@ -133,8 +134,8 @@ class _ToastWidgetState extends State<_ToastWidget>
                     Flexible(
                       child: Text(
                         widget.message,
-                        style: AppTypography.bodyLargeBold.copyWith(
-                          color: AppColors.ink,
+                        style: t.bodyLargeBold.copyWith(
+                          color: t.ink,
                         ),
                       ),
                     ),

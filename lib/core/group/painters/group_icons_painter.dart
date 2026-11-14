@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../theme/putar_theme.dart';
 
 /// Ikon Vektor Custom untuk Fitur Grup & Sinkronisasi
 /// Gaya Neo-Brutalist: strokeWidth 2.8, StrokeCap.round, StrokeJoin.round
@@ -686,7 +687,7 @@ class CustomGearPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomGearPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.8,
   });
 
@@ -740,7 +741,7 @@ class CustomWheelPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomWheelPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -782,7 +783,7 @@ class CustomUserPlusPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomUserPlusPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -833,7 +834,7 @@ class CustomUserMinusPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomUserMinusPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -881,7 +882,7 @@ class CustomKeyPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomKeyPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -928,7 +929,7 @@ class CustomFlagPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomFlagPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -974,7 +975,7 @@ class CustomTrashPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomTrashPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.6,
   });
 
@@ -1026,7 +1027,7 @@ class CustomChevronRightPainter extends CustomPainter {
   final double strokeWidth;
 
   const CustomChevronRightPainter({
-    this.color = const Color(0xFF22163A),
+    this.color = PutarTheme.kPasarMalamInk,
     this.strokeWidth = 2.8,
   });
 

@@ -7,8 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/games/game_engine.dart';
 import '../../core/painters/sticker_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/in_app_toast.dart';
@@ -142,27 +141,28 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
     final currentActive = await db.getActiveDate();
 
     if (currentActive != null && mounted) {
+      final t = context.putarTheme;
       SoundService.instance.play(Sfx.uiTap);
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: AppColors.ink, width: 3),
+            borderRadius: BorderRadius.circular(t.cardRadius),
+            side: BorderSide(color: t.ink, width: t.borderWidth),
           ),
-          title: const Text(
+          title: Text(
             'Date Masih Aktif!',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
+              fontWeight: t.weightExtraBold,
+              color: t.ink,
               fontSize: 20,
             ),
           ),
           content: Text(
             'Kamu masih memiliki date yang aktif dengan budget ${RupiahFormatter.format(currentActive.budget)}.\n\nSelesaikan date yang sedang aktif di menu Catatan terlebih dahulu sebelum memulai sesi baru.',
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: t.ink,
               fontSize: 14,
               height: 1.4,
             ),
@@ -170,30 +170,30 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'Tutup',
                 style: TextStyle(
-                  color: AppColors.disabled,
-                  fontWeight: FontWeight.w700,
+                  color: t.textDisabled,
+                  fontWeight: t.weightBold,
                 ),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.matahari,
-                foregroundColor: AppColors.ink,
+                backgroundColor: t.secondary,
+                foregroundColor: t.ink,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.ink, width: 2),
+                  side: BorderSide(color: t.ink, width: 2),
                 ),
               ),
               onPressed: () {
                 Navigator.pop(ctx);
                 context.go('/catatan');
               },
-              child: const Text(
+              child: Text(
                 'Buka Catatan',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: t.weightExtraBold),
               ),
             ),
           ],
@@ -218,18 +218,19 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
   }
 
   void _showCustomMultiplierDialog() {
+    final t = context.putarTheme;
     final controller = TextEditingController(text: RupiahFormatter.format(_multiplier).replaceAll('Rp', ''));
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: t.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: AppColors.ink, width: 3),
+          borderRadius: BorderRadius.circular(t.cardRadius),
+          side: BorderSide(color: t.ink, width: t.borderWidth),
         ),
-        title: const Text(
+        title: Text(
           'Kelipatan Kustom',
-          style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
+          style: TextStyle(fontWeight: t.weightExtraBold, color: t.ink),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -238,17 +239,17 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
               height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: AppColors.cream,
+                color: t.bg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.ink, width: 2.5),
+                border: Border.all(color: t.ink, width: t.subtleBorderWidth),
               ),
               child: Row(
                 children: [
                   Text(
                     'Rp ',
-                    style: AppTypography.titleMedium.copyWith(
-                      color: AppColors.tomat,
-                      fontWeight: FontWeight.w800,
+                    style: t.titleMedium.copyWith(
+                      color: t.danger,
+                      fontWeight: t.weightExtraBold,
                     ),
                   ),
                   Expanded(
@@ -257,7 +258,7 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                       autofocus: true,
                       keyboardType: TextInputType.number,
                       inputFormatters: const [ThousandsSeparatorInputFormatter()],
-                      style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
+                      style: t.titleMedium.copyWith(color: t.ink),
                       decoration: const InputDecoration(border: InputBorder.none),
                     ),
                   ),
@@ -269,15 +270,15 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: AppColors.disabled)),
+            child: Text('Batal', style: TextStyle(color: t.textDisabled)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.matahari,
-              foregroundColor: AppColors.ink,
+              backgroundColor: t.secondary,
+              foregroundColor: t.ink,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppColors.ink, width: 2),
+                side: BorderSide(color: t.ink, width: 2),
               ),
             ),
             onPressed: () {
@@ -290,7 +291,7 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                 InAppToast.show(context, message: 'Kelipatan antara Rp1.000 - Rp500.000');
               }
             },
-            child: const Text('Terapkan', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: Text('Terapkan', style: TextStyle(fontWeight: t.weightExtraBold)),
           ),
         ],
       ),
@@ -299,11 +300,12 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeDateAsync = ref.watch(activeDateStreamProvider);
     final activeDate = activeDateAsync.value;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -326,24 +328,24 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        border: Border.all(color: t.ink, width: t.borderWidth),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(3, 3),
+                            color: t.shadowColor,
+                            offset: t.smallShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 22,
                         height: 22,
                         child: CustomPaint(
                           painter: CustomBackIconPainter(
-                            color: AppColors.ink,
+                            color: t.ink,
                             strokeWidth: 3.0,
                           ),
                         ),
@@ -354,10 +356,10 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                   Expanded(
                     child: Text(
                       'Kocok Dadu',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -382,13 +384,13 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                           height: 32,
                           margin: const EdgeInsets.only(left: 6),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.tomat : AppColors.surface,
+                            color: isSelected ? t.danger : t.surface,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.ink, width: 2),
-                            boxShadow: const [
+                            border: Border.all(color: t.ink, width: 2),
+                            boxShadow: [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(2, 2),
+                                color: t.shadowColor,
+                                offset: t.miniShadowOffset,
                                 blurRadius: 0,
                               ),
                             ],
@@ -396,9 +398,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                           alignment: Alignment.center,
                           child: Text(
                             '$count',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -420,25 +422,25 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.shadowColor,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 16,
                           height: 16,
                           child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.2,
                             ),
                           ),
@@ -447,9 +449,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                         Expanded(
                           child: Text(
                             'Date aktif: ${RupiahFormatter.format(activeDate.budget)} · Buka Catatan',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -464,22 +466,22 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    color: t.secondary,
+                    borderRadius: BorderRadius.circular(t.chipRadius),
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.shadowColor,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
                   ),
                   child: Text(
                     '$_diceCount dadu × nominal pilihanmu',
-                    style: AppTypography.bodySmall.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                    style: t.bodySmall.copyWith(
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                       fontSize: 13,
                     ),
                   ),
@@ -493,13 +495,13 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                 clipBehavior: Clip.antiAlias,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFE9A8),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppColors.ink, width: 3),
-                  boxShadow: const [
+                  color: t.accentWarmSoft,
+                  borderRadius: BorderRadius.circular(t.cardRadius),
+                  border: Border.all(color: t.ink, width: t.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(4, 4),
+                      color: t.shadowColor,
+                      offset: t.standardShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -524,7 +526,7 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                               width: 180,
                               height: 14,
                               decoration: BoxDecoration(
-                                color: AppColors.ink.withValues(alpha: 0.25),
+                                color: t.ink.withValues(alpha: 0.25),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
@@ -541,10 +543,10 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(_diceCount, (index) {
                             final dieBg = index == 0
-                                ? AppColors.surface
+                                ? t.surface
                                 : index == 1
-                                    ? AppColors.langit
-                                    : AppColors.mint;
+                                    ? t.accentBlue
+                                    : t.success;
                             final dieSize = _diceCount == 1
                                 ? 104.0
                                 : _diceCount == 2
@@ -575,26 +577,26 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
               if (_wonAmount != null && !_isRolling) ...[
                 PopReveal(
                   child: StickerCard(
-                    backgroundColor: AppColors.surface,
-                    borderRadius: 22,
-                    borderWidth: 3,
+                    backgroundColor: t.surface,
+                    borderRadius: t.cardRadius,
+                    borderWidth: t.borderWidth,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: Column(
                       children: [
                         Text(
                           'Total ${_currentValues.fold(0, (a, b) => a + b)} × ${RupiahFormatter.format(_multiplier)} = budget kamu',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                          style: t.bodySmall.copyWith(
+                            fontWeight: t.weightBold,
+                            color: t.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           RupiahFormatter.format(_wonAmount!),
-                          style: AppTypography.displayLarge.copyWith(
+                          style: t.displayLarge.copyWith(
                             fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ],
@@ -610,9 +612,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                 children: [
                   Text(
                     'Kelipatan',
-                    style: AppTypography.titleMedium.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                    style: t.titleMedium.copyWith(
+                      fontWeight: t.weightExtraBold,
+                      color: t.ink,
                       fontSize: 16,
                     ),
                   ),
@@ -621,9 +623,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                     child: Text(
                       'Dadu × ${RupiahFormatter.format(_multiplier)}',
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodySmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.tomat,
+                      style: t.bodySmall.copyWith(
+                        fontWeight: t.weightBold,
+                        color: t.danger,
                         fontSize: 13,
                       ),
                     ),
@@ -633,8 +635,8 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
               const SizedBox(height: 4),
               Text(
                 'Nilai dadu dijumlahkan lalu dikalikan kelipatan untuk menentukan budget.',
-                style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
+                style: t.bodySmall.copyWith(
+                  color: t.textSecondary,
                   fontSize: 12,
                 ),
               ),
@@ -661,14 +663,14 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.matahari : AppColors.surface,
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: AppColors.ink, width: 3),
+                            color: isSelected ? t.secondary : t.surface,
+                            borderRadius: BorderRadius.circular(t.chipRadius),
+                            border: Border.all(color: t.ink, width: t.borderWidth),
                             boxShadow: isSelected
-                                ? const [
+                                ? [
                                     BoxShadow(
-                                      color: AppColors.ink,
-                                      offset: Offset(3, 3),
+                                      color: t.shadowColor,
+                                      offset: t.smallShadowOffset,
                                       blurRadius: 0,
                                     ),
                                   ]
@@ -676,9 +678,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                           ),
                           child: Text(
                             RupiahFormatter.format(m),
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.bodySmall.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                               fontSize: 14,
                             ),
                           ),
@@ -697,15 +699,15 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
                         color: !_presetMultipliers.contains(_multiplier)
-                            ? AppColors.matahari
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: AppColors.ink, width: 3),
+                            ? t.secondary
+                            : t.surface,
+                        borderRadius: BorderRadius.circular(t.chipRadius),
+                        border: Border.all(color: t.ink, width: t.borderWidth),
                         boxShadow: !_presetMultipliers.contains(_multiplier)
-                            ? const [
+                            ? [
                                 BoxShadow(
-                                  color: AppColors.ink,
-                                  offset: Offset(3, 3),
+                                  color: t.shadowColor,
+                                  offset: t.smallShadowOffset,
                                   blurRadius: 0,
                                 ),
                               ]
@@ -715,9 +717,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                         !_presetMultipliers.contains(_multiplier)
                             ? RupiahFormatter.format(_multiplier)
                             : '+ Nominal Kustom',
-                        style: AppTypography.bodySmall.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                        style: t.bodySmall.copyWith(
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                           fontSize: 14,
                         ),
                       ),
@@ -732,8 +734,8 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
               if (_wonAmount != null && !_isRolling) ...[
                 StickerButton.large(
                   text: 'Ambil Budget ${RupiahFormatter.format(_wonAmount!)}',
-                  backgroundColor: AppColors.matahari,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.secondary,
+                  textColor: t.ink,
                   onPressed: () => _startActiveDate(_wonAmount!),
                 ),
                 const SizedBox(height: 12),
@@ -741,8 +743,8 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
 
               StickerButton.large(
                 text: _isRolling ? 'MENGOBRAK...' : 'KOCOK DADU',
-                backgroundColor: AppColors.tomat,
-                textColor: AppColors.ink,
+                backgroundColor: t.danger,
+                textColor: t.ink,
                 onPressed: _isRolling ? () {} : _rollDice,
               ),
               const SizedBox(height: 14),
@@ -751,8 +753,8 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
               StickerButton(
                 height: 50,
                 borderRadius: 25,
-                backgroundColor: AppColors.surface,
-                textColor: AppColors.ink,
+                backgroundColor: t.surface,
+                textColor: t.ink,
                 onPressed: () {
                   if (_isRolling) return;
                   SoundService.instance.play(Sfx.uiTap);
@@ -762,12 +764,12 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 18,
                       height: 18,
                       child: CustomPaint(
                         painter: CustomSettingsIconPainter(
-                          color: AppColors.ink,
+                          color: t.ink,
                           strokeWidth: 2.6,
                         ),
                       ),
@@ -778,9 +780,9 @@ class _DiceScreenState extends ConsumerState<DiceScreen>
                         fit: BoxFit.scaleDown,
                         child: Text(
                           'Ubah Kelipatan (${RupiahFormatter.format(_multiplier)})',
-                          style: AppTypography.buttonSmall.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
+                          style: t.buttonSmall.copyWith(
+                            color: t.ink,
+                            fontWeight: t.weightExtraBold,
                             fontSize: 14,
                           ),
                         ),
@@ -818,8 +820,9 @@ class _AnimatedDie extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     if (!isRolling) {
-      return _buildDieBody(value);
+      return _buildDieBody(value, t);
     }
 
     return AnimatedBuilder(
@@ -827,36 +830,36 @@ class _AnimatedDie extends StatelessWidget {
       builder: (context, child) {
         // Timeline 0.0 - 1.0 dengan delayFraction per dadu
         final rawT = (controller.value - delayFraction) / (1.0 - delayFraction);
-        final t = rawT.clamp(0.0, 1.0);
+        final tVal = rawT.clamp(0.0, 1.0);
 
         double translateY = 0.0;
         double rotation = 0.0;
         double opacity = 1.0;
 
-        if (t < 0.30) {
-          final p = t / 0.30;
+        if (tVal < 0.30) {
+          final p = tVal / 0.30;
           final easeP = Curves.easeInQuad.transform(p);
           translateY = -170.0 * (1.0 - easeP);
           rotation = -420.0 * (1.0 - p);
           opacity = (p * 5.0).clamp(0.0, 1.0);
-        } else if (t < 0.38) {
+        } else if (tVal < 0.38) {
           // Bounce 1: naik melengkung ke -46
-          final p = (t - 0.30) / 0.08;
+          final p = (tVal - 0.30) / 0.08;
           translateY = -46.0 * math.sin(p * math.pi);
           rotation = 0.0 + 110.0 * p;
-        } else if (t < 0.46) {
+        } else if (tVal < 0.46) {
           // Turun dari bounce 1 ke tanah
-          final p = (t - 0.38) / 0.08;
+          final p = (tVal - 0.38) / 0.08;
           translateY = -46.0 * (1.0 - p);
           rotation = 110.0 + 90.0 * p;
-        } else if (t < 0.52) {
+        } else if (tVal < 0.52) {
           // Bounce 2: naik kecil ke -14
-          final p = (t - 0.46) / 0.06;
+          final p = (tVal - 0.46) / 0.06;
           translateY = -14.0 * math.sin(p * math.pi);
           rotation = 200.0 + 130.0 * p;
-        } else if (t < 0.60) {
+        } else if (tVal < 0.60) {
           // Settle ke tanah
-          final p = (t - 0.52) / 0.08;
+          final p = (tVal - 0.52) / 0.08;
           translateY = 0.0;
           rotation = 330.0 + 30.0 * p;
         } else {
@@ -866,8 +869,8 @@ class _AnimatedDie extends StatelessWidget {
         }
 
         // Tampilkan angka berputar cepat saat melayang, lalu lock tepat ke target
-        final displayVal = t < 0.58
-            ? (((t * 26).toInt() + (delayFraction * 10).toInt()) % 6) + 1
+        final displayVal = tVal < 0.58
+            ? (((tVal * 26).toInt() + (delayFraction * 10).toInt()) % 6) + 1
             : value;
 
         return Opacity(
@@ -876,7 +879,7 @@ class _AnimatedDie extends StatelessWidget {
             offset: Offset(0, translateY),
             child: Transform.rotate(
               angle: rotation * math.pi / 180,
-              child: _buildDieBody(displayVal),
+              child: _buildDieBody(displayVal, t),
             ),
           ),
         );
@@ -884,25 +887,25 @@ class _AnimatedDie extends StatelessWidget {
     );
   }
 
-  Widget _buildDieBody(int val) {
+  Widget _buildDieBody(int val, PutarTheme t) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(size * 0.24),
-        border: Border.all(color: AppColors.ink, width: 3.5),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: t.heroBorderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(4, 4),
+            color: t.shadowColor,
+            offset: t.standardShadowOffset,
             blurRadius: 0,
           ),
         ],
       ),
       padding: EdgeInsets.all(size * 0.12),
       child: CustomPaint(
-        painter: _DieDotsPainter(val),
+        painter: _DieDotsPainter(val, t.ink),
       ),
     );
   }
@@ -911,13 +914,14 @@ class _AnimatedDie extends StatelessWidget {
 /// CustomPainter untuk menggambar titik-titik dadu (1 sampai 6)
 class _DieDotsPainter extends CustomPainter {
   final int value;
+  final Color dotColor;
 
-  const _DieDotsPainter(this.value);
+  const _DieDotsPainter(this.value, this.dotColor);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.ink
+      ..color = dotColor
       ..style = PaintingStyle.fill;
 
     final dotRadius = size.width * 0.11;
@@ -972,6 +976,7 @@ class _DieDotsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DieDotsPainter oldDelegate) => oldDelegate.value != value;
+  bool shouldRepaint(covariant _DieDotsPainter oldDelegate) =>
+      oldDelegate.value != value || oldDelegate.dotColor != dotColor;
 }
 

@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../painters/group_icons_painter.dart';
 import '../sync/sync_state.dart';
 
@@ -59,32 +58,32 @@ class _SyncStripState extends State<SyncStrip> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  Color _getBackgroundColor(SyncState state) {
+  Color _getBackgroundColor(PutarTheme t, SyncState state) {
     switch (state) {
       case SyncState.tersinkron:
-        return AppColors.mint;
+        return t.success;
       case SyncState.menunggu:
-        return AppColors.jeruk;
+        return t.accentOrange;
       case SyncState.menyinkronkan:
-        return AppColors.langit;
+        return t.accentBlue;
       case SyncState.offline:
-        return AppColors.matahari;
+        return t.secondary;
       case SyncState.gagal:
-        return AppColors.tomat;
+        return t.danger;
     }
   }
 
-  Widget _buildIcon(SyncState state) {
+  Widget _buildIcon(PutarTheme t, SyncState state) {
     switch (state) {
       case SyncState.tersinkron:
         return CustomPaint(
           size: const Size(18, 18),
-          painter: const CustomCheckPainter(color: AppColors.ink),
+          painter: CustomCheckPainter(color: t.ink),
         );
       case SyncState.menunggu:
         return CustomPaint(
           size: const Size(18, 18),
-          painter: const CustomClockPainter(color: AppColors.ink),
+          painter: CustomClockPainter(color: t.ink),
         );
       case SyncState.menyinkronkan:
         return AnimatedBuilder(
@@ -97,23 +96,23 @@ class _SyncStripState extends State<SyncStrip> with SingleTickerProviderStateMix
           },
           child: CustomPaint(
             size: const Size(18, 18),
-            painter: const CustomSyncArrowsPainter(color: AppColors.ink),
+            painter: CustomSyncArrowsPainter(color: t.ink),
           ),
         );
       case SyncState.offline:
         return CustomPaint(
           size: const Size(20, 18),
-          painter: const CustomCloudOfflinePainter(color: AppColors.ink),
+          painter: CustomCloudOfflinePainter(color: t.ink),
         );
       case SyncState.gagal:
         return CustomPaint(
           size: const Size(18, 18),
-          painter: const CustomWarningTrianglePainter(color: AppColors.ink),
+          painter: CustomWarningTrianglePainter(color: t.ink),
         );
     }
   }
 
-  String _getMessage(SyncState state) {
+  String _getMessage(PutarTheme t, SyncState state) {
     switch (state) {
       case SyncState.tersinkron:
         return 'Semua data tersinkron';
@@ -124,14 +123,15 @@ class _SyncStripState extends State<SyncStrip> with SingleTickerProviderStateMix
       case SyncState.offline:
         return 'Offline: Menggunakan data di HP ini';
       case SyncState.gagal:
-        return 'Gagal sinkron ke server';
+        return '${t.text(PutarCopyKeys.syncFailed)} sinkron ke server';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = _getBackgroundColor(widget.state);
-    final message = _getMessage(widget.state);
+    final t = context.putarTheme;
+    final bgColor = _getBackgroundColor(t, widget.state);
+    final message = _getMessage(t, widget.state);
 
     return AnimatedSlide(
       offset: widget.isVisible ? Offset.zero : const Offset(0, -1),
@@ -151,27 +151,27 @@ class _SyncStripState extends State<SyncStrip> with SingleTickerProviderStateMix
               color: bgColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.ink,
+                color: t.ink,
                 width: 2.5,
               ),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(0, 3),
+                  color: t.ink,
+                  offset: const Offset(0, 3),
                   blurRadius: 0,
                 ),
               ],
             ),
             child: Row(
               children: [
-                _buildIcon(widget.state),
+                _buildIcon(t, widget.state),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     message,
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
+                    style: t.bodySmall.copyWith(
+                      color: t.ink,
+                      fontWeight: t.weightBold,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -187,25 +187,25 @@ class _SyncStripState extends State<SyncStrip> with SingleTickerProviderStateMix
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.cream,
+                          color: t.bg,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: AppColors.ink,
+                            color: t.ink,
                             width: 2.0,
                           ),
-                          boxShadow: const [
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(0, 2),
+                              color: t.ink,
+                              offset: const Offset(0, 2),
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         child: Text(
                           'Coba lagi',
-                          style: AppTypography.buttonSmall.copyWith(
+                          style: t.buttonSmall.copyWith(
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: t.weightExtraBold,
                           ),
                         ),
                       ),

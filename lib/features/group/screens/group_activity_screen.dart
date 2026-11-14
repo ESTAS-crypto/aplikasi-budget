@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/sound_service.dart';
 import '../../../core/painters/sticker_icons.dart';
 import '../../../core/group/models/group_event_model.dart';
@@ -17,7 +16,7 @@ import '../../../core/widgets/sticker_button.dart';
 import '../../../core/notifications/coordinator/notification_coordinator.dart';
 import '../../navigation/app_router.dart';
 
-enum ActivityFilter { semua, roda, catatan }
+enum ActivityFilter { semua, roda, catatan, date, anggota }
 
 /// Layar 20: Aktivitas Grup (Grup5.dc.html)
 /// Menampilkan log aktivitas realtime (BARU dan SEBELUMNYA), filter, dan arti status sinkron
@@ -31,7 +30,13 @@ class GroupActivityScreen extends ConsumerStatefulWidget {
 class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
   ActivityFilter _selectedFilter = ActivityFilter.semua;
   DateTime? _initialReadThreshold;
+  DateTime? _markedReadAt;
+  DateTime? _preMarkReadAt;
+  final Set<String> _knownEventIdsOnOpen = {};
+  final Set<String> _liveArrivedIds = {};
+  bool _capturedInitialEvents = false;
   String? _activeGid;
+  GroupService? _groupService;
 
   @override
   void initState() {
@@ -44,28 +49,80 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
   @override
   void dispose() {
     if (_activeGid != null) {
+      _groupService?.markActivityAsRead(_activeGid!);
       NotificationCoordinator.instance.onScreenClosed(_activeGid!);
     }
     super.dispose();
   }
 
   void _markAsRead() {
-    _activeGid = ref.read(groupServiceProvider).getActiveGroupId();
+    final gs = ref.read(groupServiceProvider);
+    _groupService = gs;
+    _activeGid = gs.getActiveGroupId();
     if (_activeGid != null) {
-      ref.read(groupServiceProvider).markActivityAsRead(_activeGid!);
+      if (_markedReadAt == null) {
+        final now = DateTime.now();
+        final members = ref.read(activeGroupMembersStreamProvider).valueOrNull ?? [];
+        final authService = ref.read(groupAuthServiceProvider);
+        DateTime? preOpen;
+        for (final m in members) {
+          if (authService.isCurrentUser(m.uid) &&
+              m.lastReadAt.millisecondsSinceEpoch > 0 &&
+              !m.lastReadAt.isAfter(now.add(const Duration(minutes: 15)))) {
+            preOpen = m.lastReadAt;
+            break;
+          }
+        }
+        final localRead = gs.getLocalLastReadAt(_activeGid!);
+        if (preOpen == null &&
+            localRead != null &&
+            localRead.millisecondsSinceEpoch > 0 &&
+            !localRead.isAfter(now.add(const Duration(minutes: 15)))) {
+          preOpen = localRead;
+        }
+        _preMarkReadAt = preOpen;
+        _markedReadAt = now;
+      }
+      gs.markActivityAsRead(_activeGid!);
+      gs.refreshEvents(_activeGid!);
       NotificationCoordinator.instance.onActivityScreenOpened(_activeGid!);
     }
   }
 
-  List<GroupEventModel> _filterEvents(List<GroupEventModel> events) {
-    switch (_selectedFilter) {
+  bool _matchesFilter(GroupEventModel e, ActivityFilter filter) {
+    switch (filter) {
       case ActivityFilter.semua:
-        return events;
+        return true;
       case ActivityFilter.roda:
-        return events.where((e) => e.type == GroupEventType.spin).toList();
+        return e.type == GroupEventType.spin ||
+            e.type == GroupEventType.gameResult ||
+            (e.type == GroupEventType.custom &&
+                (e.payload['action'] == 'update_slots' ||
+                    e.payload['wheelSlots'] != null));
       case ActivityFilter.catatan:
-        return events.where((e) => e.type == GroupEventType.expense).toList();
+        return e.type == GroupEventType.expense ||
+            e.type == GroupEventType.expenseDeleted;
+      case ActivityFilter.date:
+        return e.type == GroupEventType.sessionStart ||
+            e.type == GroupEventType.sessionEnd ||
+            e.type == GroupEventType.budgetChanged ||
+            (e.type == GroupEventType.custom &&
+                e.payload['action'] != 'update_slots' &&
+                e.payload['wheelSlots'] == null);
+      case ActivityFilter.anggota:
+        return e.type == GroupEventType.memberJoin ||
+            e.type == GroupEventType.memberLeave ||
+            e.type == GroupEventType.codeChanged;
     }
+  }
+
+  List<GroupEventModel> _filterEvents(List<GroupEventModel> events) {
+    return events.where((e) => _matchesFilter(e, _selectedFilter)).toList();
+  }
+
+  int _countForFilter(List<GroupEventModel> events, ActivityFilter filter) {
+    if (filter == ActivityFilter.semua) return events.length;
+    return events.where((e) => _matchesFilter(e, filter)).length;
   }
 
   int _findMemberColorIndex(String actorUid, List<GroupMemberModel> members) {
@@ -85,17 +142,35 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final authService = ref.watch(groupAuthServiceProvider);
     final currentUid = authService.currentUid;
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
     final eventsAsync = ref.watch(activeGroupEventsStreamProvider);
 
-    final members = membersAsync.valueOrNull ?? [];
-    final allEvents = eventsAsync.valueOrNull ?? [];
-    final filteredEvents = _filterEvents(allEvents);
-
+    final gs = ref.read(groupServiceProvider);
+    _groupService = gs;
     final activeGid = ref.watch(activeGroupIdProvider);
+    _activeGid = activeGid ?? _activeGid;
     final groupAsync = ref.watch(activeGroupStreamProvider);
+    final members = membersAsync.valueOrNull ?? [];
+    final allEvents = eventsAsync.valueOrNull ??
+        (activeGid != null ? gs.getLocalEvents(activeGid) : const <GroupEventModel>[]);
+    if (!_capturedInitialEvents && (eventsAsync.hasValue || allEvents.isNotEmpty)) {
+      _capturedInitialEvents = true;
+      for (final e in allEvents) {
+        if (e.eventId.isNotEmpty) {
+          _knownEventIdsOnOpen.add(e.eventId);
+        }
+      }
+    } else if (_capturedInitialEvents) {
+      for (final e in allEvents) {
+        if (e.eventId.isNotEmpty && !_knownEventIdsOnOpen.contains(e.eventId)) {
+          _liveArrivedIds.add(e.eventId);
+        }
+      }
+    }
+    final filteredEvents = _filterEvents(allEvents);
     final group = groupAsync.valueOrNull;
     final isOwner = (group != null && authService.isCurrentUser(group.ownerUid)) ||
         members.any((m) => m.role == 'owner' && authService.isCurrentUser(m.uid));
@@ -113,14 +188,14 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
           GoRouter.of(rootCtx).go('/');
         } catch (_) {}
       });
-      return const Scaffold(
-        backgroundColor: AppColors.cream,
-        body: Center(child: SizedBox.shrink()),
+      return Scaffold(
+        backgroundColor: t.bg,
+        body: const Center(child: SizedBox.shrink()),
       );
     }
 
     if (activeGid == null) {
-      return _buildNoGroupScaffold();
+      return _buildNoGroupScaffold(t);
     }
 
     final myMember = members.firstWhere(
@@ -135,16 +210,50 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
       ),
     );
 
-    if (_initialReadThreshold == null && myMember.lastReadAt.millisecondsSinceEpoch > 0) {
-      _initialReadThreshold = myMember.lastReadAt;
+    final now = DateTime.now();
+    final maxFutureLimit = now.add(const Duration(minutes: 2));
+    final hasValidMemberReadAt = myMember.lastReadAt.millisecondsSinceEpoch > 0 &&
+        !myMember.lastReadAt.isAfter(maxFutureLimit);
+    final localReadAt = gs.getLocalLastReadAt(activeGid);
+    final safeLocalReadAt =
+        (localReadAt != null && !localReadAt.isAfter(maxFutureLimit))
+            ? localReadAt
+            : null;
+    final memberReadPredatesOpen = _markedReadAt == null ||
+        myMember.lastReadAt.isBefore(_markedReadAt!.subtract(const Duration(seconds: 1)));
+
+    if (_initialReadThreshold == null) {
+      if (hasValidMemberReadAt && memberReadPredatesOpen) {
+        _initialReadThreshold = myMember.lastReadAt;
+      } else if (_preMarkReadAt != null) {
+        _initialReadThreshold = _preMarkReadAt;
+      } else if (_markedReadAt == null && safeLocalReadAt != null) {
+        _initialReadThreshold = safeLocalReadAt;
+      }
     }
 
-    final threshold = _initialReadThreshold ?? myMember.lastReadAt;
-    final newEvents = filteredEvents.where((e) => !authService.isCurrentUser(e.actorUid) && e.createdAt.isAfter(threshold)).toList();
-    final previousEvents = filteredEvents.where((e) => authService.isCurrentUser(e.actorUid) || !e.createdAt.isAfter(threshold)).toList();
+    final threshold = _initialReadThreshold ??
+        (_markedReadAt == null
+            ? (hasValidMemberReadAt
+                ? myMember.lastReadAt
+                : (safeLocalReadAt ?? DateTime.fromMillisecondsSinceEpoch(0)))
+            : (_preMarkReadAt ?? DateTime.fromMillisecondsSinceEpoch(0)));
+    bool isNewActivity(GroupEventModel e) {
+      if (authService.isCurrentUser(e.actorUid)) {
+        return false;
+      }
+      if (e.type == GroupEventType.gameResult && e.payload['valid'] == false) {
+        return false;
+      }
+      if (_liveArrivedIds.contains(e.eventId)) return true;
+      return gs.isUnreadEligibleEvent(e, threshold);
+    }
+
+    final newEvents = filteredEvents.where(isNewActivity).toList();
+    final previousEvents = filteredEvents.where((e) => !isNewActivity(e)).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -169,21 +278,24 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3.0),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: t.borderWidth),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.shadowColor,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const CustomPaint(
-                          size: Size(20, 20),
-                          painter: CustomBackIconPainter(strokeWidth: 2.8),
+                        child: CustomPaint(
+                          size: const Size(20, 20),
+                          painter: CustomBackIconPainter(
+                            color: t.ink,
+                            strokeWidth: 2.8,
+                          ),
                         ),
                       ),
                     ),
@@ -192,10 +304,10 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
                   Expanded(
                     child: Text(
                       'Aktivitas grup',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -214,21 +326,21 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3.0),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: t.borderWidth),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.shadowColor,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const CustomPaint(
-                          size: Size(22, 22),
-                          painter: CustomGearPainter(color: AppColors.ink, strokeWidth: 2.8),
+                        child: CustomPaint(
+                          size: const Size(22, 22),
+                          painter: CustomGearPainter(color: t.ink, strokeWidth: 2.8),
                         ),
                       ),
                     ),
@@ -237,17 +349,46 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
               ),
             ),
 
-            // Filter Chips: "Semua · N", "Roda", "Catatan" (Grup5.dc.html)
+            // Filter Chips: "Semua · N", "Roda", "Catatan", "Date", "Anggota"
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
               child: Row(
                 children: [
-                  _buildFilterChip('Semua', ActivityFilter.semua, count: allEvents.length),
+                  _buildFilterChip(
+                    t,
+                    'Semua',
+                    ActivityFilter.semua,
+                    count: allEvents.length,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Roda', ActivityFilter.roda),
+                  _buildFilterChip(
+                    t,
+                    'Roda',
+                    ActivityFilter.roda,
+                    count: _countForFilter(allEvents, ActivityFilter.roda),
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Catatan', ActivityFilter.catatan),
+                  _buildFilterChip(
+                    t,
+                    'Catatan',
+                    ActivityFilter.catatan,
+                    count: _countForFilter(allEvents, ActivityFilter.catatan),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    t,
+                    'Date',
+                    ActivityFilter.date,
+                    count: _countForFilter(allEvents, ActivityFilter.date),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    t,
+                    'Anggota',
+                    ActivityFilter.anggota,
+                    count: _countForFilter(allEvents, ActivityFilter.anggota),
+                  ),
                 ],
               ),
             ),
@@ -255,89 +396,88 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
 
             // Daftar Aktivitas & Status Sinkronisasi
             Expanded(
-              child: filteredEvents.isEmpty
-                  ? _buildEmptyState()
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 1. Bagian BARU (Grup5.dc.html)
-                          if (newEvents.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),
-                              child: Text(
-                                'BARU',
-                                style: AppTypography.bodySmall.copyWith(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.0,
-                                  color: AppColors.ink.withValues(alpha: 0.65),
-                                ),
-                              ),
-                            ),
-                            ...newEvents.map((e) => ActivityTile(
-                                  event: e,
-                                  isUnread: true,
-                                  isMe: authService.isCurrentUser(e.actorUid),
-                                  colorIndex: _findMemberColorIndex(e.actorUid, members),
-                                  onTap: e.sessionId.isNotEmpty
-                                      ? () {
-                                          SoundService.instance.play(Sfx.uiTap);
-                                          context.push(
-                                            '/group/history/$activeGid/${e.sessionId}',
-                                          );
-                                        }
-                                      : null,
-                                )),
-                            const SizedBox(height: 12),
-                          ],
-
-                          // 2. Bagian SEBELUMNYA
-                          if (previousEvents.isNotEmpty) ...[
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(99),
-                                  border: Border.all(color: AppColors.ink, width: 2.5),
-                                ),
-                                child: Text(
-                                  'SEBELUMNYA',
-                                  style: AppTypography.buttonSmall.copyWith(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.ink,
-                                    letterSpacing: 0.6,
+              child: RefreshIndicator(
+                color: t.ink,
+                backgroundColor: t.secondary,
+                onRefresh: () async {
+                  await Future.wait([
+                    gs.refreshEvents(activeGid),
+                    gs.fetchGroup(activeGid),
+                  ]);
+                },
+                child: allEvents.isEmpty
+                    ? _buildEmptyState(t)
+                    : filteredEvents.isEmpty
+                        ? _buildFilteredEmptyState(t)
+                        : SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // 1. Bagian BARU (Grup5.dc.html)
+                                if (newEvents.isNotEmpty) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4, right: 4, top: 4, bottom: 6),
+                                    child: Text(
+                                      'BARU',
+                                      style: t.bodySmall.copyWith(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.0,
+                                        color: t.ink.withValues(alpha: 0.65),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...previousEvents.map((e) => ActivityTile(
-                                  event: e,
-                                  isUnread: false,
-                                  isMe: authService.isCurrentUser(e.actorUid),
-                                  colorIndex: _findMemberColorIndex(e.actorUid, members),
-                                  onTap: e.sessionId.isNotEmpty
-                                      ? () {
-                                          SoundService.instance.play(Sfx.uiTap);
-                                          context.push(
-                                            '/group/history/$activeGid/${e.sessionId}',
-                                          );
-                                        }
-                                      : null,
-                                )),
-                            const SizedBox(height: 16),
-                          ],
+                                  ...newEvents.map((e) => ActivityTile(
+                                        event: e,
+                                        isUnread: true,
+                                        isMe: authService.isCurrentUser(e.actorUid),
+                                        colorIndex: _findMemberColorIndex(e.actorUid, members),
+                                        onTap: _resolveEventTap(context, e, activeGid),
+                                      )),
+                                  const SizedBox(height: 12),
+                                ],
 
-                          // 3. Kartu Bawah: Arti Status Sinkron (Grup5.dc.html)
-                          const SyncLegend(isCard: true),
-                        ],
-                      ),
-                    ),
+                                // 2. Bagian SEBELUMNYA
+                                if (previousEvents.isNotEmpty) ...[
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: t.surface,
+                                        borderRadius: BorderRadius.circular(99),
+                                        border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                                      ),
+                                      child: Text(
+                                        'SEBELUMNYA',
+                                        style: t.buttonSmall.copyWith(
+                                          fontSize: 11,
+                                          fontWeight: t.weightExtraBold,
+                                          color: t.ink,
+                                          letterSpacing: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...previousEvents.map((e) => ActivityTile(
+                                        event: e,
+                                        isUnread: false,
+                                        isMe: authService.isCurrentUser(e.actorUid),
+                                        colorIndex: _findMemberColorIndex(e.actorUid, members),
+                                        onTap: _resolveEventTap(context, e, activeGid),
+                                      )),
+                                  const SizedBox(height: 16),
+                                ],
+
+                                // 3. Kartu Bawah: Arti Status Sinkron (Grup5.dc.html)
+                                const SyncLegend(isCard: true),
+                              ],
+                            ),
+                          ),
+              ),
             ),
           ],
         ),
@@ -345,7 +485,7 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, ActivityFilter filter, {int? count}) {
+  Widget _buildFilterChip(PutarTheme t, String label, ActivityFilter filter, {int? count}) {
     final isSelected = _selectedFilter == filter;
 
     return Semantics(
@@ -362,14 +502,14 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.matahari : Colors.white,
+            color: isSelected ? t.secondary : t.surface,
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: AppColors.ink, width: 3.0),
+            border: Border.all(color: t.ink, width: t.borderWidth),
             boxShadow: isSelected
-                ? const [
+                ? [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(3, 3),
+                      color: t.shadowColor,
+                      offset: t.smallShadowOffset,
                       blurRadius: 0,
                     ),
                   ]
@@ -380,19 +520,19 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
             children: [
               Text(
                 label,
-                style: AppTypography.buttonSmall.copyWith(
+                style: t.buttonSmall.copyWith(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
               if (count != null && count > 0)
                 Text(
                   ' · $count',
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
             ],
@@ -402,8 +542,42 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  VoidCallback? _resolveEventTap(
+    BuildContext context,
+    GroupEventModel e,
+    String activeGid,
+  ) {
+    final isWheelSlots = e.type == GroupEventType.custom &&
+        (e.payload['action'] == 'update_slots' || e.payload['wheelSlots'] != null);
+    if (e.type == GroupEventType.budgetChanged || isWheelSlots) {
+      return () {
+        SoundService.instance.play(Sfx.uiTap);
+        context.push('/group/budget-settings/$activeGid');
+      };
+    }
+    if (e.type == GroupEventType.memberJoin ||
+        e.type == GroupEventType.memberLeave ||
+        e.type == GroupEventType.codeChanged) {
+      return () {
+        SoundService.instance.play(Sfx.uiTap);
+        context.push('/group/invite/$activeGid');
+      };
+    }
+    if (e.sessionId.isNotEmpty) {
+      final isNote = e.type == GroupEventType.expense ||
+          e.type == GroupEventType.expenseDeleted;
+      return () {
+        SoundService.instance.play(Sfx.uiTap);
+        final suffix = isNote ? '?tab=catatan' : '';
+        context.push('/group/history/$activeGid/${e.sessionId}$suffix');
+      };
+    }
+    return null;
+  }
+
+  Widget _buildEmptyState(PutarTheme t) {
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         children: [
@@ -411,22 +585,22 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: t.surface,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.ink, width: 3.0),
-              boxShadow: const [
+              border: Border.all(color: t.ink, width: t.borderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(3, 3),
+                  color: t.shadowColor,
+                  offset: t.smallShadowOffset,
                   blurRadius: 0,
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: const CustomPaint(
-              size: Size(36, 36),
+            child: CustomPaint(
+              size: const Size(36, 36),
               painter: CustomClockPainter(
-                color: AppColors.disabled,
+                color: t.textDisabled,
                 strokeWidth: 2.8,
               ),
             ),
@@ -434,13 +608,13 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
           const SizedBox(height: 16),
           Text(
             'Belum ada aktivitas',
-            style: AppTypography.titleMedium.copyWith(fontSize: 18, fontWeight: FontWeight.w800),
+            style: t.titleMedium.copyWith(fontSize: 18, fontWeight: t.weightExtraBold),
           ),
           const SizedBox(height: 6),
           Text(
             'Putaran roda dan pengeluaran belanja yang dicatat bersama akan muncul di sini.',
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.textSecondary,
+            style: t.bodySmall.copyWith(
+              color: t.textSecondary,
               fontSize: 13,
             ),
             textAlign: TextAlign.center,
@@ -452,17 +626,80 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
     );
   }
 
-  Widget _buildNoGroupScaffold() {
+  Widget _buildFilteredEmptyState(PutarTheme t) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: t.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: t.ink, width: t.borderWidth),
+              boxShadow: [
+                BoxShadow(
+                  color: t.shadowColor,
+                  offset: t.smallShadowOffset,
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: CustomPaint(
+              size: const Size(36, 36),
+              painter: CustomClockPainter(
+                color: t.textDisabled,
+                strokeWidth: 2.8,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada notifikasi di kategori ini',
+            textAlign: TextAlign.center,
+            style: t.titleMedium.copyWith(fontSize: 18, fontWeight: t.weightExtraBold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Coba pilih kategori lain atau tampilkan semua aktivitas grup.',
+            textAlign: TextAlign.center,
+            style: t.bodySmall.copyWith(
+              color: t.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          StickerButton(
+            text: 'Tampilkan Semua',
+            backgroundColor: t.secondary,
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            onPressed: () {
+              setState(() {
+                _selectedFilter = ActivityFilter.semua;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+          const SyncLegend(isCard: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoGroupScaffold(PutarTheme t) {
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const CustomPaint(
-            size: Size(22, 22),
-            painter: CustomBackArrowPainter(color: AppColors.ink),
+          icon: CustomPaint(
+            size: const Size(22, 22),
+            painter: CustomBackArrowPainter(color: t.ink),
           ),
           onPressed: () {
             if (Navigator.of(context).canPop()) {
@@ -474,7 +711,7 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
         ),
         title: Text(
           'Aktivitas Grup',
-          style: AppTypography.titleMedium.copyWith(color: AppColors.ink),
+          style: t.titleMedium.copyWith(color: t.ink),
         ),
       ),
       body: SafeArea(
@@ -488,34 +725,34 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
+                  color: t.secondary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.ink, width: 3),
-                  boxShadow: const [
+                  border: Border.all(color: t.ink, width: t.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(3, 3),
+                      color: t.shadowColor,
+                      offset: t.smallShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
                 ),
                 alignment: Alignment.center,
-                child: const CustomPaint(
-                  size: Size(36, 36),
-                  painter: CustomBellPainter(color: AppColors.ink, strokeWidth: 2.8),
+                child: CustomPaint(
+                  size: const Size(36, 36),
+                  painter: CustomBellPainter(color: t.ink, strokeWidth: 2.8),
                 ),
               ),
               const SizedBox(height: 20),
               Text(
                 'Belum Ada Notifikasi Grup',
-                style: AppTypography.titleMedium.copyWith(fontSize: 22),
+                style: t.titleMedium.copyWith(fontSize: 22),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Gabung atau buat grup bersama teman untuk melihat riwayat putar roda, catatan belanja, dan aktivitas grup.',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                style: t.bodyMedium.copyWith(
+                  color: t.textSecondary,
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
@@ -523,7 +760,7 @@ class _GroupActivityScreenState extends ConsumerState<GroupActivityScreen> {
               const SizedBox(height: 24),
               StickerButton.large(
                 text: 'BUAT ATAU GABUNG GRUP',
-                backgroundColor: AppColors.matahari,
+                backgroundColor: t.secondary,
                 onPressed: () => context.push('/group/join-or-create'),
               ),
               const Spacer(),

@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
+import '../../../core/painters/mochi_painter.dart';
 import '../../../core/painters/sticker_icons.dart';
 import '../../../core/widgets/sticker_button.dart';
 import '../../../core/widgets/sticker_snackbar.dart';
@@ -27,6 +27,7 @@ import '../../../core/group/widgets/group_important_dialog.dart';
 import '../../../core/widgets/in_app_toast.dart';
 import '../../navigation/app_router.dart';
 import '../../wheel/wheel_painter.dart';
+import 'group_date_result_screen.dart';
 
 /// Layar 18: Roda Bersama Grup
 /// Menampilkan roda grup, kartu putaran terakhir, sisa budget realtime, avatar online, dan lonceng notifikasi aktivitas
@@ -50,7 +51,6 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
   String? _spectatorActorName;
   int? _spectatorBudget;
   String? _spectatorSessionId;
-  String? _spectatorActorUid;
   String? _currentSpinSessionId;
   GroupSessionModel? _localLiveSession;
 
@@ -58,6 +58,23 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
 
   List<int> _currentSlots = GroupModel.defaultSlots;
   late Map<int, TextPainter> _textPaintersCache;
+  PutarTheme _cacheTheme = PutarTheme.pasarMalam;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final t = context.putarTheme;
+    if (_cacheTheme != t) {
+      for (final tp in _textPaintersCache.values) {
+        tp.dispose();
+      }
+      _cacheTheme = t;
+      _textPaintersCache = WheelPainter.buildTextCache(
+        _currentSlots,
+        theme: _cacheTheme,
+      );
+    }
+  }
 
   void _syncSlotsIfNeeded(List<int> newSlots) {
     if (!listEquals(_currentSlots, newSlots)) {
@@ -65,7 +82,10 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
         tp.dispose();
       }
       _currentSlots = List.from(newSlots);
-      _textPaintersCache = WheelPainter.buildTextCache(_currentSlots);
+      _textPaintersCache = WheelPainter.buildTextCache(
+        _currentSlots,
+        theme: _cacheTheme,
+      );
     }
   }
 
@@ -174,78 +194,125 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
           ? (_spectatorSessionId ?? 'sess_${DateTime.now().millisecondsSinceEpoch}')
           : (_currentSpinSessionId ?? 'sess_${DateTime.now().millisecondsSinceEpoch}');
 
-      // Segera tandai sesi putaran ini agar listener global tidak memicu notifikasi tertunda/duplikat
-      ref.read(groupServiceProvider).markSpinAsShown(effectiveSessionId);
-
-      // Segera update kartu sesi lokal agar langsung menampilkan hasil putaran tanpa delay (0ms)
-      final liveSession = GroupSessionModel(
-        sessionId: effectiveSessionId,
-        budget: won,
-        startedByUid: wasSpectator ? (_spectatorActorUid ?? '') : (authService.currentUid ?? ''),
-        startedByName: actorName,
-        startedAt: DateTime.now(),
-      );
-
       setState(() {
-        _localLiveSession = liveSession;
         _isSpinning = false;
         _isSpectatorMode = false;
         _spectatorActorName = null;
         _spectatorBudget = null;
         _spectatorSessionId = null;
-        _spectatorActorUid = null;
       });
 
-      // 0ms LOCAL-FIRST: Update dan simpan langsung ke local group agar tab Catatan & seluruh app
-      // langsung mengenali budget aktif seketika tanpa harus menunggu respons jaringan!
-      final activeGid = ref.read(activeGroupIdProvider) ?? ref.read(groupServiceProvider).getActiveGroupId();
-      if (activeGid != null) {
-        final localGroup = ref.read(groupServiceProvider).getLocalGroup(activeGid);
-        if (localGroup != null) {
-          final updated = localGroup.copyWith(activeSession: liveSession);
-          await ref.read(groupServiceProvider).saveLocalGroup(updated);
-          ref.read(groupServiceProvider).notifyGroupChanged(activeGid, updated);
+      final formattedBudget = RupiahFormatter.format(won);
+
+      if (wasSpectator) {
+        if (mounted) {
+          showStickerSnackbar(
+            context,
+            message: '$actorName memutar roda: $formattedBudget',
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+      final groupService = ref.read(groupServiceProvider);
+      final activeGid =
+          ref.read(activeGroupIdProvider) ?? groupService.getActiveGroupId();
+      final activeGroup = ref.read(activeGroupStreamProvider).valueOrNull ??
+          (activeGid != null ? groupService.getLocalGroup(activeGid) : null);
+
+      final existingSession = activeGid != null
+          ? groupService.getEffectiveActiveSession(activeGid, activeGroup)
+          : activeGroup?.activeSession;
+
+      // Jika catatan grup sebelumnya masih ada (budget > 0), tanyakan persetujuan terlebih dahulu.
+      // Jika catatan grup masih kosong, langsung pasang hasil putaran ke catatan grup.
+      if (existingSession != null && existingSession.budget > 0) {
+        final accepted = await GroupImportantDialog.showConfirmAcceptGameBudget(
+          context,
+          budget: won,
+          currentBudget: existingSession.budget,
+          gameName: 'Roda Putar',
+        );
+
+        if (accepted != true) {
+          if (mounted) {
+            showStickerSnackbar(
+              context,
+              message:
+                  'Budget $formattedBudget dibatalkan. Catatan grup tetap ${RupiahFormatter.format(existingSession.budget)}.',
+            );
+          }
+          return;
         }
       }
 
-      // Feedback hasil putaran pada layar (snackbar & kartu budget)
+      // Segera tandai sesi putaran ini agar listener global tidak memicu notifikasi tertunda/duplikat
+      groupService.markSpinAsShown(effectiveSessionId);
+
+      // Segera update kartu sesi lokal agar langsung menampilkan hasil putaran tanpa delay (0ms)
+      final liveSession = GroupSessionModel(
+        sessionId: effectiveSessionId,
+        gid: activeGid ?? '',
+        budget: won,
+        game: 'wheel',
+        startedByUid: authService.currentUid ?? '',
+        startedByName: actorName,
+        startedAt: DateTime.now(),
+      );
+
       if (mounted) {
-        final formattedBudget = RupiahFormatter.format(won);
-        showStickerSnackbar(
-          context,
-          message: wasSpectator
-              ? '🎉 $actorName menentukan budget grup: $formattedBudget!'
-              : 'Budget grup ditentukan: $formattedBudget! Klik "Catat Belanja" untuk mulai.',
-        );
+        setState(() {
+          _localLiveSession = liveSession;
+        });
       }
 
-      // UPDATE 2D: Klaim sesi dan tulis event dalam satu transaksi
-      if (!wasSpectator) {
-        final activeGroup = ref.read(activeGroupStreamProvider).valueOrNull ??
-            (activeGid != null
-                ? ref.read(groupServiceProvider).getLocalGroup(activeGid)
-                : null);
-        if (activeGroup != null) {
-          try {
-            final gameService = ref.read(groupGameServiceProvider);
-            final claimResult = await gameService.claimSessionAndWriteResult(
-              gid: activeGroup.id,
-              game: 'wheel',
-              amount: won,
-              customSessionId: effectiveSessionId,
-              detail: {
-                'slot_index': winningIndex,
-                'amount': won,
-              },
-            );
-            if (!claimResult.success && mounted) {
+      // 0ms LOCAL-FIRST: Bersihkan penanda sesi berakhir, lalu simpan ke local group agar tab Catatan
+      // langsung menampilkan budget aktif seketika tanpa delay atau tertimpa polling!
+      if (activeGid != null) {
+        await groupService.clearEndedSessionMarker(activeGid);
+        final localGroup = groupService.getLocalGroup(activeGid) ?? activeGroup;
+        if (localGroup != null) {
+          final updated = localGroup.copyWith(activeSession: liveSession);
+          await groupService.saveLocalGroup(updated);
+          groupService.notifyGroupChanged(activeGid, updated);
+        }
+      }
+
+      // UPDATE 2D: Klaim sesi dan tulis event dalam satu transaksi sebelum konfirmasi dipasang
+      bool claimedSuccessfully = true;
+      final targetGroup = activeGroup ??
+          (activeGid != null ? groupService.getLocalGroup(activeGid) : null);
+      if (targetGroup != null) {
+        try {
+          final gameService = ref.read(groupGameServiceProvider);
+          final claimResult = await gameService.claimSessionAndWriteResult(
+            gid: targetGroup.id,
+            game: 'wheel',
+            amount: won,
+            customSessionId: effectiveSessionId,
+            detail: {
+              'slot_index': winningIndex,
+              'amount': won,
+            },
+          );
+          if (!claimResult.success) {
+            claimedSuccessfully = false;
+            if (mounted) {
               InAppToast.show(
                 context,
                 message: claimResult.message,
               );
             }
-          } catch (_) {}
-        }
+          }
+        } catch (_) {}
+      }
+
+      if (claimedSuccessfully && mounted) {
+        showStickerSnackbar(
+          context,
+          message: 'Budget grup dipasang: $formattedBudget! Klik "Catat Belanja" untuk mulai.',
+        );
       }
     }
   }
@@ -439,6 +506,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final activeGroupId = ref.watch(activeGroupIdProvider);
     final activeGroupAsync = ref.watch(activeGroupStreamProvider);
     final membersAsync = ref.watch(activeGroupMembersStreamProvider);
@@ -465,8 +533,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
 
     if (rawGroup == null) {
       if (activeGroupId != null && activeGroupId.isNotEmpty) {
-        return const Scaffold(
-          backgroundColor: AppColors.cream,
+        return Scaffold(
+          backgroundColor: t.bg,
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -474,15 +542,14 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 SizedBox(
                   width: 32,
                   height: 32,
-                  child: CircularProgressIndicator(color: AppColors.ink, strokeWidth: 3),
+                  child: CircularProgressIndicator(color: t.ink, strokeWidth: 3),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
                   'Menghubungkan ke grup...',
-                  style: TextStyle(
-                    fontFamily: AppTypography.fontFamily,
+                  style: t.bodyMedium.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
+                    color: t.ink,
                     fontSize: 14,
                   ),
                 ),
@@ -491,7 +558,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
           ),
         );
       }
-      return _buildNoGroupScaffold();
+      return _buildNoGroupScaffold(t);
     }
     final group = rawGroup;
     _syncSlotsIfNeeded(group.getWheelPool());
@@ -533,7 +600,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
           groupName: group.name,
         );
       });
-      return _buildNoGroupScaffold();
+      return _buildNoGroupScaffold(t);
     }
 
     final ownerMember = members.firstWhere(
@@ -603,7 +670,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
         : 1.0;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -632,21 +699,24 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                         height: 44,
                         margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 2.8),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: 2.8),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(2, 2),
+                              color: t.ink,
+                              offset: t.miniShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const CustomPaint(
-                          size: Size(18, 18),
-                          painter: CustomBackIconPainter(strokeWidth: 2.8),
+                        child: CustomPaint(
+                          size: const Size(18, 18),
+                          painter: CustomBackIconPainter(
+                            color: t.ink,
+                            strokeWidth: 2.8,
+                          ),
                         ),
                       ),
                     ),
@@ -654,9 +724,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                   Expanded(
                     child: Text(
                       'Putar Jajan',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 22,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -680,21 +750,21 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: t.surface,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.ink, width: 2.8),
-                              boxShadow: const [
+                              border: Border.all(color: t.ink, width: 2.8),
+                              boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.ink,
-                                  offset: Offset(3, 3),
+                                  color: t.ink,
+                                  offset: t.smallShadowOffset,
                                   blurRadius: 0,
                                 ),
                               ],
                             ),
                             alignment: Alignment.center,
-                            child: const CustomPaint(
-                              size: Size(20, 20),
-                              painter: CustomBellPainter(color: AppColors.ink, strokeWidth: 2.8),
+                            child: CustomPaint(
+                              size: const Size(20, 20),
+                              painter: CustomBellPainter(color: t.ink, strokeWidth: 2.8),
                             ),
                           ),
                           if (unreadCount > 0)
@@ -706,16 +776,16 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                                 height: 20,
                                 padding: const EdgeInsets.symmetric(horizontal: 5),
                                 decoration: BoxDecoration(
-                                  color: AppColors.tomat,
+                                  color: t.danger,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppColors.ink, width: 2),
+                                  border: Border.all(color: t.ink, width: 2),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   '$unreadCount',
-                                  style: AppTypography.buttonSmall.copyWith(
+                                  style: t.buttonSmall.copyWith(
                                     fontSize: 11,
-                                    color: AppColors.surface,
+                                    color: t.surface,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -745,11 +815,14 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               const SizedBox(height: 12),
 
               // 3. Presence Bar (Avatar Anggota & "N anggota online")
-              _buildPresenceBar(members, group.id),
+              _buildPresenceBar(t, members, group.id),
               const SizedBox(height: 12),
+              if (t.wheelDecor == PutarWheelDecor.ears)
+                const SizedBox(height: 18),
 
               // 4. Roda Putar Interaktif
               _buildInteractiveWheel(
+                t,
                 canSpin: canSpin && !isLocked,
                 isOwner: isOwner,
                 ownerName: ownerName,
@@ -761,12 +834,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               const SizedBox(height: 16),
 
               // 5. Kartu Putaran Terakhir
-              _buildLastSpinCard(group, session),
+              _buildLastSpinCard(t, group, session),
               const SizedBox(height: 14),
 
               // 6. Bar Sisa Budget Grup
               if (session != null) ...[
                 _buildBudgetSummaryBar(
+                  t,
                   remainingBudget: remainingBudget,
                   sessionBudget: session.budget,
                   progress: progress,
@@ -781,8 +855,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                   if (session == null) ...[
                     StickerButton.large(
                       text: 'MULAI DATE (${RupiahFormatter.formatCompact(group.fixedBudget)})',
-                      backgroundColor: AppColors.tomat,
-                      textColor: AppColors.ink,
+                      backgroundColor: t.danger,
+                      textColor: t.ink,
                       onPressed: () async {
                         SoundService.instance.play(Sfx.wheelLand);
                         HapticFeedback.heavyImpact();
@@ -804,9 +878,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                         Expanded(
                           child: StickerButton.large(
                             text: 'MULAI DATE BARU',
-                            backgroundColor: AppColors.surface,
-                            textColor: AppColors.ink,
-                            borderColor: AppColors.ink,
+                            backgroundColor: t.surface,
+                            textColor: t.ink,
+                            borderColor: t.ink,
                             onPressed: () async {
                               SoundService.instance.play(Sfx.wheelLand);
                               HapticFeedback.heavyImpact();
@@ -827,8 +901,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                         Expanded(
                           child: StickerButton.large(
                             text: 'CATAT JAJAN',
-                            backgroundColor: AppColors.tomat,
-                            textColor: AppColors.ink,
+                            backgroundColor: t.danger,
+                            textColor: t.ink,
                             onPressed: () {
                               SoundService.instance.play(Sfx.uiTap);
                               ref.read(appScopeProvider.notifier).state = AppScope.grup;
@@ -843,9 +917,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 ] else ...[
                   StickerButton.large(
                     text: 'MENUNGGU PEMILIK MEMULAI DATE',
-                    backgroundColor: AppColors.surface,
-                    textColor: AppColors.ink,
-                    borderColor: AppColors.ink,
+                    backgroundColor: t.surface,
+                    textColor: t.ink,
+                    borderColor: t.ink,
                     onPressed: () => _showNonOwnerBlockedFeedback(ownerName, isFixed: true),
                   ),
                 ],
@@ -858,13 +932,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: t.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.2),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: 2.2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.ink,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
@@ -873,18 +947,18 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CustomPaint(
-                          size: Size(16, 16),
-                          painter: CustomGearPainter(color: AppColors.ink),
+                        CustomPaint(
+                          size: const Size(16, 16),
+                          painter: CustomGearPainter(color: t.ink),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             'Pengaturan Budget Grup',
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: t.buttonSmall.copyWith(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -893,16 +967,16 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.mint,
+                            color: t.accentMint,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.ink, width: 1.5),
+                            border: Border.all(color: t.ink, width: 1.5),
                           ),
                           child: Text(
                             'Angka Tetap',
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: t.buttonSmall.copyWith(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -915,8 +989,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 // Saat sesi sudah punya budget, tombol pemilik berbunyi "Ulangi budget" dan meminta konfirmasi.
                 StickerButton.large(
                   text: _isSpinning ? 'MEMUTAR...' : 'ULANGI BUDGET',
-                  backgroundColor: AppColors.tomat,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.danger,
+                  textColor: t.ink,
                   onPressed: _isSpinning
                       ? null
                       : () async {
@@ -936,17 +1010,17 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 const SizedBox(height: 10),
                 StickerButton.large(
                   text: 'AKHIRI DATE GRUP',
-                  backgroundColor: AppColors.matahari,
-                  textColor: AppColors.ink,
-                  borderColor: AppColors.ink,
+                  backgroundColor: t.secondary,
+                  textColor: t.ink,
+                  borderColor: t.ink,
                   onPressed: () => _confirmEndSession(group),
                 ),
               ] else if (canSpin) ...[
                 // Mode Dari Permainan (bisa memutar roda)
                 StickerButton.large(
                   text: _isSpinning ? 'MEMUTAR...' : 'PUTAR RODA',
-                  backgroundColor: AppColors.tomat,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.danger,
+                  textColor: t.ink,
                   onPressed: _isSpinning ? null : () => _spinWheel(canSpin: true, ownerName: ownerName),
                 ),
                 const SizedBox(height: 10),
@@ -960,13 +1034,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: t.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.2),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: 2.2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.ink,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
@@ -975,18 +1049,18 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CustomPaint(
-                          size: Size(16, 16),
-                          painter: CustomGearPainter(color: AppColors.ink),
+                        CustomPaint(
+                          size: const Size(16, 16),
+                          painter: CustomGearPainter(color: t.ink),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             'Atur Nominal Roda Grup',
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: t.buttonSmall.copyWith(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -995,16 +1069,16 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.matahari,
+                            color: t.secondary,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.ink, width: 1.5),
+                            border: Border.all(color: t.ink, width: 1.5),
                           ),
                           child: Text(
                             '${group.getWheelPool().length} Pilihan',
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: t.buttonSmall.copyWith(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                           ),
                         ),
@@ -1016,9 +1090,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 // Anggota: Sesi Terkunci (Date berjalan)
                 StickerButton.large(
                   text: 'Date berjalan · permainan terkunci',
-                  backgroundColor: AppColors.surface,
-                  textColor: AppColors.ink,
-                  borderColor: AppColors.ink,
+                  backgroundColor: t.surface,
+                  textColor: t.ink,
+                  borderColor: t.ink,
                   onPressed: () {
                     InAppToast.show(
                       context,
@@ -1030,9 +1104,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 // Anggota: Bukan Pemilik (playPolicy == 'owner')
                 StickerButton.large(
                   text: 'Hanya pemilik yang bisa memutar',
-                  backgroundColor: AppColors.surface,
-                  textColor: AppColors.ink,
-                  borderColor: AppColors.ink,
+                  backgroundColor: t.surface,
+                  textColor: t.ink,
+                  borderColor: t.ink,
                   onPressed: () {
                     InAppToast.show(
                       context,
@@ -1049,13 +1123,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: t.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.2),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: 2.2),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.ink,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
@@ -1064,18 +1138,18 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CustomPaint(
-                          size: Size(16, 16),
-                          painter: CustomGearPainter(color: AppColors.ink),
+                        CustomPaint(
+                          size: const Size(16, 16),
+                          painter: CustomGearPainter(color: t.ink),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             'Lihat Pengaturan Budget',
-                            style: AppTypography.buttonSmall.copyWith(
+                            style: t.buttonSmall.copyWith(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                              color: t.ink,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1089,8 +1163,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 const SizedBox(height: 12),
                 StickerButton.large(
                   text: '+ CATAT BELANJA / JAJAN',
-                  backgroundColor: AppColors.mint,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.accentMint,
+                  textColor: t.ink,
                   onPressed: () {
                     ref.read(appScopeProvider.notifier).state = AppScope.grup;
                     context.go('/catatan');
@@ -1106,26 +1180,55 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
   }
 
   Future<void> _confirmEndSession(GroupModel group) async {
+    final groupService = ref.read(groupServiceProvider);
+    final summary = groupService.getActiveSessionSummary(group.id);
     final confirm = await GroupImportantDialog.showConfirmEndGroupSession(
       context,
       groupName: group.name,
-      budget: group.activeSession?.budget,
+      budget: summary.budget > 0 ? summary.budget : group.activeSession?.budget,
+      totalSpent: summary.totalSpent,
+      itemCount: summary.itemCount,
     );
     if (confirm == true) {
+      final sessionBeforeEnd = group.activeSession;
       if (mounted) {
         setState(() {
           _localLiveSession = null;
           _lastSessionId = null;
         });
       }
-      await ref.read(groupGameServiceProvider).endSession(gid: group.id);
+      if (summary.sessionId.isNotEmpty) {
+        await groupService.markResultAsShown(group.id, summary.sessionId);
+      }
+      final frozen =
+          await ref.read(groupGameServiceProvider).endSession(gid: group.id);
       if (mounted) {
-        showStickerSnackbar(context, message: 'Date grup telah diakhiri. Roda siap diputar!');
+        final budget = frozen?.budget ?? sessionBeforeEnd?.budget ?? 0;
+        final totalSpent = frozen?.totalSpent ?? summary.totalSpent;
+        final uri = buildGroupDateResultUri(
+          groupName: group.name,
+          budget: budget,
+          totalSpent: totalSpent,
+          itemCount: summary.itemCount,
+          groupId: group.id,
+          sessionId: frozen?.sessionId ?? summary.sessionId,
+          budgetByName: frozen?.budgetByName ?? sessionBeforeEnd?.budgetByName,
+          budgetGame: frozen?.game ?? sessionBeforeEnd?.game,
+          endedByName: frozen?.endedByName,
+          endedByUid: frozen?.endedByUid,
+          sessionDate: frozen?.startedAt ?? sessionBeforeEnd?.startedAt,
+          endedAt: frozen?.endedAt,
+        );
+        context.push(uri.toString());
       }
     }
   }
 
-  Widget _buildPresenceBar(List<GroupMemberModel> members, String activeGid) {
+  Widget _buildPresenceBar(
+    PutarTheme t,
+    List<GroupMemberModel> members,
+    String activeGid,
+  ) {
     final now = DateTime.now();
     // Hitung anggota yang aktif (lastSeenAt < 15 menit atau jika null fallback ke member)
     final seen = <String>{};
@@ -1147,13 +1250,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: t.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.ink, width: 2),
-          boxShadow: const [
+          border: Border.all(color: t.ink, width: 2),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(2, 2),
+              color: t.ink,
+              offset: t.miniShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -1182,10 +1285,10 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
             Expanded(
               child: Text(
                 '${onlineMembers.length} anggota online',
-                style: AppTypography.bodySmall.copyWith(
+                style: t.bodySmall.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
+                  color: t.ink,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1194,21 +1297,21 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.cream,
+                color: t.bg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.ink, width: 1.5),
+                border: Border.all(color: t.ink, width: 1.5),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CustomPaint(
-                    size: Size(12, 12),
-                    painter: CustomGearPainter(color: AppColors.ink),
+                  CustomPaint(
+                    size: const Size(12, 12),
+                    painter: CustomGearPainter(color: t.ink),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Kelola',
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1230,6 +1333,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     required int fixedBudget,
     required bool sessionActive,
   }) {
+    final t = context.putarTheme;
     SoundService.instance.play(Sfx.uiTap);
     HapticFeedback.selectionClick();
 
@@ -1242,13 +1346,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            border: Border.all(color: t.ink, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.ink,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -1262,16 +1366,16 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.ink, width: 2),
+                      border: Border.all(color: t.ink, width: 2),
                     ),
                     child: Text(
                       'Mode Angka Tetap',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -1281,11 +1385,17 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.ink, width: 2),
+                        border: Border.all(color: t.ink, width: 2),
                       ),
-                      child: const Icon(Icons.close, size: 18, color: AppColors.ink),
+                      child: CustomPaint(
+                        size: const Size(18, 18),
+                        painter: CustomCloseIconPainter(
+                          color: t.ink,
+                          strokeWidth: 2.6,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1293,21 +1403,21 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               const SizedBox(height: 14),
               Text(
                 'Budget Date: ${RupiahFormatter.format(fixedBudget)}',
-                style: AppTypography.titleMedium.copyWith(fontSize: 18, color: AppColors.ink),
+                style: t.titleMedium.copyWith(fontSize: 18, color: t.ink),
               ),
               const SizedBox(height: 8),
               Text(
                 sessionActive
                     ? 'Date sedang aktif dengan budget tetap ${RupiahFormatter.format(fixedBudget)}. Roda ini tidak mengubah budget yang sudah ditentukan.'
                     : 'Pada Mode Angka Tetap, nominal budget date bernilai pasti ${RupiahFormatter.format(fixedBudget)} per sesi tanpa perlu diundi dari putaran roda.',
-                style: AppTypography.bodyMedium.copyWith(fontSize: 13, color: AppColors.ink),
+                style: t.bodyMedium.copyWith(fontSize: 13, color: t.ink),
               ),
               const SizedBox(height: 18),
               if (isOwner) ...[
                 StickerButton.large(
                   text: 'UBAH KE MODE PUTAR RODA',
-                  backgroundColor: AppColors.tomat,
-                  textColor: AppColors.ink,
+                  backgroundColor: t.danger,
+                  textColor: t.ink,
                   onPressed: () async {
                     Navigator.of(ctx).pop();
                     await ref.read(groupServiceProvider).updateGroupBudgetSettings(
@@ -1329,8 +1439,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               ],
               StickerButton.large(
                 text: 'PUTAR RODA ISENG (SERU-SERUAN)',
-                backgroundColor: AppColors.mint,
-                textColor: AppColors.ink,
+                backgroundColor: t.accentMint,
+                textColor: t.ink,
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   _spinWheel(
@@ -1343,9 +1453,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               const SizedBox(height: 10),
               StickerButton.large(
                 text: 'MENGERTI',
-                backgroundColor: AppColors.surface,
-                textColor: AppColors.ink,
-                borderColor: AppColors.ink,
+                backgroundColor: t.surface,
+                textColor: t.ink,
+                borderColor: t.ink,
                 onPressed: () => Navigator.of(ctx).pop(),
               ),
             ],
@@ -1355,7 +1465,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     );
   }
 
-  Widget _buildInteractiveWheel({
+  Widget _buildInteractiveWheel(
+    PutarTheme t, {
     required bool canSpin,
     required bool isOwner,
     required String ownerName,
@@ -1370,76 +1481,97 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
           final size = math.min(230.0, constraints.maxWidth - 20);
           final wheelCenter = Offset(size / 2, size / 2);
 
-          return GestureDetector(
-            onTap: () {
-              if (isFixed) {
-                _handleFixedWheelInteraction(
-                  context,
-                  isOwner: isOwner,
-                  group: group,
-                  ownerName: ownerName,
-                  fixedBudget: fixedBudget,
-                  sessionActive: sessionActive,
-                );
-              }
-            },
-            onPanStart: (d) {
-              if (isFixed) {
-                _handleFixedWheelInteraction(
-                  context,
-                  isOwner: isOwner,
-                  group: group,
-                  ownerName: ownerName,
-                  fixedBudget: fixedBudget,
-                  sessionActive: sessionActive,
-                );
-                return;
-              }
-              _onPanStart(d, wheelCenter, canSpin: canSpin, ownerName: ownerName);
-            },
-            onPanUpdate: (d) {
-              if (isFixed) return;
-              _onPanUpdate(d, wheelCenter, canSpin: canSpin);
-            },
-            onPanEnd: (d) {
-              if (isFixed) return;
-              _onPanEnd(d, canSpin: canSpin);
-            },
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: CustomPaint(
-                size: Size(size, size),
-                painter: WheelPainter(
-                  slots: _currentSlots,
-                  rotationAngleDegrees: _currentRotationAngle,
-                  cachedTextPainters: _textPaintersCache,
-                  pointerFlickAngleDegrees: WheelMath.calculatePointerFlickAngle(
-                    currentAngle: _currentRotationAngle,
-                    totalSlots: _currentSlots.length,
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (isFixed) {
+                    _handleFixedWheelInteraction(
+                      context,
+                      isOwner: isOwner,
+                      group: group,
+                      ownerName: ownerName,
+                      fixedBudget: fixedBudget,
+                      sessionActive: sessionActive,
+                    );
+                  }
+                },
+                onPanStart: (d) {
+                  if (isFixed) {
+                    _handleFixedWheelInteraction(
+                      context,
+                      isOwner: isOwner,
+                      group: group,
+                      ownerName: ownerName,
+                      fixedBudget: fixedBudget,
+                      sessionActive: sessionActive,
+                    );
+                    return;
+                  }
+                  _onPanStart(d, wheelCenter, canSpin: canSpin, ownerName: ownerName);
+                },
+                onPanUpdate: (d) {
+                  if (isFixed) return;
+                  _onPanUpdate(d, wheelCenter, canSpin: canSpin);
+                },
+                onPanEnd: (d) {
+                  if (isFixed) return;
+                  _onPanEnd(d, canSpin: canSpin);
+                },
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: CustomPaint(
+                    size: Size(size, size),
+                    painter: WheelPainter(
+                      slots: _currentSlots,
+                      rotationAngleDegrees: _currentRotationAngle,
+                      cachedTextPainters: _textPaintersCache,
+                      pointerFlickAngleDegrees: WheelMath.calculatePointerFlickAngle(
+                        currentAngle: _currentRotationAngle,
+                        totalSlots: _currentSlots.length,
+                      ),
+                      theme: t,
+                      paintHubMascot: t.mascot == null,
+                      mochiExpression: _isSpinning
+                          ? MochiExpression.wow
+                          : MochiExpression.normal,
+                    ),
                   ),
                 ),
               ),
-            ),
+              if (t.mascot == PutarMascotKind.mochi)
+                MochiWidget(
+                  size: 52.0 * (size / 300.0),
+                  expression: _isSpinning
+                      ? MochiExpression.wow
+                      : MochiExpression.normal,
+                ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildLastSpinCard(GroupModel group, GroupSessionModel? session) {
+  Widget _buildLastSpinCard(
+    PutarTheme t,
+    GroupModel group,
+    GroupSessionModel? session,
+  ) {
     final isFixed = group.budgetMode == 'fixed';
     if (session == null) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.ink, width: 2.5),
-          boxShadow: const [
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.smallCardRadius),
+          border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.ink,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -1450,14 +1582,14 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: isFixed ? AppColors.mint : AppColors.matahari,
+                color: isFixed ? t.accentMint : t.secondary,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.ink, width: 2),
+                border: Border.all(color: t.ink, width: 2),
               ),
               alignment: Alignment.center,
-              child: const CustomPaint(
-                size: Size(18, 18),
-                painter: CustomSyncArrowsPainter(color: AppColors.ink, strokeWidth: 2.2),
+              child: CustomPaint(
+                size: const Size(18, 18),
+                painter: CustomSyncArrowsPainter(color: t.ink, strokeWidth: 2.2),
               ),
             ),
             const SizedBox(width: 12),
@@ -1467,14 +1599,14 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 children: [
                   Text(
                     isFixed ? 'Belum ada date yang dimulai' : 'Belum ada putaran sesi',
-                    style: AppTypography.bodyLargeBold.copyWith(fontSize: 14),
+                    style: t.bodyLargeBold.copyWith(fontSize: 14),
                   ),
                   Text(
                     isFixed
                         ? 'Mulai date untuk mengaktifkan batas jajan bersama!'
                         : 'Putar roda untuk menentukan batas jajan bersama!',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+                    style: t.bodySmall.copyWith(
+                      color: t.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -1494,13 +1626,13 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.ink, width: 2.5),
-          boxShadow: const [
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.smallCardRadius),
+          border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(3, 3),
+              color: t.ink,
+              offset: t.smallShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -1519,14 +1651,14 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 children: [
                   Text(
                     isFixed ? '${session.startedByName} memulai date' : '${session.startedByName} memutar roda',
-                    style: AppTypography.bodyLargeBold.copyWith(fontSize: 14),
+                    style: t.bodyLargeBold.copyWith(fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     '${_formatRelativeTime(session.startedAt)} · Buka catatan belanja →',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+                    style: t.bodySmall.copyWith(
+                      color: t.textSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1544,9 +1676,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 alignment: Alignment.centerRight,
                 child: Text(
                   RupiahFormatter.format(session.budget),
-                  style: AppTypography.titleLarge.copyWith(
+                  style: t.titleLarge.copyWith(
                     fontSize: 17,
-                    color: AppColors.ink,
+                    color: t.ink,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1558,7 +1690,8 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     );
   }
 
-  Widget _buildBudgetSummaryBar({
+  Widget _buildBudgetSummaryBar(
+    PutarTheme t, {
     required int remainingBudget,
     required int sessionBudget,
     required double progress,
@@ -1577,10 +1710,10 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               Expanded(
                 child: Text(
                   'Sisa budget grup',
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1594,10 +1727,10 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                     alignment: Alignment.centerRight,
                     child: Text(
                       '${RupiahFormatter.format(remainingBudget)} / ${RupiahFormatter.format(sessionBudget)}',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -1611,16 +1744,16 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
           Container(
             height: 16,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: t.surface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.ink, width: 2.5),
+              border: Border.all(color: t.ink, width: t.subtleBorderWidth),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
               widthFactor: progress,
               child: Container(
                 decoration: BoxDecoration(
-                  color: progress > 0.35 ? AppColors.mint : AppColors.tomat,
+                  color: progress > 0.35 ? t.accentMint : t.danger,
                   borderRadius: BorderRadius.circular(7),
                 ),
               ),
@@ -1631,9 +1764,9 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
     );
   }
 
-  Widget _buildNoGroupScaffold() {
+  Widget _buildNoGroupScaffold(PutarTheme t) {
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -1661,21 +1794,24 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                         height: 44,
                         margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 2.8),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: 2.8),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(2, 2),
+                              color: t.ink,
+                              offset: t.miniShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: const CustomPaint(
-                          size: Size(18, 18),
-                          painter: CustomBackIconPainter(strokeWidth: 2.8),
+                        child: CustomPaint(
+                          size: const Size(18, 18),
+                          painter: CustomBackIconPainter(
+                            color: t.ink,
+                            strokeWidth: 2.8,
+                          ),
                         ),
                       ),
                     ),
@@ -1701,34 +1837,34 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
+                  color: t.secondary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.ink, width: 3),
-                  boxShadow: const [
+                  border: Border.all(color: t.ink, width: t.borderWidth),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(3, 3),
+                      color: t.ink,
+                      offset: t.smallShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
                 ),
                 alignment: Alignment.center,
-                child: const CustomPaint(
-                  size: Size(36, 36),
-                  painter: CustomCrownPainter(color: AppColors.ink, strokeWidth: 2.8),
+                child: CustomPaint(
+                  size: const Size(36, 36),
+                  painter: CustomCrownPainter(color: t.ink, strokeWidth: 2.8),
                 ),
               ),
               const SizedBox(height: 20),
               Text(
                 'Belum Bergabung Grup',
-                style: AppTypography.titleMedium.copyWith(fontSize: 22),
+                style: t.titleMedium.copyWith(fontSize: 22),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Buat grup atau gabung dengan kode undangan untuk memutar roda bersama teman-temanmu.',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                style: t.bodyMedium.copyWith(
+                  color: t.textSecondary,
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
@@ -1736,7 +1872,7 @@ class _GroupWheelViewState extends ConsumerState<GroupWheelView>
               const SizedBox(height: 24),
               StickerButton.large(
                 text: 'BUAT ATAU GABUNG GRUP',
-                backgroundColor: AppColors.matahari,
+                backgroundColor: t.secondary,
                 onPressed: () => context.push('/group/join-or-create'),
               ),
               const Spacer(),

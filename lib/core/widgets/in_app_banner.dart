@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
+import '../theme/putar_theme.dart';
 import '../painters/sticker_icons.dart';
 import '../utils/rupiah_formatter.dart';
 import '../utils/sound_service.dart';
@@ -101,6 +100,7 @@ class _BannerWidgetState extends State<_BannerWidget>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final topPadding = MediaQuery.of(context).padding.top;
     final progress = widget.spentPercentage.clamp(0.0, 1.0);
 
@@ -126,16 +126,16 @@ class _BannerWidgetState extends State<_BannerWidget>
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.matahari,
-                  borderRadius: BorderRadius.circular(22),
+                  color: t.warning,
+                  borderRadius: BorderRadius.circular(t.cardRadius),
                   border: Border.all(
-                    color: AppColors.ink,
-                    width: 3.0,
+                    color: t.borderColor,
+                    width: t.borderWidth,
                   ),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(4, 4),
+                      color: t.shadowColor,
+                      offset: t.standardShadowOffset,
                       blurRadius: 0,
                     ),
                   ],
@@ -152,9 +152,9 @@ class _BannerWidgetState extends State<_BannerWidget>
                           width: 38,
                           height: 38,
                           margin: const EdgeInsets.only(right: 12),
-                          child: const CustomPaint(
+                          child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.8,
                             ),
                           ),
@@ -165,17 +165,17 @@ class _BannerWidgetState extends State<_BannerWidget>
                             children: [
                               Text(
                                 'Sisa ${RupiahFormatter.format(widget.remainingBudget)} lagi',
-                                style: AppTypography.titleMedium.copyWith(
-                                  color: AppColors.ink,
+                                style: t.titleMedium.copyWith(
+                                  color: t.ink,
                                   fontSize: 18,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 'Sudah ${(progress * 100).toInt()}% terpakai. Pilih jajan yang hemat dulu ya.',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.ink,
-                                  fontWeight: FontWeight.w600,
+                                style: t.bodySmall.copyWith(
+                                  color: t.ink,
+                                  fontWeight: t.weightSemiBold,
                                 ),
                               ),
                             ],
@@ -189,11 +189,11 @@ class _BannerWidgetState extends State<_BannerWidget>
                       height: 14,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         borderRadius: BorderRadius.circular(7),
                         border: Border.all(
-                          color: AppColors.ink,
-                          width: 2.5,
+                          color: t.borderColor,
+                          width: t.subtleBorderWidth,
                         ),
                       ),
                       clipBehavior: Clip.antiAlias,
@@ -201,7 +201,7 @@ class _BannerWidgetState extends State<_BannerWidget>
                         alignment: Alignment.centerLeft,
                         widthFactor: progress,
                         child: Container(
-                          color: AppColors.tomat,
+                          color: t.danger,
                         ),
                       ),
                     ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
+/// Tipografi statis tema bawaan (Pasar Malam).
+/// Widget UI wajib membaca `context.putarTheme.<style>` agar mengikuti font tema aktif.
 class AppTypography {
   AppTypography._();
 

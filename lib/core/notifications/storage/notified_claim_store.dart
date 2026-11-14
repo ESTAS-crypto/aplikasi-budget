@@ -80,6 +80,9 @@ abstract class NotifiedClaimStore {
   /// Memperbarui watermark waktu event terakhir yang disampaikan per grup
   Future<void> setLastDeliveredEventAt(String gid, DateTime timestamp);
 
+  /// Menghapus watermark grup jika terdeteksi corrupt (mis. timestamp masa depan akibat clock skew)
+  Future<void> clearLastDeliveredEventAt(String gid);
+
   /// Menghapus seluruh data klaim (untuk testing / reset)
   Future<void> clearAll();
 }
@@ -100,6 +103,11 @@ class InMemoryNotifiedClaimStore implements NotifiedClaimStore {
     if (current == null || timestamp.isAfter(current)) {
       _watermarks[gid] = timestamp;
     }
+  }
+
+  @override
+  Future<void> clearLastDeliveredEventAt(String gid) async {
+    _watermarks.remove(gid);
   }
 
   @override
@@ -181,6 +189,12 @@ class SharedPrefsNotifiedClaimStore implements NotifiedClaimStore {
     if (current == null || timestamp.isAfter(current)) {
       await prefs.setString('$_watermarkPrefix$gid', timestamp.toIso8601String());
     }
+  }
+
+  @override
+  Future<void> clearLastDeliveredEventAt(String gid) async {
+    final prefs = await _getPrefs();
+    await prefs.remove('$_watermarkPrefix$gid');
   }
 
   @override

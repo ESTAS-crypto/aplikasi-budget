@@ -7,8 +7,7 @@ import '../../core/group/painters/group_icons_painter.dart';
 import '../../core/group/services/group_service.dart';
 import '../../core/group/widgets/scope_switcher.dart';
 import '../group/screens/group_history_view.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/painters/sticker_icons.dart';
 import '../../core/widgets/sticker_card.dart';
 import '../../core/widgets/sticker_chip.dart';
@@ -33,9 +32,10 @@ class HistoryScreen extends ConsumerWidget {
     final unreadCount = ref.watch(unreadActivityCountProvider);
 
     final dates = finishedDatesAsync.value ?? [];
+    final t = context.putarTheme;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -49,9 +49,9 @@ class HistoryScreen extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       'Riwayat date',
-                      style: AppTypography.displayMedium.copyWith(
+                      style: t.displayMedium.copyWith(
                         fontSize: 32,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -74,22 +74,25 @@ class HistoryScreen extends ConsumerWidget {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: t.surface,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.ink, width: 2.5),
-                              boxShadow: const [
+                              border: Border.all(
+                                color: t.ink,
+                                width: t.subtleBorderWidth,
+                              ),
+                              boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.ink,
-                                  offset: Offset(3, 3),
+                                  color: t.shadowColor,
+                                  offset: t.smallShadowOffset,
                                   blurRadius: 0,
                                 ),
                               ],
                             ),
                             alignment: Alignment.center,
-                            child: const CustomPaint(
-                              size: Size(20, 20),
+                            child: CustomPaint(
+                              size: const Size(20, 20),
                               painter: CustomBellPainter(
-                                color: AppColors.ink,
+                                color: t.ink,
                                 strokeWidth: 2.5,
                               ),
                             ),
@@ -103,17 +106,17 @@ class HistoryScreen extends ConsumerWidget {
                                 height: 18,
                                 padding: const EdgeInsets.symmetric(horizontal: 4),
                                 decoration: BoxDecoration(
-                                  color: AppColors.tomat,
+                                  color: t.danger,
                                   borderRadius: BorderRadius.circular(9),
-                                  border: Border.all(color: AppColors.ink, width: 1.8),
+                                  border: Border.all(color: t.ink, width: 1.8),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   '$unreadCount',
-                                  style: AppTypography.buttonSmall.copyWith(
+                                  style: t.buttonSmall.copyWith(
                                     fontSize: 10,
-                                    color: AppColors.surface,
-                                    fontWeight: FontWeight.w800,
+                                    color: t.surface,
+                                    fontWeight: t.weightExtraBold,
                                     height: 1.1,
                                   ),
                                 ),
@@ -136,21 +139,21 @@ class HistoryScreen extends ConsumerWidget {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 2.5),
-                          boxShadow: const [
+                          border: Border.all(color: t.ink, width: 2.5),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.ink,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         padding: const EdgeInsets.all(9),
-                        child: const CustomPaint(
+                        child: CustomPaint(
                           painter: CustomSettingsIconPainter(
-                            color: AppColors.ink,
+                            color: t.ink,
                             strokeWidth: 2.5,
                           ),
                         ),
@@ -172,25 +175,25 @@ class HistoryScreen extends ConsumerWidget {
 
               // Kartu Matahari Hero: "Beruntun lolos budget"
               StickerCard.hero(
-                backgroundColor: AppColors.matahari,
+                backgroundColor: t.secondary,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Beruntun lolos budget',
-                      style: AppTypography.bodySmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
+                      style: t.bodySmall.copyWith(
+                        fontWeight: t.weightBold,
+                        color: t.ink,
                         fontSize: 14,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '$streak minggu',
-                      style: AppTypography.displayLarge.copyWith(
+                      style: t.displayLarge.copyWith(
                         fontSize: 42,
-                        color: AppColors.ink,
+                        color: t.ink,
                         letterSpacing: -1.0,
                       ),
                     ),
@@ -202,13 +205,13 @@ class HistoryScreen extends ConsumerWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _AnimatedBar(index: 0, heightFraction: 0.45, color: AppColors.tomat),
-                          _AnimatedBar(index: 1, heightFraction: 0.72, color: AppColors.jeruk),
-                          _AnimatedBar(index: 2, heightFraction: 0.40, color: AppColors.matahari),
-                          _AnimatedBar(index: 3, heightFraction: 1.00, color: AppColors.mint),
-                          _AnimatedBar(index: 4, heightFraction: 0.65, color: AppColors.langit),
-                          _AnimatedBar(index: 5, heightFraction: 0.85, color: AppColors.lavender),
-                          _AnimatedBar(index: 6, heightFraction: 0.55, color: AppColors.permen),
+                          _AnimatedBar(index: 0, heightFraction: 0.45, color: t.accentCoral),
+                          _AnimatedBar(index: 1, heightFraction: 0.72, color: t.accentOrange),
+                          _AnimatedBar(index: 2, heightFraction: 0.40, color: t.accentYellow),
+                          _AnimatedBar(index: 3, heightFraction: 1.00, color: t.accentMint),
+                          _AnimatedBar(index: 4, heightFraction: 0.65, color: t.accentBlue),
+                          _AnimatedBar(index: 5, heightFraction: 0.85, color: t.accentPurple),
+                          _AnimatedBar(index: 6, heightFraction: 0.55, color: t.accentPink),
                         ],
                       ),
                     ),
@@ -220,9 +223,9 @@ class HistoryScreen extends ConsumerWidget {
               // Bagian "Date sebelumnya"
               Text(
                 'Date sebelumnya',
-                style: AppTypography.titleLarge.copyWith(
+                style: t.titleLarge.copyWith(
                   fontSize: 20,
-                  color: AppColors.ink,
+                  color: t.ink,
                 ),
               ),
               const SizedBox(height: 12),
@@ -234,8 +237,8 @@ class HistoryScreen extends ConsumerWidget {
                     child: Text(
                       'Belum ada riwayat kencan.\nSelesaikan date pertama kamu!',
                       textAlign: TextAlign.center,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
+                      style: t.bodyMedium.copyWith(
+                        color: t.textSecondary,
                         fontSize: 15,
                       ),
                     ),
@@ -316,6 +319,7 @@ class _AnimatedBarState extends State<_AnimatedBar>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2.5),
@@ -331,7 +335,7 @@ class _AnimatedBarState extends State<_AnimatedBar>
                   color: widget.color,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppColors.ink,
+                    color: t.ink,
                     width: 2.8,
                   ),
                 ),
@@ -352,6 +356,7 @@ class _DateHistoryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.putarTheme;
     final db = ref.watch(databaseProvider);
     final isPassed = date.isPassed ?? true;
     final dateFormatted = IndonesianDateFormatter.fullDayAndDate(date.startedAt);
@@ -369,8 +374,8 @@ class _DateHistoryCard extends ConsumerWidget {
             context.push('/date-result/${date.id}');
           },
           child: StickerCard(
-            backgroundColor: AppColors.surface,
-            borderRadius: 22,
+            backgroundColor: t.surface,
+            borderRadius: t.cardRadius,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
@@ -380,17 +385,17 @@ class _DateHistoryCard extends ConsumerWidget {
                     children: [
                       Text(
                         dateFormatted,
-                        style: AppTypography.bodyLargeBold.copyWith(
-                          color: AppColors.ink,
+                        style: t.bodyLargeBold.copyWith(
+                          color: t.ink,
                           fontSize: 16,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Budget ${RupiahFormatter.format(date.budget)} · terpakai ${RupiahFormatter.formatRb(totalSpent)}',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
+                        style: t.bodySmall.copyWith(
+                          color: t.textSecondary,
+                          fontWeight: t.weightSemiBold,
                         ),
                       ),
                     ],
@@ -400,10 +405,10 @@ class _DateHistoryCard extends ConsumerWidget {
                 // Lencana Lolos (Mint) / Lewat (Tomat)
                 StickerChip(
                   label: isPassed ? 'Lolos' : 'Lewat ${RupiahFormatter.formatRb(diff)}',
-                  backgroundColor: isPassed ? AppColors.mint : AppColors.tomat,
-                  textColor: AppColors.ink,
-                  borderColor: AppColors.ink,
-                  borderWidth: 2.5,
+                  backgroundColor: isPassed ? t.success : t.danger,
+                  textColor: t.ink,
+                  borderColor: t.ink,
+                  borderWidth: t.subtleBorderWidth,
                 ),
               ],
             ),

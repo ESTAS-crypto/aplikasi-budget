@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../../utils/rupiah_formatter.dart';
 import '../models/group_event_model.dart';
 import '../painters/group_icons_painter.dart';
@@ -28,17 +27,9 @@ class ActivityTile extends StatelessWidget {
     this.onTap,
   });
 
-  static const List<Color> _avatarColors = [
-    Color(0xFF6FB1FF), // Langit
-    Color(0xFFB8E986), // Lime
-    Color(0xFFFF8FC0), // Merah Muda
-    Color(0xFFFFD23F), // Matahari
-    Color(0xFFB8A4FF), // Lavender
-    Color(0xFFFF6B5A), // Tomat
-  ];
-
-  Color _getAvatarBg(int idx) {
-    return _avatarColors[idx % _avatarColors.length];
+  Color _getAvatarBg(PutarTheme t, int idx) {
+    final colors = t.memberAvatarColors;
+    return colors[idx % colors.length];
   }
 
   String _formatRelativeTime(DateTime dt) {
@@ -60,9 +51,9 @@ class ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actor = isMe ? 'Kamu' : event.actorName;
+    final t = context.putarTheme;
     final initialLetter = (isMe ? 'K' : (event.actorName.isNotEmpty ? event.actorName[0] : 'A')).toUpperCase();
-    final avatarBg = _getAvatarBg(colorIndex);
+    final avatarBg = _getAvatarBg(t, colorIndex);
 
     final rawSummary = (event.summary != null && event.summary!.isNotEmpty)
         ? event.summary!
@@ -72,9 +63,11 @@ class ActivityTile extends StatelessWidget {
         ? 'Kamu${rawSummary.substring(event.actorName.length)}'
         : rawSummary;
 
+    final visuals = _resolveVisuals(t);
+
     final card = isUnread
-        ? _buildBaruCard(actor, initialLetter, avatarBg, displaySummary)
-        : _buildSebelumnyaCard(actor, initialLetter, avatarBg, displaySummary);
+        ? _buildBaruCard(t, visuals, initialLetter, avatarBg, displaySummary)
+        : _buildSebelumnyaCard(t, visuals, initialLetter, avatarBg, displaySummary);
 
     return Semantics(
       container: true,
@@ -90,82 +83,237 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
-  /// 1. Tampilan Kartu BARU (Layar 20: Grup5.dc.html)
-  Widget _buildBaruCard(String actor, String initial, Color avatarBg, String displaySummary) {
-    final String subtitle;
-    int? nominal;
-    int? remaining;
-    Color nominalBg = AppColors.matahari;
-    CustomPainter lencanaPainter = const CustomReceiptPainter(color: AppColors.ink, strokeWidth: 2.2);
-
+  _EventVisualData _resolveVisuals(PutarTheme t) {
     switch (event.type) {
       case GroupEventType.expense:
       case GroupEventType.expenseDeleted:
         final isDeleted = event.type == GroupEventType.expenseDeleted ||
             event.payload['deleted'] == true;
-        if (isDeleted) {
-          subtitle = event.payload['title'] ?? 'pengeluaran';
-          lencanaPainter = const CustomTrashPainter(color: AppColors.ink, strokeWidth: 2.2);
-        } else {
-          subtitle = event.payload['title'] ?? 'pengeluaran';
-          lencanaPainter = const CustomReceiptPainter(color: AppColors.ink, strokeWidth: 2.2);
-        }
-        nominal = (event.payload['amount'] as num?)?.toInt();
-        remaining = (event.payload['remaining'] as num?)?.toInt();
-        nominalBg = AppColors.matahari;
-        break;
+        final isEdited = !isDeleted && event.payload['edited'] == true;
+        final noteTitle = event.payload['title']?.toString() ?? 'pengeluaran';
+        return _EventVisualData(
+          subtitle: isDeleted
+              ? 'Dihapus: $noteTitle'
+              : (isEdited ? 'Diubah: $noteTitle' : noteTitle),
+          categoryLabel: isDeleted ? 'Dihapus' : (isEdited ? 'Diubah' : 'Catatan'),
+          categoryBg: isDeleted
+              ? t.danger.withValues(alpha: 0.25)
+              : t.secondary,
+          nominal: (event.payload['amount'] as num?)?.toInt(),
+          nominalBg: t.secondary,
+          remaining: (event.payload['remaining'] as num?)?.toInt(),
+          lencanaPainter: isDeleted
+              ? CustomTrashPainter(color: t.ink, strokeWidth: 2.2)
+              : CustomReceiptPainter(color: t.ink, strokeWidth: 2.2),
+        );
 
       case GroupEventType.spin:
-        subtitle = 'Budget baru untuk sesi ini';
-        nominal = (event.payload['budget'] as num?)?.toInt();
-        nominalBg = AppColors.lavender;
-        lencanaPainter = const CustomWheelPainter(color: AppColors.ink, strokeWidth: 2.2);
-        break;
-
-      case GroupEventType.memberJoin:
-        subtitle = 'Siap jajan bareng';
-        lencanaPainter = const CustomUserPlusPainter(color: AppColors.ink, strokeWidth: 2.2);
-        break;
-
-      case GroupEventType.memberLeave:
-        subtitle = 'Sampai jumpa di lain kesempatan';
-        lencanaPainter = const CustomUserMinusPainter(color: AppColors.ink, strokeWidth: 2.2);
-        break;
-
-      case GroupEventType.sessionStart:
-        subtitle = 'Putar roda dan catat jajan!';
-        lencanaPainter = const CustomFlagPainter(color: AppColors.ink, strokeWidth: 2.2);
-        break;
-
-      case GroupEventType.sessionEnd:
-        subtitle = 'Sesi date grup telah selesai';
-        lencanaPainter = const CustomFlagPainter(color: AppColors.ink, strokeWidth: 2.2);
-        break;
-
-      case GroupEventType.custom:
-        subtitle = 'Pengaturan roda diperbarui';
-        lencanaPainter = const CustomGearPainter(color: AppColors.ink);
-        break;
-
-      case GroupEventType.budgetChanged:
-        subtitle = 'Pengaturan budget diperbarui';
-        lencanaPainter = const CustomGearPainter(color: AppColors.ink);
-        break;
-
-      case GroupEventType.codeChanged:
-        subtitle = 'Kode undangan diperbarui';
-        lencanaPainter = const CustomGearPainter(color: AppColors.ink);
-        break;
+        return _EventVisualData(
+          subtitle: 'Budget baru untuk date ini',
+          categoryLabel: 'Roda Putar',
+          categoryBg: t.accentPurple,
+          nominal: (event.payload['budget'] as num?)?.toInt(),
+          nominalBg: t.accentPurple,
+          lencanaPainter: CustomWheelPainter(color: t.ink, strokeWidth: 2.2),
+        );
 
       case GroupEventType.gameResult:
-        final game = event.payload['game'] ?? 'permainan';
-        final gameLabel = GroupEventModel.formatGameName(game.toString());
-        subtitle = 'Hasil $gameLabel untuk budget date';
-        nominal = (event.payload['amount'] as num?)?.toInt();
-        nominalBg = AppColors.lavender;
-        lencanaPainter = const CustomWheelPainter(color: AppColors.ink, strokeWidth: 2.2);
-        break;
+        final game = event.payload['game']?.toString() ?? 'permainan';
+        final gameLabel = GroupEventModel.formatGameName(game);
+        final isValid = event.payload['valid'] != false;
+        return _EventVisualData(
+          subtitle: isValid
+              ? 'Hasil $gameLabel · budget date'
+              : '$gameLabel · tidak dipakai untuk budget',
+          categoryLabel: gameLabel,
+          categoryBg: isValid
+              ? t.accentPurple
+              : t.textDisabled.withValues(alpha: 0.25),
+          nominal: (event.payload['amount'] as num?)?.toInt(),
+          nominalBg: isValid
+              ? t.accentPurple
+              : t.textDisabled.withValues(alpha: 0.25),
+          statusLabel: isValid ? null : 'Tidak berlaku',
+          statusBg: t.danger.withValues(alpha: 0.25),
+          lencanaPainter: CustomWheelPainter(color: t.ink, strokeWidth: 2.2),
+        );
+
+      case GroupEventType.memberJoin:
+        return _EventVisualData(
+          subtitle: 'Siap jajan bareng',
+          categoryLabel: 'Gabung',
+          categoryBg: t.success,
+          lencanaPainter: CustomUserPlusPainter(color: t.ink, strokeWidth: 2.2),
+        );
+
+      case GroupEventType.memberLeave:
+        return _EventVisualData(
+          subtitle: 'Sampai jumpa di lain kesempatan',
+          categoryLabel: 'Keluar',
+          categoryBg: t.surface,
+          lencanaPainter: CustomUserMinusPainter(color: t.ink, strokeWidth: 2.2),
+        );
+
+      case GroupEventType.sessionStart:
+        final mode = event.payload['mode']?.toString();
+        return _EventVisualData(
+          subtitle: mode == 'fixed'
+              ? 'Date dimulai dengan budget tetap'
+              : 'Putar roda dan catat jajan!',
+          categoryLabel: 'Mulai Date',
+          categoryBg: t.success,
+          nominal: (event.payload['budget'] as num?)?.toInt(),
+          nominalBg: t.success,
+          lencanaPainter: CustomFlagPainter(color: t.ink, strokeWidth: 2.2),
+        );
+
+      case GroupEventType.sessionEnd:
+        final status = event.payload['status']?.toString().toLowerCase() ?? 'lolos';
+        final isLewat = status == 'lewat';
+        final totalSpent = (event.payload['totalSpent'] as num?)?.toInt();
+        final budget = (event.payload['budget'] as num?)?.toInt();
+        return _EventVisualData(
+          subtitle: (budget != null && budget > 0)
+              ? '${isLewat ? "Overbudget" : "Hemat"} · Budget ${RupiahFormatter.format(budget)}'
+              : 'Sesi date grup telah selesai',
+          categoryLabel: 'Date Selesai',
+          categoryBg: isLewat
+              ? t.danger.withValues(alpha: 0.25)
+              : t.success,
+          nominal: totalSpent,
+          nominalText: totalSpent != null
+              ? 'Terpakai ${RupiahFormatter.format(totalSpent)}'
+              : null,
+          nominalBg: t.secondary,
+          statusLabel: isLewat ? 'Lewat' : 'Lolos',
+          statusBg: isLewat
+              ? t.danger.withValues(alpha: 0.25)
+              : t.success,
+          lencanaPainter: CustomFlagPainter(color: t.ink, strokeWidth: 2.2),
+        );
+
+      case GroupEventType.budgetChanged:
+        final mode = event.payload['mode']?.toString();
+        final fixedBudget = (event.payload['fixedBudget'] as num?)?.toInt();
+        return _EventVisualData(
+          subtitle: mode == 'fixed'
+              ? 'Mode budget tetap diaktifkan'
+              : (mode == 'game'
+                  ? 'Mode budget permainan diaktifkan'
+                  : 'Pengaturan budget diperbarui'),
+          categoryLabel: 'Budget',
+          categoryBg: t.accentPurple,
+          nominal: (mode == 'fixed' && fixedBudget != null && fixedBudget > 0)
+              ? fixedBudget
+              : null,
+          nominalBg: t.accentPurple,
+          lencanaPainter: CustomGearPainter(color: t.ink),
+        );
+
+      case GroupEventType.codeChanged:
+        final newCode = event.payload['code']?.toString();
+        return _EventVisualData(
+          subtitle: (newCode != null && newCode.isNotEmpty)
+              ? 'Kode undangan baru: $newCode'
+              : 'Kode undangan diperbarui',
+          categoryLabel: 'Undangan',
+          categoryBg: t.surface,
+          lencanaPainter: CustomGearPainter(color: t.ink),
+        );
+
+      case GroupEventType.custom:
+        if (event.payload['action'] == 'session_result_updated') {
+          final status = event.payload['status']?.toString().toLowerCase() ?? 'lolos';
+          final isLewat = status == 'lewat';
+          final totalSpent = (event.payload['totalSpent'] as num?)?.toInt();
+          return _EventVisualData(
+            subtitle: event.summary ??
+                'Hasil date diperbarui setelah sinkronisasi catatan offline',
+            categoryLabel: 'Hasil Diperbarui',
+            categoryBg: isLewat
+                ? t.danger.withValues(alpha: 0.25)
+                : t.success,
+            nominal: totalSpent,
+            nominalText: totalSpent != null
+                ? 'Terpakai ${RupiahFormatter.format(totalSpent)}'
+                : null,
+            nominalBg: t.secondary,
+            statusLabel: isLewat ? 'Lewat' : 'Lolos',
+            statusBg: isLewat
+                ? t.danger.withValues(alpha: 0.25)
+                : t.success,
+            lencanaPainter:
+                CustomFlagPainter(color: t.ink, strokeWidth: 2.2),
+          );
+        }
+        final isWheelSlots = event.payload['action'] == 'update_slots' ||
+            event.payload['wheelSlots'] != null;
+        return _EventVisualData(
+          subtitle: isWheelSlots
+              ? 'Daftar nominal roda diperbarui'
+              : (event.payload['subtitle']?.toString() ?? 'Pengaturan grup diperbarui'),
+          categoryLabel: isWheelSlots ? 'Slot Roda' : 'Grup',
+          categoryBg: t.accentPurple,
+          lencanaPainter: CustomGearPainter(color: t.ink),
+        );
     }
+  }
+
+  List<Widget> _buildDetailChips(
+    PutarTheme t,
+    _EventVisualData visuals, {
+    required bool includeCategory,
+  }) {
+    final chips = <Widget>[];
+    if (includeCategory) {
+      chips.add(_buildChip(
+        t,
+        text: visuals.categoryLabel,
+        backgroundColor: visuals.categoryBg,
+      ));
+    }
+    if (visuals.nominalText != null) {
+      chips.add(_buildChip(
+        t,
+        text: visuals.nominalText!,
+        backgroundColor: visuals.nominalBg ?? t.secondary,
+      ));
+    } else if (visuals.nominal != null &&
+        (visuals.nominal! > 0 || event.type == GroupEventType.gameResult)) {
+      chips.add(_buildChip(
+        t,
+        text: RupiahFormatter.format(visuals.nominal!),
+        backgroundColor: visuals.nominalBg ?? t.secondary,
+      ));
+    }
+    if (visuals.remaining != null) {
+      chips.add(_buildChip(
+        t,
+        text: 'Sisa ${RupiahFormatter.format(visuals.remaining!)}',
+        backgroundColor: visuals.remaining! < 0
+            ? t.danger.withValues(alpha: 0.25)
+            : t.success,
+      ));
+    }
+    if (visuals.statusLabel != null) {
+      chips.add(_buildChip(
+        t,
+        text: visuals.statusLabel!,
+        backgroundColor: visuals.statusBg ?? t.success,
+      ));
+    }
+    return chips;
+  }
+
+  /// 1. Tampilan Kartu BARU (Layar 20: Grup5.dc.html)
+  Widget _buildBaruCard(
+    PutarTheme t,
+    _EventVisualData visuals,
+    String initial,
+    Color avatarBg,
+    String displaySummary,
+  ) {
+    final detailChips = _buildDetailChips(t, visuals, includeCategory: false);
 
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 8),
@@ -176,13 +324,13 @@ class ActivityTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.ink, width: 3.0),
-              boxShadow: const [
+              color: t.surface,
+              borderRadius: BorderRadius.circular(t.cardRadius),
+              border: Border.all(color: t.ink, width: t.borderWidth),
+              boxShadow: [
                 BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(4, 4),
+                  color: t.ink,
+                  offset: t.standardShadowOffset,
                   blurRadius: 0,
                 ),
               ],
@@ -203,15 +351,15 @@ class ActivityTile extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: avatarBg,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3.0),
+                          border: Border.all(color: t.ink, width: t.borderWidth),
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           initial,
-                          style: AppTypography.displayMedium.copyWith(
+                          style: t.displayMedium.copyWith(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ),
@@ -222,14 +370,14 @@ class ActivityTile extends StatelessWidget {
                           width: 20,
                           height: 20,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: t.surface,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.ink, width: 2.5),
+                            border: Border.all(color: t.ink, width: 2.5),
                           ),
                           alignment: Alignment.center,
                           child: CustomPaint(
                             size: const Size(11, 11),
-                            painter: lencanaPainter,
+                            painter: visuals.lencanaPainter,
                           ),
                         ),
                       ),
@@ -246,10 +394,10 @@ class ActivityTile extends StatelessWidget {
                       // Judul Aksi (Nama Bold)
                       Text(
                         displaySummary,
-                        style: AppTypography.bodyMedium.copyWith(
+                        style: t.bodyMedium.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          fontWeight: t.weightExtraBold,
+                          color: t.ink,
                           height: 1.25,
                         ),
                         maxLines: 2,
@@ -259,11 +407,11 @@ class ActivityTile extends StatelessWidget {
 
                       // Subjudul Deskripsi
                       Text(
-                        subtitle,
-                        style: AppTypography.bodySmall.copyWith(
+                        visuals.subtitle,
+                        style: t.bodySmall.copyWith(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5B4B7A),
+                          fontWeight: t.weightSemiBold,
+                          color: t.textSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -275,25 +423,17 @@ class ActivityTile extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          if (nominal != null && nominal > 0)
-                            _buildChip(
-                              text: RupiahFormatter.format(nominal),
-                              backgroundColor: nominalBg,
-                            ),
-                          if (remaining != null)
-                            _buildChip(
-                              text: 'Sisa ${RupiahFormatter.format(remaining)}',
-                              backgroundColor: AppColors.mint,
-                            ),
+                          ...detailChips,
                           _buildChip(
+                            t,
                             text: _formatRelativeTime(event.createdAt),
-                            backgroundColor: Colors.white,
-                            leading: const Padding(
-                              padding: EdgeInsets.only(right: 3),
+                            backgroundColor: t.surface,
+                            leading: Padding(
+                              padding: const EdgeInsets.only(right: 3),
                               child: CustomPaint(
-                                size: Size(11, 11),
+                                size: const Size(11, 11),
                                 painter: CustomClockPainter(
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                   strokeWidth: 2.4,
                                 ),
                               ),
@@ -315,16 +455,16 @@ class ActivityTile extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1.5),
               decoration: BoxDecoration(
-                color: AppColors.tomat,
+                color: t.danger,
                 borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: AppColors.ink, width: 2.5),
+                border: Border.all(color: t.ink, width: 2.5),
               ),
               child: Text(
                 'Baru',
-                style: AppTypography.buttonSmall.copyWith(
+                style: t.buttonSmall.copyWith(
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ),
@@ -335,24 +475,33 @@ class ActivityTile extends StatelessWidget {
   }
 
   /// 2. Tampilan Kartu SEBELUMNYA (Layar 20: Grup5.dc.html)
-  Widget _buildSebelumnyaCard(String actor, String initial, Color avatarBg, String displaySummary) {
+  Widget _buildSebelumnyaCard(
+    PutarTheme t,
+    _EventVisualData visuals,
+    String initial,
+    Color avatarBg,
+    String displaySummary,
+  ) {
+    final detailChips = _buildDetailChips(t, visuals, includeCategory: true);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.ink, width: 3.0),
-          boxShadow: const [
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.smallCardRadius),
+          border: Border.all(color: t.ink, width: t.borderWidth),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(2, 2),
+              color: t.ink,
+              offset: t.miniShadowOffset,
               blurRadius: 0,
             ),
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Avatar Ringkas 34x34
             Container(
@@ -361,40 +510,59 @@ class ActivityTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: avatarBg,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.ink, width: 3.0),
+                border: Border.all(color: t.ink, width: t.borderWidth),
               ),
               alignment: Alignment.center,
               child: Text(
                 initial,
-                style: AppTypography.displayMedium.copyWith(
+                style: t.displayMedium.copyWith(
                   fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ),
             const SizedBox(width: 10),
 
-            // Teks Ringkasan Aktivitas
+            // Teks Ringkasan Aktivitas + Chips Detail
             Expanded(
-              child: Text(
-                displaySummary,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.bodySmall.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
-                  height: 1.25,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displaySummary,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.bodySmall.copyWith(
+                            fontSize: 13,
+                            fontWeight: t.weightBold,
+                            color: t.ink,
+                            height: 1.25,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildChip(
+                        t,
+                        text: _formatRelativeTime(event.createdAt),
+                        backgroundColor: t.surface,
+                      ),
+                    ],
+                  ),
+                  if (detailChips.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: detailChips,
+                    ),
+                  ],
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-
-            // Chip Waktu di Kanan
-            _buildChip(
-              text: _formatRelativeTime(event.createdAt),
-              backgroundColor: Colors.white,
             ),
           ],
         ),
@@ -402,7 +570,8 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
-  Widget _buildChip({
+  Widget _buildChip(
+    PutarTheme t, {
     required String text,
     required Color backgroundColor,
     Widget? leading,
@@ -412,22 +581,52 @@ class ActivityTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.ink, width: 2.0),
+        border: Border.all(color: t.ink, width: 2.0),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           ?leading,
-          Text(
-            text,
-            style: AppTypography.buttonSmall.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.ink,
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.buttonSmall.copyWith(
+                fontSize: 12,
+                fontWeight: t.weightBold,
+                color: t.ink,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _EventVisualData {
+  final String subtitle;
+  final String categoryLabel;
+  final Color categoryBg;
+  final int? nominal;
+  final String? nominalText;
+  final Color? nominalBg;
+  final int? remaining;
+  final String? statusLabel;
+  final Color? statusBg;
+  final CustomPainter lencanaPainter;
+
+  const _EventVisualData({
+    required this.subtitle,
+    required this.categoryLabel,
+    required this.categoryBg,
+    this.nominal,
+    this.nominalText,
+    this.nominalBg,
+    this.remaining,
+    this.statusLabel,
+    this.statusBg,
+    required this.lencanaPainter,
+  });
 }

@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../models/invite_code_model.dart';
 
 /// Komponen Neo-Brutalist 6 Kotak Kode Undangan
@@ -93,6 +92,7 @@ class _InviteCodeBoxesState extends State<InviteCodeBoxes> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final currentCode = widget.code.toUpperCase();
 
     return LayoutBuilder(
@@ -167,17 +167,17 @@ class _InviteCodeBoxesState extends State<InviteCodeBoxes> {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isFilled
-                                ? AppColors.surface
-                                : (isCurrentActive ? AppColors.matahari.withValues(alpha: 0.35) : AppColors.surface),
+                                ? t.surface
+                                : (isCurrentActive ? t.secondary.withValues(alpha: 0.35) : t.surface),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: isCurrentActive ? AppColors.ink : AppColors.ink,
+                              color: t.ink,
                               width: isCurrentActive ? 3.0 : 2.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.ink,
-                                offset: isCurrentActive ? const Offset(2, 3) : const Offset(2, 2),
+                                color: t.ink,
+                                offset: isCurrentActive ? const Offset(2, 3) : t.miniShadowOffset,
                                 blurRadius: 0,
                               ),
                             ],
@@ -185,17 +185,17 @@ class _InviteCodeBoxesState extends State<InviteCodeBoxes> {
                           child: isFilled
                               ? Text(
                                   char,
-                                  style: AppTypography.displayMedium.copyWith(
+                                  style: t.displayMedium.copyWith(
                                     fontSize: boxSize * 0.55,
-                                    color: AppColors.ink,
-                                    fontWeight: FontWeight.w800,
+                                    color: t.ink,
+                                    fontWeight: t.weightExtraBold,
                                   ),
                                 )
                               : (isCurrentActive && _cursorVisible
                                   ? Container(
                                       width: 2.5,
                                       height: boxSize * 0.5,
-                                      color: AppColors.ink,
+                                      color: t.ink,
                                     )
                                   : const SizedBox.shrink()),
                         );

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_typography.dart';
+import '../../theme/putar_theme.dart';
 import '../../utils/sound_service.dart';
 
 enum AppScope { pribadi, grup }
@@ -24,19 +23,20 @@ class ScopeSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.cream,
+        color: t.bg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.ink,
+          color: t.ink,
           width: 2.5,
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.ink,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -47,15 +47,17 @@ class ScopeSwitcher extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildSegment(
+              t: t,
               scope: AppScope.pribadi,
               label: 'Pribadi',
-              activeColor: AppColors.matahari,
+              activeColor: t.secondary,
             ),
             const SizedBox(width: 4),
             _buildSegment(
+              t: t,
               scope: AppScope.grup,
               label: 'Grup',
-              activeColor: AppColors.langit,
+              activeColor: t.accentBlue,
             ),
           ],
         ),
@@ -64,6 +66,7 @@ class ScopeSwitcher extends StatelessWidget {
   }
 
   Widget _buildSegment({
+    required PutarTheme t,
     required AppScope scope,
     required String label,
     required Color activeColor,
@@ -89,13 +92,13 @@ class ScopeSwitcher extends StatelessWidget {
             color: isSelected ? activeColor : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: isSelected
-                ? Border.all(color: AppColors.ink, width: 2)
+                ? Border.all(color: t.ink, width: 2)
                 : Border.all(color: Colors.transparent, width: 2),
             boxShadow: isSelected
-                ? const [
+                ? [
                     BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(2, 2),
+                      color: t.ink,
+                      offset: t.miniShadowOffset,
                       blurRadius: 0,
                     ),
                   ]
@@ -103,9 +106,9 @@ class ScopeSwitcher extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: AppTypography.buttonSmall.copyWith(
-              color: AppColors.ink,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            style: t.buttonSmall.copyWith(
+              color: t.ink,
+              fontWeight: isSelected ? t.weightExtraBold : t.weightSemiBold,
             ),
           ),
         ),

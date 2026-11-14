@@ -11,6 +11,10 @@ class SupabaseConfig {
   /// Inisialisasi Supabase di aplikasi Flutter
   static Future<void> initialize() async {
     try {
+      Supabase.instance.client;
+      return;
+    } catch (_) {}
+    try {
       await Supabase.initialize(
         url: projectUrl,
         publishableKey: publishableKey,

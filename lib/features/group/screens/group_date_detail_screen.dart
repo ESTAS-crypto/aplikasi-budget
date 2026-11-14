@@ -18,8 +18,7 @@ import '../../../core/group/sync/sync_state.dart';
 import '../../../core/group/widgets/sync_badge.dart';
 import '../../../core/group/widgets/sync_strip.dart';
 import '../../../core/painters/sticker_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/putar_theme.dart';
 import '../../../core/utils/indonesian_date_formatter.dart';
 import '../../../core/utils/rupiah_formatter.dart';
 import '../../../core/utils/sound_service.dart';
@@ -60,20 +59,13 @@ class GroupDateDetailScreen extends ConsumerStatefulWidget {
     this.onNoteTapped,
   });
 
-  /// Palet warna avatar lingkaran sesuai Rgrup2..Rgrup5.dc.html
-  static const List<Color> avatarPalette = [
-    Color(0xFF6FB1FF), // 0: Langit (#6FB1FF)
-    Color(0xFFFF8FC0), // 1: Permen (#FF8FC0)
-    Color(0xFFB8E986), // 2: Lime (#B8E986)
-    Color(0xFFB8A4FF), // 3: Lavender (#B8A4FF)
-    Color(0xFFFFD23F), // 4: Matahari (#FFD23F)
-    Color(0xFF3DDBB0), // 5: Mint (#3DDBB0)
-    Color(0xFFFF9F43), // 6: Jeruk (#FF9F43)
-    Color(0xFFFF6B5A), // 7: Tomat (#FF6B5A)
-  ];
+  /// Palet warna avatar lingkaran sesuai tema aktif
+  static List<Color> get avatarPalette =>
+      PutarTheme.pasarMalam.detailMemberColors;
 
-  static Color avatarColorFor(int index) {
-    return avatarPalette[index.abs() % avatarPalette.length];
+  static Color avatarColorFor(int index, {PutarTheme? theme}) {
+    final palette = (theme ?? PutarTheme.pasarMalam).detailMemberColors;
+    return palette[index.abs() % palette.length];
   }
 
   static String formatDotTime(DateTime dt) {
@@ -169,6 +161,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final horizontalPad = screenWidth < 340 ? 16.0 : 24.0;
     final disableAnim = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
@@ -224,7 +217,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
 
     if (rawSession == null) {
       return Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: t.bg,
         body: SafeArea(
           child: Padding(
             padding: EdgeInsets.fromLTRB(horizontalPad, 20, horizontalPad, 16),
@@ -261,7 +254,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     final hasPendingOrOffline = hasPendingWrites || isOffline;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -292,7 +285,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                     const SizedBox(height: 10),
 
                     // 2. Pemilih Tab: Ringkasan | Catatan | Linimasa
-                    _buildTabSwitcher(),
+                    _buildTabSwitcher(t),
                     const SizedBox(height: 10),
 
                     // 3. Isi Tab dengan transisi fade 150ms (100ms bila disableAnimations)
@@ -328,6 +321,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     required String title,
     required GroupSessionModel? session,
   }) {
+    final t = context.putarTheme;
     final isLolos = session?.isLolos ?? true;
     final statusBadgeText = session == null
         ? ''
@@ -353,22 +347,22 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: t.surface,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.ink, width: 3),
-                boxShadow: const [
+                border: Border.all(color: t.ink, width: t.borderWidth),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: t.ink,
+                    offset: t.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
               ),
               alignment: Alignment.center,
-              child: const CustomPaint(
-                size: Size(22, 22),
+              child: CustomPaint(
+                size: const Size(22, 22),
                 painter: CustomBackIconPainter(
-                  color: AppColors.ink,
+                  color: t.ink,
                   strokeWidth: 3.0,
                 ),
               ),
@@ -383,10 +377,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
             child: Text(
               title,
               maxLines: 1,
-              style: AppTypography.displayMedium.copyWith(
+              style: t.displayMedium.copyWith(
                 fontSize: 23,
                 fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+                color: t.ink,
               ),
             ),
           ),
@@ -398,18 +392,18 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: isLolos ? AppColors.mint : AppColors.tomat,
+                color: isLolos ? t.accentMint : t.danger,
                 borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: AppColors.ink, width: 2),
+                border: Border.all(color: t.ink, width: 2),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isLolos) ...[
-                    const CustomPaint(
-                      size: Size(13, 13),
+                    CustomPaint(
+                      size: const Size(13, 13),
                       painter: CustomCheckIconPainter(
-                        color: AppColors.ink,
+                        color: t.ink,
                         strokeWidth: 3.2,
                       ),
                     ),
@@ -417,10 +411,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                   ],
                   Text(
                     statusBadgeText,
-                    style: AppTypography.buttonSmall.copyWith(
+                    style: t.buttonSmall.copyWith(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                   ),
                 ],
@@ -432,17 +426,17 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     );
   }
 
-  Widget _buildTabSwitcher() {
+  Widget _buildTabSwitcher(PutarTheme t) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.ink, width: 3),
-        boxShadow: const [
+        border: Border.all(color: t.ink, width: t.borderWidth),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(3, 3),
+            color: t.ink,
+            offset: t.smallShadowOffset,
             blurRadius: 0,
           ),
         ],
@@ -450,16 +444,19 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
       child: Row(
         children: [
           _buildTabSegment(
+            t,
             tab: GroupDateDetailTab.ringkasan,
             label: 'Ringkasan',
           ),
           const SizedBox(width: 4),
           _buildTabSegment(
+            t,
             tab: GroupDateDetailTab.catatan,
             label: 'Catatan',
           ),
           const SizedBox(width: 4),
           _buildTabSegment(
+            t,
             tab: GroupDateDetailTab.linimasa,
             label: 'Linimasa',
           ),
@@ -468,7 +465,8 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     );
   }
 
-  Widget _buildTabSegment({
+  Widget _buildTabSegment(
+    PutarTheme t, {
     required GroupDateDetailTab tab,
     required String label,
   }) {
@@ -486,10 +484,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.matahari : AppColors.surface,
+              color: isSelected ? t.secondary : t.surface,
               borderRadius: BorderRadius.circular(99),
               border: Border.all(
-                color: isSelected ? AppColors.ink : Colors.transparent,
+                color: isSelected ? t.ink : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -499,10 +497,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
               child: Text(
                 label,
                 maxLines: 1,
-                style: AppTypography.buttonSmall.copyWith(
+                style: t.buttonSmall.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  color: t.ink,
                 ),
               ),
             ),
@@ -575,6 +573,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     required GroupAuthService authService,
     required bool hasPendingWrites,
   }) {
+    final t = context.putarTheme;
     final activeNotes = notesWithRemaining.map((e) => e.note).toList();
     final totalSpent = session.totalSpent;
     final isLolos = totalSpent <= session.budget;
@@ -634,13 +633,13 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.matahari,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    color: t.secondary,
+                    borderRadius: BorderRadius.circular(t.cardRadius),
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(5, 5),
+                        color: t.ink,
+                        offset: t.dialogShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
@@ -650,10 +649,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                     children: [
                       Text(
                         isLolos ? 'Hemat' : 'Lewat budget',
-                        style: AppTypography.bodySmall.copyWith(
+                        style: t.bodySmall.copyWith(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
+                          color: t.ink,
                         ),
                       ),
                       FittedBox(
@@ -661,11 +660,11 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           RupiahFormatter.format(hematOrLewatAmount),
-                          style: AppTypography.displayLarge.copyWith(
+                          style: t.displayLarge.copyWith(
                             fontSize: 42,
                             fontWeight: FontWeight.w800,
                             height: 1.1,
-                            color: AppColors.ink,
+                            color: t.ink,
                           ),
                         ),
                       ),
@@ -675,7 +674,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                         height: 16,
                         borderRadius: 10,
                         borderWidth: 3.0,
-                        fillColor: isLolos ? AppColors.mint : AppColors.tomat,
+                        fillColor: isLolos ? t.accentMint : t.danger,
                         showRightDividerBorder: true,
                       ),
                       const SizedBox(height: 6),
@@ -687,10 +686,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                               'Terpakai ${RupiahFormatter.format(totalSpent)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: AppTypography.bodySmall.copyWith(
+                              style: t.bodySmall.copyWith(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                color: t.ink,
                               ),
                             ),
                           ),
@@ -701,10 +700,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.right,
-                              style: AppTypography.bodySmall.copyWith(
+                              style: t.bodySmall.copyWith(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                color: t.ink,
                               ),
                             ),
                           ),
@@ -714,10 +713,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Belum termasuk catatan terbaru anggota lain',
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
+                            color: t.ink,
                           ),
                         ),
                       ],
@@ -733,13 +732,13 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    color: t.surface,
+                    borderRadius: BorderRadius.circular(t.cardRadius),
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(3, 3),
+                        color: t.ink,
+                        offset: t.smallShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
@@ -749,10 +748,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                     children: [
                       Text(
                         'BUDGET DITENTUKAN OLEH',
-                        style: AppTypography.buttonSmall.copyWith(
+                        style: t.buttonSmall.copyWith(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF5B4B7A),
+                          color: t.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -762,6 +761,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                             name: budgetActorName,
                             color: GroupDateDetailScreen.avatarColorFor(
                               budgetActorColorIdx,
+                              theme: t,
                             ),
                             size: 34,
                             fontSize: 16,
@@ -775,20 +775,20 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                                   '$budgetActorName · $gameTitle',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.bodyLargeBold.copyWith(
+                                  style: t.bodyLargeBold.copyWith(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w800,
                                     height: 1.2,
-                                    color: AppColors.ink,
+                                    color: t.ink,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '$gameDetail · $gameTime',
-                                  style: AppTypography.bodySmall.copyWith(
+                                  style: t.bodySmall.copyWith(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF5B4B7A),
+                                    color: t.textSecondary,
                                   ),
                                 ),
                               ],
@@ -813,13 +813,13 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.ink, width: 3),
-                    boxShadow: const [
+                    color: t.surface,
+                    borderRadius: BorderRadius.circular(t.cardRadius),
+                    border: Border.all(color: t.ink, width: t.borderWidth),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(4, 4),
+                        color: t.ink,
+                        offset: t.standardShadowOffset,
                         blurRadius: 0,
                       ),
                     ],
@@ -835,20 +835,20 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                               'Pengeluaran per orang',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: AppTypography.titleMedium.copyWith(
+                              style: t.titleMedium.copyWith(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
+                                color: t.ink,
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             '${notesWithRemaining.length} catatan',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF5B4B7A),
+                              color: t.textSecondary,
                             ),
                           ),
                         ],
@@ -859,9 +859,9 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Text(
                             'Belum ada data anggota',
-                            style: AppTypography.bodySmall.copyWith(
+                            style: t.bodySmall.copyWith(
                               fontSize: 12,
-                              color: const Color(0xFF5B4B7A),
+                              color: t.textSecondary,
                             ),
                           ),
                         )
@@ -876,8 +876,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                             members: members,
                             isCurrentUser: isMe,
                           );
-                          final barColor =
-                              GroupDateDetailScreen.avatarColorFor(colorIdx);
+                          final barColor = GroupDateDetailScreen.avatarColorFor(
+                            colorIdx,
+                            theme: t,
+                          );
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
@@ -905,11 +907,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                                               displayName,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: AppTypography.bodySmall
-                                                  .copyWith(
+                                              style: t.bodySmall.copyWith(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w800,
-                                                color: AppColors.ink,
+                                                color: t.ink,
                                               ),
                                             ),
                                           ),
@@ -920,11 +921,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                                                     item.amountSpent,
                                                   )
                                                 : 'Rp0',
-                                            style: AppTypography.bodySmall
-                                                .copyWith(
+                                            style: t.bodySmall.copyWith(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w800,
-                                              color: AppColors.ink,
+                                              color: t.ink,
                                             ),
                                           ),
                                         ],
@@ -941,11 +941,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                                         const SizedBox(height: 2),
                                         Text(
                                           'Belum mencatat',
-                                          style:
-                                              AppTypography.bodySmall.copyWith(
+                                          style: t.bodySmall.copyWith(
                                             fontSize: 10.5,
                                             fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF5B4B7A),
+                                            color: t.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -966,9 +965,9 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    _buildWhiteInfoPill('Mulai $startClock oleh $startedByLabel'),
-                    if (endClock != null) _buildWhiteInfoPill('Selesai $endClock'),
-                    _buildWhiteInfoPill(durationLabel),
+                    _buildWhiteInfoPill(t, 'Mulai $startClock oleh $startedByLabel'),
+                    if (endClock != null) _buildWhiteInfoPill(t, 'Selesai $endClock'),
+                    _buildWhiteInfoPill(t, durationLabel),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -991,13 +990,13 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
             child: Container(
               height: 50,
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: t.surface,
                 borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: AppColors.ink, width: 3),
-                boxShadow: const [
+                border: Border.all(color: t.ink, width: t.borderWidth),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: t.ink,
+                    offset: t.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
@@ -1009,10 +1008,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'Bagikan ringkasan',
-                    style: AppTypography.buttonLarge.copyWith(
+                    style: t.buttonLarge.copyWith(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -1024,20 +1023,20 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     );
   }
 
-  Widget _buildWhiteInfoPill(String label) {
+  Widget _buildWhiteInfoPill(PutarTheme t, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.ink, width: 2),
+        border: Border.all(color: t.ink, width: 2),
       ),
       child: Text(
         label,
-        style: AppTypography.buttonSmall.copyWith(
+        style: t.buttonSmall.copyWith(
           fontSize: 11,
           fontWeight: FontWeight.w800,
-          color: AppColors.ink,
+          color: t.ink,
         ),
       ),
     );
@@ -1054,6 +1053,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     required List<GroupMemberModel> members,
     required GroupAuthService authService,
   }) {
+    final t = context.putarTheme;
     // Susun daftar anggota untuk chip filter (Semua · N, lalu tiap anggota)
     final memberChips = <_MemberChipInfo>[];
     final seenUids = <String>{};
@@ -1074,7 +1074,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
         _MemberChipInfo(
           uid: m.uid,
           displayName: name,
-          color: GroupDateDetailScreen.avatarColorFor(cIdx),
+          color: GroupDateDetailScreen.avatarColorFor(cIdx, theme: t),
         ),
       );
     }
@@ -1099,7 +1099,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
         _MemberChipInfo(
           uid: uid,
           displayName: name,
-          color: GroupDateDetailScreen.avatarColorFor(cIdx),
+          color: GroupDateDetailScreen.avatarColorFor(cIdx, theme: t),
         ),
       );
     }
@@ -1166,20 +1166,20 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                   'Total ${RupiahFormatter.format(filteredTotal)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 '${filteredNotes.length} catatan',
-                style: AppTypography.bodySmall.copyWith(
+                style: t.bodySmall.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF5B4B7A),
+                  color: t.textSecondary,
                 ),
               ),
             ],
@@ -1191,12 +1191,18 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
         Expanded(
           child: filteredNotes.isEmpty
               ? Center(
-                  child: Text(
-                    'Belum ada catatan pengeluaran',
-                    style: AppTypography.bodyMedium.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF5B4B7A),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      _selectedMemberUid == null
+                          ? 'Belum ada catatan pengeluaran'
+                          : '${memberChips.any((m) => m.uid == _selectedMemberUid) ? memberChips.firstWhere((m) => m.uid == _selectedMemberUid).displayName : 'Anggota'} belum mencatat pengeluaran di date ini',
+                      textAlign: TextAlign.center,
+                      style: t.bodyMedium.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: t.textSecondary,
+                      ),
                     ),
                   ),
                 )
@@ -1223,7 +1229,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                       index: index,
                       item: item,
                       authorDisplayName: authorLabel,
-                      avatarColor: GroupDateDetailScreen.avatarColorFor(cIdx),
+                      avatarColor: GroupDateDetailScreen.avatarColorFor(
+                        cIdx,
+                        theme: t,
+                      ),
                       onTap: () {
                         SoundService.instance.play(Sfx.uiTap);
                         if (widget.onNoteTapped != null) {
@@ -1242,7 +1251,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
                             group: group,
                             authorDisplayName: authorLabel,
                             authorAvatarColor:
-                                GroupDateDetailScreen.avatarColorFor(cIdx),
+                                GroupDateDetailScreen.avatarColorFor(
+                              cIdx,
+                              theme: t,
+                            ),
                           );
                         }
                       },
@@ -1256,10 +1268,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
         Text(
           'Ketuk catatan untuk melihat detailnya. Filter per anggota di atas.',
           textAlign: TextAlign.center,
-          style: AppTypography.bodySmall.copyWith(
+          style: t.bodySmall.copyWith(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF5B4B7A),
+            color: t.textSecondary,
           ),
         ),
       ],
@@ -1277,7 +1289,9 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
     required List<GroupMemberModel> members,
     required GroupAuthService authService,
   }) {
+    final t = context.putarTheme;
     final timelineItems = _buildTimelineEntries(
+      theme: t,
       session: session,
       notesWithRemaining: notesWithRemaining,
       sessionEvents: sessionEvents,
@@ -1289,10 +1303,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
       return Center(
         child: Text(
           'Belum ada aktivitas di linimasa',
-          style: AppTypography.bodyMedium.copyWith(
+          style: t.bodyMedium.copyWith(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF5B4B7A),
+            color: t.textSecondary,
           ),
         ),
       );
@@ -1316,6 +1330,7 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
   }
 
   List<_TimelineEntry> _buildTimelineEntries({
+    required PutarTheme theme,
     required GroupSessionModel session,
     required List<GroupNoteWithRemaining> notesWithRemaining,
     required List<GroupEventModel> sessionEvents,
@@ -1339,7 +1354,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
         members: members,
         isCurrentUser: isMe,
       );
-      final avatarColor = GroupDateDetailScreen.avatarColorFor(colorIdx);
+      final avatarColor = GroupDateDetailScreen.avatarColorFor(
+        colorIdx,
+        theme: theme,
+      );
 
       if (evt.type == GroupEventType.sessionStart) {
         hasStartEvent = true;
@@ -1440,6 +1458,37 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
             subtitle: '$subPrefix · ${notesWithRemaining.length} catatan',
           ),
         );
+      } else if (evt.type == GroupEventType.custom &&
+          evt.payload['action'] == 'session_result_updated') {
+        final rawStatus = evt.payload['status']?.toString().toLowerCase();
+        final isLolos = rawStatus != null && rawStatus.isNotEmpty
+            ? rawStatus == 'lolos'
+            : session.isLolos;
+        final updatedTotal =
+            (evt.payload['totalSpent'] as num?)?.toInt() ?? session.totalSpent;
+        final updatedBudget =
+            (evt.payload['budget'] as num?)?.toInt() ?? session.budget;
+        final diff = (updatedBudget - updatedTotal).abs();
+        final statusWord = isLolos ? 'Lolos' : 'Lewat';
+        final diffLabel = isLolos
+            ? 'Hemat ${RupiahFormatter.format(diff)}'
+            : 'Lewat ${RupiahFormatter.format(diff)}';
+        final isLateOffline = evt.payload['lateOfflineSync'] == true;
+        entries.add(
+          _TimelineEntry(
+            id: evt.eventId,
+            timestamp: evt.createdAt,
+            kind: _TimelineNodeKind.flagMint,
+            actorName: actorName,
+            avatarColor: avatarColor,
+            actionText: isLateOffline
+                ? 'menyelaraskan catatan offline · Hasil date diperbarui: '
+                : 'memicu pembaruan · Hasil date diperbarui: ',
+            boldTrailing: statusWord,
+            subtitle:
+                'Terpakai ${RupiahFormatter.format(updatedTotal)} · $diffLabel',
+          ),
+        );
       }
     }
 
@@ -1463,7 +1512,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
           timestamp: session.startedAt,
           kind: _TimelineNodeKind.flagMint,
           actorName: actorName,
-          avatarColor: GroupDateDetailScreen.avatarColorFor(colorIdx),
+          avatarColor: GroupDateDetailScreen.avatarColorFor(
+            colorIdx,
+            theme: theme,
+          ),
           actionText: 'memulai date',
         ),
       );
@@ -1495,7 +1547,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
           kind: _TimelineNodeKind.gameYellow,
           gameType: session.game,
           actorName: actorName,
-          avatarColor: GroupDateDetailScreen.avatarColorFor(colorIdx),
+          avatarColor: GroupDateDetailScreen.avatarColorFor(
+            colorIdx,
+            theme: theme,
+          ),
           actionText: 'memainkan $gameLabel',
           subtitle: sub,
         ),
@@ -1523,7 +1578,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
           timestamp: note.createdAt,
           kind: _TimelineNodeKind.receiptBlue,
           actorName: actorName,
-          avatarColor: GroupDateDetailScreen.avatarColorFor(colorIdx),
+          avatarColor: GroupDateDetailScreen.avatarColorFor(
+            colorIdx,
+            theme: theme,
+          ),
           actionText: 'menambahkan ${RupiahFormatter.format(note.amount)}',
           subtitle: note.title,
         ),
@@ -1555,7 +1613,10 @@ class _GroupDateDetailScreenState extends ConsumerState<GroupDateDetailScreen> {
           timestamp: session.endedAt!,
           kind: _TimelineNodeKind.flagMint,
           actorName: actorName,
-          avatarColor: GroupDateDetailScreen.avatarColorFor(colorIdx),
+          avatarColor: GroupDateDetailScreen.avatarColorFor(
+            colorIdx,
+            theme: theme,
+          ),
           actionText: 'menyelesaikan date: ',
           boldTrailing: statusWord,
           subtitle: '$subPrefix · ${notesWithRemaining.length} catatan',
@@ -1593,13 +1654,14 @@ class GroupCircleAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.ink, width: borderWidth),
+        border: Border.all(color: t.ink, width: borderWidth),
       ),
       alignment: Alignment.center,
       child: FittedBox(
@@ -1608,11 +1670,11 @@ class GroupCircleAvatar extends StatelessWidget {
           padding: const EdgeInsets.all(2),
           child: Text(
             _initial(),
-            style: AppTypography.buttonSmall.copyWith(
+            style: t.buttonSmall.copyWith(
               fontSize: fontSize,
               fontWeight: FontWeight.w800,
               height: 1.0,
-              color: AppColors.ink,
+              color: t.ink,
             ),
           ),
         ),
@@ -1641,6 +1703,7 @@ class _GrowingProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final disableAnim = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final target = fraction.clamp(0.0, 1.0);
 
@@ -1648,9 +1711,9 @@ class _GrowingProgressBar extends StatelessWidget {
       height: height,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.surface,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.ink, width: borderWidth),
+        border: Border.all(color: t.ink, width: borderWidth),
       ),
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
@@ -1677,7 +1740,7 @@ class _GrowingProgressBar extends StatelessWidget {
                     border: (showRightDividerBorder && val > 0.02 && val < 0.98)
                         ? Border(
                             right: BorderSide(
-                              color: AppColors.ink,
+                              color: t.ink,
                               width: borderWidth,
                             ),
                           )
@@ -1764,6 +1827,7 @@ class _MemberFilterChipState extends State<_MemberFilterChip>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     final disableAnim = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final hasAvatar = widget.avatarName != null && widget.avatarColor != null;
 
@@ -1785,14 +1849,14 @@ class _MemberFilterChipState extends State<_MemberFilterChip>
             duration: Duration(milliseconds: disableAnim ? 100 : 180),
             padding: EdgeInsets.fromLTRB(hasAvatar ? 5 : 12, 4, 12, 4),
             decoration: BoxDecoration(
-              color: widget.isSelected ? AppColors.matahari : AppColors.surface,
+              color: widget.isSelected ? t.secondary : t.surface,
               borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: AppColors.ink, width: 3),
+              border: Border.all(color: t.ink, width: t.borderWidth),
               boxShadow: widget.isSelected
-                  ? const [
+                  ? [
                       BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(2, 2),
+                        color: t.ink,
+                        offset: t.miniShadowOffset,
                         blurRadius: 0,
                       ),
                     ]
@@ -1813,10 +1877,10 @@ class _MemberFilterChipState extends State<_MemberFilterChip>
                 ],
                 Text(
                   widget.label,
-                  style: AppTypography.buttonSmall.copyWith(
+                  style: t.buttonSmall.copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    color: t.ink,
                   ),
                 ),
               ],
@@ -1895,6 +1959,7 @@ class _SessionNoteCardState extends State<_SessionNoteCard>
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     final note = widget.item.note;
     final clock = GroupDateDetailScreen.formatDotTime(note.createdAt);
     final remainingFormatted = RupiahFormatter.format(widget.item.remainingAfter);
@@ -1930,13 +1995,13 @@ class _SessionNoteCardState extends State<_SessionNoteCard>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.ink, width: 3),
-                boxShadow: const [
+                color: theme.surface,
+                borderRadius: BorderRadius.circular(theme.cardRadius),
+                border: Border.all(color: theme.ink, width: theme.borderWidth),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink,
-                    offset: Offset(3, 3),
+                    color: theme.ink,
+                    offset: theme.smallShadowOffset,
                     blurRadius: 0,
                   ),
                 ],
@@ -1963,10 +2028,10 @@ class _SessionNoteCardState extends State<_SessionNoteCard>
                                 note.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: AppTypography.bodyLargeBold.copyWith(
+                                style: theme.bodyLargeBold.copyWith(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
+                                  color: theme.ink,
                                 ),
                               ),
                             ),
@@ -1984,10 +2049,10 @@ class _SessionNoteCardState extends State<_SessionNoteCard>
                           subtitleText,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodySmall.copyWith(
+                          style: theme.bodySmall.copyWith(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: const Color(0xFF5B4B7A),
+                            color: theme.textSecondary,
                           ),
                         ),
                       ],
@@ -2000,19 +2065,19 @@ class _SessionNoteCardState extends State<_SessionNoteCard>
                       fit: BoxFit.scaleDown,
                       child: Text(
                         amountFormatted,
-                        style: AppTypography.bodyLargeBold.copyWith(
+                        style: theme.bodyLargeBold.copyWith(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
+                          color: theme.ink,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const CustomPaint(
-                    size: Size(18, 18),
+                  CustomPaint(
+                    size: const Size(18, 18),
                     painter: CustomChevronRightPainter(
-                      color: AppColors.ink,
+                      color: theme.ink,
                       strokeWidth: 3.0,
                     ),
                   ),
@@ -2118,26 +2183,26 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
     super.dispose();
   }
 
-  Color _badgeBackground(_TimelineNodeKind kind) {
+  Color _badgeBackground(_TimelineNodeKind kind, PutarTheme theme) {
     switch (kind) {
       case _TimelineNodeKind.flagMint:
-        return AppColors.mint;
+        return theme.accentMint;
       case _TimelineNodeKind.gameYellow:
-        return AppColors.matahari;
+        return theme.secondary;
       case _TimelineNodeKind.receiptBlue:
-        return AppColors.langit;
+        return theme.accentBlue;
       case _TimelineNodeKind.deletedCoral:
-        return AppColors.tomat;
+        return theme.danger;
     }
   }
 
-  Widget _buildNodeIcon(_TimelineEntry entry) {
+  Widget _buildNodeIcon(_TimelineEntry entry, PutarTheme theme) {
     switch (entry.kind) {
       case _TimelineNodeKind.flagMint:
-        return const CustomPaint(
-          size: Size(16, 16),
+        return CustomPaint(
+          size: const Size(16, 16),
           painter: CustomFlagPainter(
-            color: AppColors.ink,
+            color: theme.ink,
             strokeWidth: 2.8,
           ),
         );
@@ -2147,18 +2212,18 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
           size: 15,
         );
       case _TimelineNodeKind.receiptBlue:
-        return const CustomPaint(
-          size: Size(16, 16),
+        return CustomPaint(
+          size: const Size(16, 16),
           painter: CustomReceiptPainter(
-            color: AppColors.ink,
+            color: theme.ink,
             strokeWidth: 2.8,
           ),
         );
       case _TimelineNodeKind.deletedCoral:
-        return const CustomPaint(
-          size: Size(15, 15),
+        return CustomPaint(
+          size: const Size(15, 15),
           painter: CustomTrashPainter(
-            color: AppColors.ink,
+            color: theme.ink,
             strokeWidth: 2.6,
           ),
         );
@@ -2167,6 +2232,7 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.putarTheme;
     final entry = widget.entry;
     final clock = GroupDateDetailScreen.formatDotTime(entry.timestamp);
     final semanticLabel =
@@ -2207,10 +2273,10 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
                       child: Text(
                         clock,
                         textAlign: TextAlign.right,
-                        style: AppTypography.buttonSmall.copyWith(
+                        style: theme.buttonSmall.copyWith(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF5B4B7A),
+                          color: theme.textSecondary,
                         ),
                       ),
                     ),
@@ -2229,19 +2295,22 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
                         bottom: 0,
                         child: Container(
                           width: 3,
-                          color: AppColors.ink,
+                          color: theme.ink,
                         ),
                       ),
                       Container(
                         width: 27,
                         height: 27,
                         decoration: BoxDecoration(
-                          color: _badgeBackground(entry.kind),
+                          color: _badgeBackground(entry.kind, theme),
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.ink, width: 3),
+                          border: Border.all(
+                            color: theme.ink,
+                            width: theme.borderWidth,
+                          ),
                         ),
                         alignment: Alignment.center,
-                        child: _buildNodeIcon(entry),
+                        child: _buildNodeIcon(entry, theme),
                       ),
                     ],
                   ),
@@ -2258,13 +2327,16 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppColors.ink, width: 3),
-                        boxShadow: const [
+                        color: theme.surface,
+                        borderRadius: BorderRadius.circular(theme.cardRadius),
+                        border: Border.all(
+                          color: theme.ink,
+                          width: theme.borderWidth,
+                        ),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(2, 2),
+                            color: theme.ink,
+                            offset: theme.miniShadowOffset,
                             blurRadius: 0,
                           ),
                         ],
@@ -2287,10 +2359,10 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
                               children: [
                                 Text.rich(
                                   TextSpan(
-                                    style: AppTypography.bodySmall.copyWith(
+                                    style: theme.bodySmall.copyWith(
                                       fontSize: 13,
                                       height: 1.25,
-                                      color: AppColors.ink,
+                                      color: theme.ink,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     children: [
@@ -2316,11 +2388,11 @@ class _TimelineNodeRowState extends State<_TimelineNodeRow>
                                   const SizedBox(height: 1),
                                   Text(
                                     entry.subtitle!,
-                                    style: AppTypography.bodySmall.copyWith(
+                                    style: theme.bodySmall.copyWith(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       height: 1.25,
-                                      color: const Color(0xFF5B4B7A),
+                                      color: theme.textSecondary,
                                     ),
                                   ),
                                 ],

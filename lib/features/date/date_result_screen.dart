@@ -5,12 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/widgets/sticker_card.dart';
 import '../../core/widgets/sticker_button.dart';
 import '../../core/painters/sticker_icons.dart';
 import '../../core/painters/confetti_painter.dart';
+import '../../core/painters/mochi_painter.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../data/database.dart';
@@ -104,10 +104,11 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = context.putarTheme;
     if (_loading || _dateRecord == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.cream,
-        body: Center(child: CircularProgressIndicator(color: AppColors.ink)),
+      return Scaffold(
+        backgroundColor: t.bg,
+        body: Center(child: CircularProgressIndicator(color: t.ink)),
       );
     }
 
@@ -115,14 +116,23 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
     final isPassed = totalSpent <= _dateRecord!.budget;
     final diff = (_dateRecord!.budget - totalSpent).abs();
 
-    final bgColor = isPassed ? AppColors.mint : AppColors.tomat;
+    final bgColor = t.mascot != null
+        ? (isPassed ? t.accentPink : t.softDangerBg)
+        : (isPassed ? t.success : t.danger);
 
     return Scaffold(
       backgroundColor: bgColor,
       body: Stack(
         children: [
           // Konfeti jatuh jika Lolos
-          if (isPassed) const Positioned.fill(child: ConfettiField(particleCount: 50)),
+          if (isPassed)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: t.celebration == PutarCelebrationStyle.hearts
+                  ? const HeartConfettiField(particleCount: 28)
+                  : const ConfettiField(particleCount: 50),
+            ),
+          ),
 
           SafeArea(
             child: SingleChildScrollView(
@@ -132,59 +142,90 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
                 children: [
                   const SizedBox(height: 16),
 
-                  // Stempel Matahari Centang (Lolos) atau Silang (Lewat)
-                  AnimatedBuilder(
-                    animation: _stampController,
-                    builder: (context, child) {
-                      return Transform.rotate(
-                        angle: _rotationAnimation.value,
-                        child: Transform.scale(
-                          scale: _scaleAnimation.value,
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 140,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: AppColors.matahari,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink, width: 4.5),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(5, 5),
-                            blurRadius: 0,
+                  // Stempel Matahari / Maskot Mochi Lolos atau Lewat
+                  if (t.mascot == PutarMascotKind.mochi)
+                    AnimatedBuilder(
+                      animation: _stampController,
+                      builder: (context, child) {
+                        final reduceMotion =
+                            MediaQuery.maybeDisableAnimationsOf(context) ??
+                                false;
+                        final jumpDy = isPassed && !reduceMotion
+                            ? -14.0 *
+                                math
+                                    .sin(_stampController.value * math.pi)
+                                    .clamp(0.0, 1.0)
+                            : 0.0;
+                        return Transform.translate(
+                          offset: Offset(0, jumpDy),
+                          child: Transform.scale(
+                            scale: reduceMotion ? 1.0 : _scaleAnimation.value,
+                            child: child,
                           ),
-                        ],
+                        );
+                      },
+                      child: MochiWidget(
+                        size: 170,
+                        expression: isPassed
+                            ? MochiExpression.happy
+                            : MochiExpression.sad,
+                        animate: !(MediaQuery.maybeDisableAnimationsOf(context) ??
+                            false),
                       ),
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: 72,
-                        height: 72,
-                        child: CustomPaint(
-                          painter: isPassed
-                              ? const CustomCheckIconPainter(
-                                  color: AppColors.ink,
-                                  strokeWidth: 5.5,
-                                )
-                              : const CustomCloseIconPainter(
-                                  color: AppColors.ink,
-                                  strokeWidth: 5.5,
-                                ),
+                    )
+                  else
+                    AnimatedBuilder(
+                      animation: _stampController,
+                      builder: (context, child) {
+                        return Transform.rotate(
+                          angle: _rotationAnimation.value,
+                          child: Transform.scale(
+                            scale: _scaleAnimation.value,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: t.secondary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: t.ink, width: 4.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: t.ink,
+                              offset: const Offset(5, 5),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: CustomPaint(
+                            painter: isPassed
+                                ? CustomCheckIconPainter(
+                                    color: t.ink,
+                                    strokeWidth: 5.5,
+                                  )
+                                : CustomCloseIconPainter(
+                                    color: t.ink,
+                                    strokeWidth: 5.5,
+                                  ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   const SizedBox(height: 28),
 
                   // Teks "Lolos budget!" / "Budget lewat!"
                   Text(
-                    isPassed ? 'Lolos budget!' : 'Budget lewat!',
-                    style: AppTypography.displayLarge.copyWith(
+                    isPassed ? 'Lolos budget!' : t.text(PutarCopyKeys.budgetOverShort),
+                    style: t.displayLarge.copyWith(
                       fontSize: 38,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -193,8 +234,8 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
                   // "Kamu hemat" / "Budget lewat"
                   Text(
                     isPassed ? 'Kamu hemat' : 'Melebihi budget',
-                    style: AppTypography.bodyLargeBold.copyWith(
-                      color: AppColors.ink.withValues(alpha: 0.85),
+                    style: t.bodyLargeBold.copyWith(
+                      color: t.ink.withValues(alpha: 0.85),
                       fontSize: 18,
                     ),
                   ),
@@ -203,9 +244,9 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
                   // Angka besar RpX
                   Text(
                     RupiahFormatter.format(diff),
-                    style: AppTypography.displayLarge.copyWith(
+                    style: t.displayLarge.copyWith(
                       fontSize: 44,
-                      color: AppColors.ink,
+                      color: t.ink,
                       letterSpacing: -1.2,
                     ),
                   ),
@@ -213,9 +254,9 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
 
                   // Kartu Ringkasan 3 Kolom (Budget, Terpakai, Jajan)
                   StickerCard(
-                    backgroundColor: AppColors.surface.withValues(alpha: 0.92),
-                    borderRadius: 22,
-                    borderWidth: 3.5,
+                    backgroundColor: t.surface.withValues(alpha: 0.92),
+                    borderRadius: t.cardRadius,
+                    borderWidth: t.heroBorderWidth,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -226,63 +267,63 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
                             children: [
                               Text(
                                 'Budget',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
+                                style: t.bodySmall.copyWith(
+                                  color: t.textSecondary,
+                                  fontWeight: t.weightBold,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 RupiahFormatter.format(_dateRecord!.budget),
-                                style: AppTypography.bodyLargeBold.copyWith(
+                                style: t.bodyLargeBold.copyWith(
                                   fontSize: 15,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(width: 2.5, height: 38, color: AppColors.ink),
+                        Container(width: 2.5, height: 38, color: t.ink),
                         // Kolom 2: Terpakai
                         Expanded(
                           child: Column(
                             children: [
                               Text(
                                 'Terpakai',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
+                                style: t.bodySmall.copyWith(
+                                  color: t.textSecondary,
+                                  fontWeight: t.weightBold,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 RupiahFormatter.format(totalSpent),
-                                style: AppTypography.bodyLargeBold.copyWith(
+                                style: t.bodyLargeBold.copyWith(
                                   fontSize: 15,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(width: 2.5, height: 38, color: AppColors.ink),
+                        Container(width: 2.5, height: 38, color: t.ink),
                         // Kolom 3: Jajan
                         Expanded(
                           child: Column(
                             children: [
                               Text(
                                 'Jajan',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
+                                style: t.bodySmall.copyWith(
+                                  color: t.textSecondary,
+                                  fontWeight: t.weightBold,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '${_items.length} item',
-                                style: AppTypography.bodyLargeBold.copyWith(
+                                style: t.bodyLargeBold.copyWith(
                                   fontSize: 15,
-                                  color: AppColors.ink,
+                                  color: t.ink,
                                 ),
                               ),
                             ],
@@ -296,8 +337,8 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
                   // Tombol "Bagikan hasil"
                   StickerButton.large(
                     text: 'Bagikan hasil',
-                    backgroundColor: AppColors.matahari,
-                    textColor: AppColors.ink,
+                    backgroundColor: t.secondary,
+                    textColor: t.ink,
                     onPressed: () => _shareResult(isPassed, diff),
                   ),
                   const SizedBox(height: 16),
@@ -312,11 +353,11 @@ class _DateResultScreenState extends ConsumerState<DateResultScreen>
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         'Putar lagi minggu depan',
-                        style: AppTypography.bodyLargeBold.copyWith(
-                          color: AppColors.ink,
+                        style: t.bodyLargeBold.copyWith(
+                          color: t.ink,
                           fontSize: 16,
                           decoration: TextDecoration.underline,
-                          decorationColor: AppColors.ink,
+                          decorationColor: t.ink,
                         ),
                       ),
                     ),

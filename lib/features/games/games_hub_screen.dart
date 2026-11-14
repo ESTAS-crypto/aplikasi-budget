@@ -11,8 +11,7 @@ import '../../core/group/services/group_service.dart';
 import '../../core/group/widgets/scope_switcher.dart';
 import '../../core/painters/game_icons_painter.dart';
 import '../../core/painters/sticker_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/putar_theme.dart';
 import '../../core/utils/rupiah_formatter.dart';
 import '../../core/utils/sound_service.dart';
 import '../../core/widgets/sticker_button.dart';
@@ -91,6 +90,7 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
       return const GroupGamesHubView();
     }
 
+    final t = context.putarTheme;
     final isGroupMode = currentScope == AppScope.grup;
 
     final activeDateAsync = ref.watch(activeDateStreamProvider);
@@ -105,7 +105,7 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
             : null);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: t.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -123,19 +123,19 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       children: [
                         Text(
                           isGroupMode ? 'Main bareng teman di grup' : 'Malam ini mau main apa?',
-                          style: AppTypography.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                          style: t.bodyMedium.copyWith(
+                            fontWeight: t.weightBold,
+                            color: t.textSecondary,
                             fontSize: 14,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           isGroupMode ? 'Permainan Grup' : 'Pilih permainan',
-                          style: AppTypography.displayMedium.copyWith(
+                          style: t.displayMedium.copyWith(
                             fontSize: 30,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                       ],
@@ -160,22 +160,25 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: t.surface,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.ink, width: 2.5),
-                              boxShadow: const [
+                              border: Border.all(
+                                color: t.ink,
+                                width: t.subtleBorderWidth,
+                              ),
+                              boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.ink,
-                                  offset: Offset(3, 3),
+                                  color: t.shadowColor,
+                                  offset: t.smallShadowOffset,
                                   blurRadius: 0,
                                 ),
                               ],
                             ),
                             alignment: Alignment.center,
-                            child: const CustomPaint(
-                              size: Size(20, 20),
+                            child: CustomPaint(
+                              size: const Size(20, 20),
                               painter: CustomBellPainter(
-                                color: AppColors.ink,
+                                color: t.ink,
                                 strokeWidth: 2.5,
                               ),
                             ),
@@ -189,17 +192,17 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                                 height: 18,
                                 padding: const EdgeInsets.symmetric(horizontal: 4),
                                 decoration: BoxDecoration(
-                                  color: AppColors.tomat,
+                                  color: t.danger,
                                   borderRadius: BorderRadius.circular(9),
-                                  border: Border.all(color: AppColors.ink, width: 1.8),
+                                  border: Border.all(color: t.ink, width: 1.8),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   '$unreadCount',
-                                  style: AppTypography.buttonSmall.copyWith(
+                                  style: t.buttonSmall.copyWith(
                                     fontSize: 10,
-                                    color: AppColors.surface,
-                                    fontWeight: FontWeight.w800,
+                                    color: t.surface,
+                                    fontWeight: t.weightExtraBold,
                                     height: 1.1,
                                   ),
                                 ),
@@ -222,21 +225,24 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: t.surface,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.ink, width: 2.5),
-                          boxShadow: const [
+                          border: Border.all(
+                            color: t.ink,
+                            width: t.subtleBorderWidth,
+                          ),
+                          boxShadow: [
                             BoxShadow(
-                              color: AppColors.ink,
-                              offset: Offset(3, 3),
+                              color: t.shadowColor,
+                              offset: t.smallShadowOffset,
                               blurRadius: 0,
                             ),
                           ],
                         ),
                         padding: const EdgeInsets.all(9),
-                        child: const CustomPaint(
+                        child: CustomPaint(
                           painter: CustomSettingsIconPainter(
-                            color: AppColors.ink,
+                            color: t.ink,
                             strokeWidth: 2.5,
                           ),
                         ),
@@ -273,25 +279,25 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      color: t.secondary,
+                      borderRadius: BorderRadius.circular(t.smallCardRadius),
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(3, 3),
+                          color: t.shadowColor,
+                          offset: t.smallShadowOffset,
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 20,
                           height: 20,
                           child: CustomPaint(
                             painter: CustomWarningIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.5,
                             ),
                           ),
@@ -303,28 +309,28 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                             children: [
                               Text(
                                 'Ada date yang sedang berjalan!',
-                                style: AppTypography.bodySmall.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
+                                style: t.bodySmall.copyWith(
+                                  fontWeight: t.weightExtraBold,
+                                  color: t.ink,
                                   fontSize: 13,
                                 ),
                               ),
                               Text(
                                 'Budget: ${RupiahFormatter.format(activeDate.budget)} · Ketuk untuk buka Catatan',
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.ink,
+                                style: t.bodySmall.copyWith(
+                                  color: t.ink,
                                   fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(
+                        SizedBox(
                           width: 14,
                           height: 14,
                           child: CustomPaint(
                             painter: CustomForwardIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 3.0,
                             ),
                           ),
@@ -342,11 +348,15 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: AppColors.mint.withValues(alpha: 0.25),
+                      color: t.success.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.ink, width: 2.2),
-                      boxShadow: const [
-                        BoxShadow(color: AppColors.ink, offset: Offset(2.5, 2.5), blurRadius: 0),
+                      border: Border.all(color: t.ink, width: 2.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: t.shadowColor,
+                          offset: const Offset(2.5, 2.5),
+                          blurRadius: 0,
+                        ),
                       ],
                     ),
                     child: Row(
@@ -354,11 +364,17 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: AppColors.mint,
+                            color: t.success,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.ink, width: 1.5),
+                            border: Border.all(color: t.ink, width: 1.5),
                           ),
-                          child: const Icon(Icons.groups_rounded, size: 20, color: AppColors.ink),
+                          child: CustomPaint(
+                            size: const Size(20, 20),
+                            painter: CustomGroupsIconPainter(
+                              color: t.ink,
+                              strokeWidth: 2.3,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -367,11 +383,17 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                             children: [
                               Text(
                                 'Grup: ${group.name}',
-                                style: AppTypography.buttonSmall.copyWith(fontSize: 13, fontWeight: FontWeight.w800),
+                                style: t.buttonSmall.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: t.weightExtraBold,
+                                ),
                               ),
                               Text(
                                 'Kode: ${group.code} · ${group.budgetMode == "fixed" ? "Mode Angka Tetap" : "Mode Putar Roda"}',
-                                style: AppTypography.bodySmall.copyWith(fontSize: 11, color: AppColors.textSecondary),
+                                style: t.bodySmall.copyWith(
+                                  fontSize: 11,
+                                  color: t.textSecondary,
+                                ),
                               ),
                             ],
                           ),
@@ -384,13 +406,16 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: t.surface,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.ink, width: 1.8),
+                              border: Border.all(color: t.ink, width: 1.8),
                             ),
                             child: Text(
                               'Kelola',
-                              style: AppTypography.buttonSmall.copyWith(fontSize: 11, fontWeight: FontWeight.w800),
+                              style: t.buttonSmall.copyWith(
+                                fontSize: 11,
+                                fontWeight: t.weightExtraBold,
+                              ),
                             ),
                           ),
                         ),
@@ -402,11 +427,15 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     padding: const EdgeInsets.all(16),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
-                        BoxShadow(color: AppColors.ink, offset: Offset(3, 3), blurRadius: 0),
+                      color: t.surface,
+                      borderRadius: BorderRadius.circular(t.smallCardRadius),
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
+                        BoxShadow(
+                          color: t.shadowColor,
+                          offset: t.smallShadowOffset,
+                          blurRadius: 0,
+                        ),
                       ],
                     ),
                     child: Column(
@@ -414,25 +443,25 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       children: [
                         Text(
                           'Belum Ada Grup Aktif',
-                          style: AppTypography.titleMedium.copyWith(
+                          style: t.titleMedium.copyWith(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Buat grup atau masukkan kode undangan untuk bermain bersama teman.',
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: t.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 12),
                         StickerButton.large(
                           text: 'BUAT ATAU GABUNG GRUP',
-                          backgroundColor: AppColors.mint,
-                          textColor: AppColors.ink,
+                          backgroundColor: t.success,
+                          textColor: t.ink,
                           onPressed: () {
                             context.push('/group/join-or-create');
                           },
@@ -450,7 +479,7 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     ? 'Mode aktif! Putar roda bersama anggota secara live dan sinkron.'
                     : 'Klasik. Putar roda, terima nasib.',
                 badgeText: isGroupMode ? '🟢 AKTIF & SINKRON' : 'Favorit',
-                badgeColor: isGroupMode ? AppColors.mint : AppColors.surface,
+                badgeColor: isGroupMode ? t.success : t.surface,
                 onTap: isGroupMode
                     ? () {
                         SoundService.instance.play(Sfx.uiTap);
@@ -469,10 +498,10 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       subtitle: isGroupMode
                           ? 'Dua dadu dikali nominal budget.'
                           : 'Dua dadu, hasilnya dikali nominal.',
-                      backgroundColor: AppColors.langit,
+                      backgroundColor: t.accentBlue,
                       gameType: GameType.dice,
                       badgeText: isGroupMode ? '🛠️ SEGERA HADIR' : null,
-                      badgeColor: AppColors.matahari,
+                      badgeColor: t.secondary,
                       isDimmed: isGroupMode,
                       onTap: isGroupMode
                           ? () => _showGameUpcomingModal(
@@ -491,10 +520,10 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       subtitle: isGroupMode
                           ? 'Tarik tuas gacha live bareng anggota.'
                           : 'Putar tuas, kapsul jatuh.',
-                      backgroundColor: AppColors.permen,
+                      backgroundColor: t.accentPink,
                       gameType: GameType.capsule,
                       badgeText: isGroupMode ? '🛠️ SEGERA HADIR' : null,
-                      badgeColor: AppColors.matahari,
+                      badgeColor: t.secondary,
                       isDimmed: isGroupMode,
                       onTap: isGroupMode
                           ? () => _showGameUpcomingModal(
@@ -517,10 +546,10 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       subtitle: isGroupMode
                           ? 'Tiga amplop misteri pilihan anggota.'
                           : 'Tiga amplop, satu pilihan.',
-                      backgroundColor: AppColors.mint,
+                      backgroundColor: t.accentMint,
                       gameType: GameType.envelope,
                       badgeText: isGroupMode ? '🛠️ SEGERA HADIR' : null,
-                      badgeColor: AppColors.matahari,
+                      badgeColor: t.secondary,
                       isDimmed: isGroupMode,
                       onTap: isGroupMode
                           ? () => _showGameUpcomingModal(
@@ -539,10 +568,10 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       subtitle: isGroupMode
                           ? 'Tebak koin bareng melipatgandakan budget.'
                           : 'Gandakan atau setengah.',
-                      backgroundColor: AppColors.jeruk,
+                      backgroundColor: t.accentOrange,
                       gameType: GameType.coin,
                       badgeText: isGroupMode ? '🛠️ SEGERA HADIR' : null,
-                      badgeColor: AppColors.matahari,
+                      badgeColor: t.secondary,
                       isDimmed: isGroupMode,
                       onTap: isGroupMode
                           ? () => _showGameUpcomingModal(
@@ -561,10 +590,10 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
               // Tombol Acak Aja
               StickerButton(
                 height: 58,
-                borderRadius: 29,
-                backgroundColor: AppColors.ink,
-                textColor: AppColors.cream,
-                shadowColor: AppColors.disabled,
+                borderRadius: t.pillButtonRadius,
+                backgroundColor: t.ink,
+                textColor: t.bg,
+                shadowColor: t.textDisabled,
                 onPressed: () {
                   if (isGroupMode) {
                     SoundService.instance.play(Sfx.uiTap);
@@ -580,12 +609,12 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 24,
                       height: 24,
                       child: CustomPaint(
                         painter: ShuffleIconPainter(
-                          color: AppColors.matahari,
+                          color: t.secondary,
                           strokeWidth: 2.6,
                         ),
                       ),
@@ -596,10 +625,10 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                         fit: BoxFit.scaleDown,
                         child: Text(
                           'Acak aja, serahkan ke aplikasi',
-                          style: AppTypography.buttonLarge.copyWith(
-                            color: AppColors.cream,
+                          style: t.buttonLarge.copyWith(
+                            color: t.bg,
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: t.weightExtraBold,
                           ),
                         ),
                       ),
@@ -611,20 +640,20 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
 
               // Banner / Tombol Atur Budget Permainan
               StickerCard(
-                backgroundColor: AppColors.surface,
-                borderRadius: 18,
+                backgroundColor: t.surface,
+                borderRadius: t.smallCardRadius,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 20,
                           height: 20,
                           child: CustomPaint(
                             painter: CustomSettingsIconPainter(
-                              color: AppColors.ink,
+                              color: t.ink,
                               strokeWidth: 2.8,
                             ),
                           ),
@@ -633,9 +662,9 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                         Expanded(
                           child: Text(
                             'Kustomisasi Budget Game',
-                            style: AppTypography.titleMedium.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
+                            style: t.titleMedium.copyWith(
+                              fontWeight: t.weightExtraBold,
+                              color: t.ink,
                               fontSize: 15,
                             ),
                           ),
@@ -645,8 +674,8 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     const SizedBox(height: 6),
                     Text(
                       'Mau atur uang di roda, kapsul, amplop, atau kelipatan dadu? Pilih game di bawah:',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
+                      style: t.bodySmall.copyWith(
+                        color: t.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -655,19 +684,19 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        _buildQuickEditChip('Atur Roda', AppColors.matahari, () {
+                        _buildQuickEditChip('Atur Roda', t.secondary, () {
                           context.push('/custom-wheel?game=wheel');
                         }),
-                        _buildQuickEditChip('Atur Kapsul', AppColors.permen, () {
+                        _buildQuickEditChip('Atur Kapsul', t.accentPink, () {
                           context.push('/custom-wheel?game=capsule');
                         }),
-                        _buildQuickEditChip('Atur Amplop', AppColors.mint, () {
+                        _buildQuickEditChip('Atur Amplop', t.accentMint, () {
                           context.push('/custom-wheel?game=envelope');
                         }),
-                        _buildQuickEditChip('Atur Dadu', AppColors.langit, () {
+                        _buildQuickEditChip('Atur Dadu', t.accentBlue, () {
                           context.push('/dice-game');
                         }),
-                        _buildQuickEditChip('Atur Koin', AppColors.jeruk, () {
+                        _buildQuickEditChip('Atur Koin', t.accentOrange, () {
                           context.push('/custom-wheel?game=coin');
                         }),
                       ],
@@ -684,6 +713,7 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
   }
 
   Widget _buildQuickEditChip(String label, Color color, VoidCallback onTap) {
+    final t = context.putarTheme;
     return GestureDetector(
       onTap: () {
         SoundService.instance.play(Sfx.uiTap);
@@ -693,12 +723,12 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: AppColors.ink, width: 2),
-          boxShadow: const [
+          borderRadius: BorderRadius.circular(t.chipRadius),
+          border: Border.all(color: t.ink, width: 2),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(2, 2),
+              color: t.shadowColor,
+              offset: t.miniShadowOffset,
               blurRadius: 0,
             ),
           ],
@@ -706,12 +736,12 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 14,
               height: 14,
               child: CustomPaint(
                 painter: CustomSettingsIconPainter(
-                  color: AppColors.ink,
+                  color: t.ink,
                   strokeWidth: 2.2,
                 ),
               ),
@@ -719,9 +749,9 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
             const SizedBox(width: 6),
             Text(
               label,
-              style: AppTypography.chipLabel.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
+              style: t.chipLabel.copyWith(
+                fontWeight: t.weightExtraBold,
+                color: t.ink,
                 fontSize: 12,
               ),
             ),
@@ -735,11 +765,12 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
     String title = 'Roda Putar',
     String subtitle = 'Klasik. Putar roda, terima nasib.',
     String badgeText = 'Favorit',
-    Color badgeColor = AppColors.surface,
+    Color? badgeColor,
     VoidCallback? onTap,
   }) {
+    final t = context.putarTheme;
     return StickerCard.hero(
-      backgroundColor: AppColors.matahari,
+      backgroundColor: t.secondary,
       padding: const EdgeInsets.all(18),
       onTap: onTap ?? () => _navigateToGame(GameType.wheel),
       child: Stack(
@@ -754,19 +785,19 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                   children: [
                     Text(
                       title,
-                      style: AppTypography.titleLarge.copyWith(
+                      style: t.titleLarge.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
+                        fontWeight: t.weightSemiBold,
+                        color: t.ink,
                         height: 1.3,
                       ),
                     ),
@@ -790,7 +821,7 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                   child: RepaintBoundary(
                     child: CustomPaint(
                       size: const Size(96, 96),
-                      painter: const _MiniWheelPainter(),
+                      painter: _MiniWheelPainter(t),
                     ),
                   ),
                 ),
@@ -805,16 +836,16 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
               decoration: BoxDecoration(
-                color: badgeColor,
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: AppColors.ink, width: 2),
+                color: badgeColor ?? t.surface,
+                borderRadius: BorderRadius.circular(t.chipRadius),
+                border: Border.all(color: t.ink, width: 2),
               ),
               child: Text(
                 badgeText,
-                style: AppTypography.chipLabel.copyWith(
+                style: t.chipLabel.copyWith(
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
+                  fontWeight: t.weightExtraBold,
+                  color: t.ink,
                 ),
               ),
             ),
@@ -830,10 +861,11 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
     required Color backgroundColor,
     required GameType gameType,
     String? badgeText,
-    Color badgeColor = AppColors.surface,
+    Color? badgeColor,
     bool isDimmed = false,
     VoidCallback? onTap,
   }) {
+    final t = context.putarTheme;
     return Opacity(
       opacity: isDimmed ? 0.75 : 1.0,
       child: StickerCard(
@@ -857,19 +889,19 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                 const SizedBox(height: 6),
                 Text(
                   title,
-                  style: AppTypography.titleMedium.copyWith(
+                  style: t.titleMedium.copyWith(
                     fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
+                    fontWeight: t.weightExtraBold,
+                    color: t.ink,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: AppTypography.bodySmall.copyWith(
+                  style: t.bodySmall.copyWith(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
+                    fontWeight: t.weightSemiBold,
+                    color: t.ink,
                     height: 1.3,
                   ),
                 ),
@@ -882,16 +914,16 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: AppColors.ink, width: 2),
+                    color: badgeColor ?? t.surface,
+                    borderRadius: BorderRadius.circular(t.chipRadius),
+                    border: Border.all(color: t.ink, width: 2),
                   ),
                   child: Text(
                     badgeText,
-                    style: AppTypography.chipLabel.copyWith(
+                    style: t.chipLabel.copyWith(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.ink,
+                      color: t.ink,
                     ),
                   ),
                 ),
@@ -916,17 +948,18 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
+        final t = ctx.putarTheme;
         return Container(
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.ink, width: 3),
-            boxShadow: const [
+            border: Border.all(color: t.ink, width: t.borderWidth),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.ink,
-                offset: Offset(4, 4),
+                color: t.shadowColor,
+                offset: t.standardShadowOffset,
                 blurRadius: 0,
               ),
             ],
@@ -940,16 +973,16 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: AppColors.matahari,
+                      color: t.secondary,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.ink, width: 2),
+                      border: Border.all(color: t.ink, width: 2),
                     ),
                     child: Text(
                       '🛠️ MODE GRUP DALAM PENGEMBANGAN',
-                      style: AppTypography.buttonSmall.copyWith(
+                      style: t.buttonSmall.copyWith(
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.ink,
+                        color: t.ink,
                       ),
                     ),
                   ),
@@ -959,11 +992,17 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: t.surface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.ink, width: 2),
+                        border: Border.all(color: t.ink, width: 2),
                       ),
-                      child: const Icon(Icons.close, size: 18, color: AppColors.ink),
+                      child: CustomPaint(
+                        size: const Size(18, 18),
+                        painter: CustomCloseIconPainter(
+                          color: t.ink,
+                          strokeWidth: 2.6,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -975,13 +1014,13 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppColors.langit,
+                      color: t.accentBlue,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.ink, width: 2.5),
-                      boxShadow: const [
+                      border: Border.all(color: t.ink, width: t.subtleBorderWidth),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(2.5, 2.5),
+                          color: t.shadowColor,
+                          offset: const Offset(2.5, 2.5),
                           blurRadius: 0,
                         ),
                       ],
@@ -996,18 +1035,18 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
                       children: [
                         Text(
                           gameName,
-                          style: AppTypography.titleLarge.copyWith(
+                          style: t.titleLarge.copyWith(
                             fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
+                            fontWeight: t.weightExtraBold,
+                            color: t.ink,
                           ),
                         ),
                         Text(
                           'Multiplayer Realtime',
-                          style: AppTypography.bodySmall.copyWith(
+                          style: t.bodySmall.copyWith(
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
+                            fontWeight: t.weightSemiBold,
+                            color: t.textSecondary,
                           ),
                         ),
                       ],
@@ -1019,37 +1058,37 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.cream,
+                  color: t.bg,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.ink, width: 1.8),
+                  border: Border.all(color: t.ink, width: 1.8),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Fitur multiplayer realtime untuk $gameName sedang dalam tahap pengembangan & uji kestabilan sinkronisasi server.',
-                      style: AppTypography.bodyMedium.copyWith(
+                      style: t.bodyMedium.copyWith(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
+                        fontWeight: t.weightSemiBold,
+                        color: t.ink,
                         height: 1.4,
                       ),
                     ),
                     const SizedBox(height: 10),
                     Text(
                       'Saat ini di mode grup kamu sudah bisa menikmati:',
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
+                        fontWeight: t.weightExtraBold,
+                        color: t.ink,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '• 🎯 Putar Jajan (Roda) — Sinkron live 100% antar-anggota\n• 💰 Mode Angka Tetap — Budget pasti tanpa undian',
-                      style: AppTypography.bodySmall.copyWith(
+                      style: t.bodySmall.copyWith(
                         fontSize: 12,
-                        color: AppColors.ink,
+                        color: t.ink,
                         height: 1.4,
                       ),
                     ),
@@ -1059,8 +1098,8 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
               const SizedBox(height: 20),
               StickerButton.large(
                 text: 'MAINKAN PUTAR RODA BERSAMA',
-                backgroundColor: AppColors.mint,
-                textColor: AppColors.ink,
+                backgroundColor: t.success,
+                textColor: t.ink,
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   ref.read(appScopeProvider.notifier).state = AppScope.grup;
@@ -1070,9 +1109,9 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
               const SizedBox(height: 8),
               StickerButton.large(
                 text: 'MENGERTI',
-                backgroundColor: AppColors.surface,
-                textColor: AppColors.ink,
-                borderColor: AppColors.ink,
+                backgroundColor: t.surface,
+                textColor: t.ink,
+                borderColor: t.ink,
                 onPressed: () => Navigator.of(ctx).pop(),
               ),
             ],
@@ -1085,18 +1124,9 @@ class _GamesHubScreenState extends ConsumerState<GamesHubScreen>
 
 /// Mini Roda 96x96 untuk kartu hero Games Hub
 class _MiniWheelPainter extends CustomPainter {
-  const _MiniWheelPainter();
+  final PutarTheme theme;
 
-  static const List<Color> _palette = [
-    Color(0xFFFF6B5A), // Tomat
-    Color(0xFFFF9F1C), // Jeruk
-    Color(0xFFFFD23F), // Matahari
-    Color(0xFF3DDBB0), // Mint
-    Color(0xFF6FB1FF), // Langit
-    Color(0xFFB8A4FF), // Lavender
-    Color(0xFFFF8FC0), // Permen
-    Color(0xFFB8E986), // Lemon
-  ];
+  const _MiniWheelPainter(this.theme);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1104,12 +1134,12 @@ class _MiniWheelPainter extends CustomPainter {
     final radius = (size.width / 2) - 2.0;
 
     final borderPaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
 
     final linePaint = Paint()
-      ..color = AppColors.ink
+      ..color = theme.ink
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
@@ -1118,7 +1148,7 @@ class _MiniWheelPainter extends CustomPainter {
     for (int i = 0; i < 8; i++) {
       final startAngle = i * sweepAngle;
       final fillPaint = Paint()
-        ..color = _palette[i]
+        ..color = theme.getWheelColor(i)
         ..style = PaintingStyle.fill;
 
       final path = Path()
@@ -1139,11 +1169,12 @@ class _MiniWheelPainter extends CustomPainter {
     canvas.drawCircle(center, radius, borderPaint);
 
     // Center hub
-    canvas.drawCircle(center, 12, Paint()..color = AppColors.surface);
+    canvas.drawCircle(center, 12, Paint()..color = theme.surface);
     canvas.drawCircle(center, 12, borderPaint);
-    canvas.drawCircle(center, 4, Paint()..color = AppColors.ink);
+    canvas.drawCircle(center, 4, Paint()..color = theme.ink);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _MiniWheelPainter oldDelegate) =>
+      oldDelegate.theme.id != theme.id;
 }
